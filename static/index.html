@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сервис коллаборативного позиционирования</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #eeb344 0%, #9be041 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Шапка сайта */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #eeb344, #9be041);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .logo-text span {
+            color: #eeb344;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-name {
+            color: #666;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #eeb344, #9be041);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Основной контент */
+        .main-content {
+            max-width: 1200px;
+            margin: 100px auto 50px;
+            padding: 0 20px;
+        }
+
+        /* Приветственный баннер */
+        .welcome-banner {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .welcome-banner h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .welcome-banner p {
+            font-size: 1.2rem;
+            color: #666;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Центральное меню */
+        .menu-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .menu-item {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-decoration: none;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            border: 2px solid transparent;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            border-color: #667eea;
+        }
+
+        .menu-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #eeb344 0%, #9be041 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .menu-item:hover .menu-icon {
+            transform: scale(1.1);
+        }
+
+        .menu-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .menu-description {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* Статистика */
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* Подвал */
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            color: #666;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .menu-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-section {
+                grid-template-columns: 1fr;
+            }
+
+            .welcome-banner h1 {
+                font-size: 2rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
+        /* Анимации */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .menu-item, .stat-card {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .menu-item:nth-child(1) { animation-delay: 0.1s; }
+        .menu-item:nth-child(2) { animation-delay: 0.2s; }
+        .menu-item:nth-child(3) { animation-delay: 0.3s; }
+        .menu-item:nth-child(4) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <!-- Шапка сайта -->
+    <header class="header">
+    </header>
+
+    <!-- Основной контент -->
+    <main class="main-content">
+        <!-- Приветственный баннер -->
+        <div class="welcome-banner">
+            <h1>Сервис коллаборативного позиционирования</h1>
+            <p>Дай прикурить!</p>
+        </div>
+
+        <!-- Центральное меню -->
+        <div class="menu-container">
+            <div class="menu-grid">
+                <!-- Новости -->
+                <a href="#" class="menu-item" onclick="alert('Переход к новостям')">
+                    <div class="menu-icon">📰</div>
+                    <div class="menu-title">Новости</div>
+                    <div class="menu-description">
+                        Последние обновления системы и новости коллаборативного позиционирования
+                    </div>
+                </a>
+
+                <!-- Обработка измерений -->
+                <a href="#" class="menu-item" onclick="alert('Переход к обработке измерений')">
+                    <div class="menu-icon">📊</div>
+                    <div class="menu-title">Обработка измерений</div>
+                    <div class="menu-description">
+                        Анализ и обработка данных позиционирования в реальном времени
+                    </div>
+                </a>
+
+                <!-- Карта пользователей -->
+                <a href="#" class="menu-item" onclick="alert('Переход к карте пользователей')">
+                    <div class="menu-icon">🗺️</div>
+                    <div class="menu-title">Карта пользователей</div>
+                    <div class="menu-description">
+                        Интерактивная карта с отображением всех активных пользователей
+                    </div>
+                </a>
+
+                <!-- Личный кабинет -->
+                <a href="#" class="menu-item" onclick="alert('Переход в личный кабинет')">
+                    <div class="menu-icon">👤</div>
+                    <div class="menu-title">Личный кабинет</div>
+                    <div class="menu-description">
+                        Управление профилем, настройками и персональными данными
+                    </div>
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="footer">
+        <div class="footer-content">
+            © 2026 Сервис коллаборативного позиционирования. Все права защищены.
+        </div>
+    </footer>
+
+    <script>
+        // Добавляем интерактивности
+        document.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const title = this.querySelector('.menu-title').textContent;
+                console.log(`Переход в раздел: ${title}`);
+                // Здесь будет реальная навигация
+            });
+        });
+
+        // Анимация появления элементов при скролле
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        });
+
+        document.querySelectorAll('.stat-card').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'all 0.5s ease-out';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
