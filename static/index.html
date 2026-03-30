@@ -347,7 +347,7 @@
     <!-- Шапка сайта -->
     <header class="header">
         <div class="header-content">
-            <div class="logo" onclick="window.location.href='index.html'">
+            <div class="logo" onclick="window.location.href='/'">
                 <div class="logo-icon">📡</div>
                 <div class="logo-text">Collab<span>Service</span></div>
             </div>
@@ -396,7 +396,7 @@
                 </div>
 
                 <!-- Личный кабинет -->
-                <div class="menu-item" data-page="profile" data-protected="true">
+                <div class="menu-item" data-page="/api/profile" data-protected="true">
                     <div class="menu-icon">👤</div>
                     <div class="menu-title">Личный кабинет</div>
                     <div class="menu-description">
@@ -479,7 +479,7 @@
             if (token && userLogin) {
                 userInfoDiv.innerHTML = `
                     <span class="user-name">${userLogin}</span>
-                    <div class="user-avatar" onclick="window.location.href='profile.html'">
+                    <div class="user-avatar" onclick="window.location.href='/api/profile'">
                         ${userLogin.charAt(0).toUpperCase()}
                     </div>
                     <button onclick="logout()" style="background: none; border: none; color: #c53030; cursor: pointer; padding: 8px; font-size: 14px;">Выйти</button>
@@ -487,8 +487,8 @@
             } else {
                 userInfoDiv.innerHTML = `
                     <div class="auth-buttons">
-                        <a href="login.html" class="login-link">Вход</a>
-                        <a href="register.html" class="register-link">Регистрация</a>
+                        <a href="/login" class="login-link">Вход</a>
+                        <a href="/register" class="register-link">Регистрация</a>
                     </div>
                 `;
             }
@@ -507,7 +507,7 @@
                     window.location.href = 'map.html';
                     break;
                 case 'profile':
-                    window.location.href = 'profile.html';
+                    window.location.href = '/api/profile';
                     break;
                 default:
                     showNotification('Страница в разработке', true);
@@ -525,7 +525,7 @@
                 if (isProtected && !isAuthenticated()) {
                     showNotification('Для доступа к этому разделу необходимо войти в систему', true);
                     setTimeout(() => {
-                        window.location.href = 'login.html';
+                        window.location.href = '/login';
                     }, 1500);
                     return;
                 }

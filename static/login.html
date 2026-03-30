@@ -190,8 +190,8 @@
             </form>
 
             <div class="auth-footer">
-                Нет аккаунта? <a href="register.html">Зарегистрироваться</a><br>
-                <a href="index.html" style="color: #6c7a6e; font-size: 0.85rem;">← Вернуться на главную</a>
+                Нет аккаунта? <a href="/register">Зарегистрироваться</a><br>
+                <a href="/" style="color: #6c7a6e; font-size: 0.85rem;">← Вернуться на главную</a>
             </div>
         </div>
     </div>
@@ -232,7 +232,7 @@
                     
                     // Перенаправляем в личный кабинет
                     setTimeout(() => {
-                        window.location.href = 'profile.html';
+                        window.location.href = '/api/profile';
                     }, 1000);
                 } else {
                     errorDiv.textContent = data.error || 'Ошибка входа. Проверьте логин и пароль.';

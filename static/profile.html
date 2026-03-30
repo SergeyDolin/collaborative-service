@@ -268,7 +268,7 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <a href="index.html" class="logo">
+            <a href="/" class="logo">
                 <div class="logo-icon">📡</div>
                 <div class="logo-text">Collab<span>Service</span></div>
             </a>
@@ -349,7 +349,7 @@
             const login = localStorage.getItem('userLogin');
             
             if (!token || !login) {
-                window.location.href = 'login.html';
+                window.location.href = '/login';
                 return false;
             }
             
@@ -362,7 +362,7 @@
         function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('userLogin');
-            window.location.href = 'index.html';
+            window.location.href = '/';
         }
         
         // Навигация
@@ -395,7 +395,7 @@
             }
             
             try {
-                const response = await fetch('/profile/password', {
+                const response = await fetch('/api/profile/password', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',

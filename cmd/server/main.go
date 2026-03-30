@@ -67,6 +67,9 @@ func main() {
 	// public route
 	router.Group(func(r chi.Router) {
 		r.Get("/", handlers.IndexHandler(sugar))
+		r.Get("/login", handlers.LoginPageHandler(sugar))
+		r.Get("/register", handlers.RegisterPageHandler(sugar))
+
 		r.Post("/register", handlers.RegisterHandler(dbStor, sugar))
 		r.Post("/login", handlers.LoginHandler(dbStor, jwtService, sugar))
 	})
@@ -74,7 +77,8 @@ func main() {
 	// private route
 	router.Group(func(r chi.Router) {
 		r.Use(middlewares.AuthMiddleware(jwtService, sugar))
-		r.Get("/profile", handlers.ProfileHandler(sugar))
+		r.Get("/profile", handlers.ProfilePageHandler(sugar))
+		r.Get("/api/profile", handlers.ProfileHandler(sugar))
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

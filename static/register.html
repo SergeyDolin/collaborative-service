@@ -187,8 +187,8 @@
             </form>
 
             <div class="auth-footer">
-                Уже есть аккаунт? <a href="login.html">Войти</a><br>
-                <a href="index.html" style="color: #6c7a6e; font-size: 0.85rem;">← Вернуться на главную</a>
+                Уже есть аккаунт? <a href="/login">Войти</a><br>
+                <a href="/" style="color: #6c7a6e; font-size: 0.85rem;">← Вернуться на главную</a>
             </div>
         </div>
     </div>
@@ -236,7 +236,7 @@
                     successDiv.style.display = 'block';
                     
                     setTimeout(() => {
-                        window.location.href = 'login.html';
+                        window.location.href = '/login';
                     }, 1500);
                 } else {
                     errorDiv.textContent = data.error || 'Ошибка регистрации. Возможно, пользователь уже существует.';
