@@ -140,7 +140,7 @@ func LoginHandler(dbStor *storage.DBStorage, jwtService *auth.JWTService, logger
 			return
 		}
 
-		// Check password
+		// Check password - user.Auth.Password должен существовать
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Auth.Password), []byte(authReq.Password)); err != nil {
 			logger.Warnf("Failed login attempt for user: %s", authReq.Login)
 			SendJSONError(res, "Invalid credentials", http.StatusUnauthorized, logger)

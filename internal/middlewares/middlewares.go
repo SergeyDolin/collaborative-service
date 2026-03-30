@@ -68,8 +68,13 @@ func LogMiddleware(logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 func AuthMiddleware(jwtService *auth.JWTService, logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger.Infof("Auth check for: %s", r.URL.Path)
+
 			authHeader := r.Header.Get("Authorization")
+			logger.Infof("Authorization header: %s", authHeader)
+
 			if authHeader == "" {
+				logger.Warn("No authorization header")
 				SendJSONError(w, "Authorization header required", http.StatusUnauthorized, logger)
 				return
 			}

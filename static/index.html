@@ -396,7 +396,7 @@
                 </div>
 
                 <!-- Личный кабинет -->
-                <div class="menu-item" data-page="/api/profile" data-protected="true">
+                <div class="menu-item" data-page="profile" data-protected="true">
                     <div class="menu-icon">👤</div>
                     <div class="menu-title">Личный кабинет</div>
                     <div class="menu-description">
@@ -479,7 +479,7 @@
             if (token && userLogin) {
                 userInfoDiv.innerHTML = `
                     <span class="user-name">${userLogin}</span>
-                    <div class="user-avatar" onclick="window.location.href='/api/profile'">
+                    <div class="user-avatar" onclick="window.location.href='/profile'">
                         ${userLogin.charAt(0).toUpperCase()}
                     </div>
                     <button onclick="logout()" style="background: none; border: none; color: #c53030; cursor: pointer; padding: 8px; font-size: 14px;">Выйти</button>
@@ -507,7 +507,7 @@
                     window.location.href = 'map.html';
                     break;
                 case 'profile':
-                    window.location.href = '/api/profile';
+                    window.location.href = 'profile';
                     break;
                 default:
                     showNotification('Страница в разработке', true);

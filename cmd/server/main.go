@@ -64,20 +64,23 @@ func main() {
 		http.Error(w, "Invalid path format", http.StatusNotFound)
 	})
 
-	// public route
+	// public route HTML
 	router.Group(func(r chi.Router) {
 		r.Get("/", handlers.IndexHandler(sugar))
 		r.Get("/login", handlers.LoginPageHandler(sugar))
 		r.Get("/register", handlers.RegisterPageHandler(sugar))
+		r.Get("/profile", handlers.ProfilePageHandler(sugar))
+	})
 
-		r.Post("/register", handlers.RegisterHandler(dbStor, sugar))
-		r.Post("/login", handlers.LoginHandler(dbStor, jwtService, sugar))
+	// public route API
+	router.Group(func(r chi.Router) {
+		r.Post("/api/register", handlers.RegisterHandler(dbStor, sugar))
+		r.Post("/api/login", handlers.LoginHandler(dbStor, jwtService, sugar))
 	})
 
 	// private route
 	router.Group(func(r chi.Router) {
 		r.Use(middlewares.AuthMiddleware(jwtService, sugar))
-		r.Get("/profile", handlers.ProfilePageHandler(sugar))
 		r.Get("/api/profile", handlers.ProfileHandler(sugar))
 	})
 
