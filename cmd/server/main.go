@@ -1,9 +1,16 @@
 package main
 
 import (
+	"collaborative/internal/auth"
+	"collaborative/internal/config"
 	"collaborative/internal/handlers"
+	"collaborative/internal/middlewares"
 	"collaborative/internal/storage"
+	"context"
 	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -11,7 +18,7 @@ import (
 )
 
 func main() {
-	parseFlags()
+	cfg := config.LoadConfig()
 	// init logger
 	logger, err := zap.NewDevelopment()
 	if err != nil {
@@ -24,10 +31,10 @@ func main() {
 	// init DB
 	var dbStor *storage.DBStorage
 
-	if flagDSN != "" {
-		sugar.Infof("Initializing PostgresSQL storage with DSN: %s", flagDSN)
+	if cfg.DSN != "" {
+		sugar.Infof("Initializing PostgresSQL storage with DSN: %s", cfg.DSN)
 
-		dbStor, err = storage.NewDBStorage(flagDSN)
+		dbStor, err = storage.NewDBStorage(cfg.DSN)
 		if err != nil {
 			sugar.Fatalf("Failed to save metrics on exit: %v", err)
 		}
@@ -37,11 +44,19 @@ func main() {
 			}
 		}()
 	}
+
+	// init JWT services
+	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.TokenExpiry)
+	sugar.Infof("JWT service initialized with expiry: %d hours", cfg.TokenExpiry)
 	// init router
 	router := chi.NewRouter()
 
 	// default router methods
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
+	router.Use(middlewares.LogMiddleware(sugar))
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	})
@@ -51,10 +66,47 @@ func main() {
 
 	// public route
 	router.Group(func(r chi.Router) {
-		r.Get("/", handlers.IndexHandler)
+		r.Get("/", handlers.IndexHandler(sugar))
 		r.Post("/register", handlers.RegisterHandler(dbStor, sugar))
+		r.Post("/login", handlers.LoginHandler(dbStor, jwtService, sugar))
 	})
 
-	sugar.Infof("Running server on %s", flagRunAddr)
-	sugar.Fatal(http.ListenAndServe(flagRunAddr, router))
+	// private route
+	router.Group(func(r chi.Router) {
+		r.Use(middlewares.AuthMiddleware(jwtService, sugar))
+		r.Get("/profile", handlers.ProfileHandler(sugar))
+	})
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
+
+	// Start the HTTP server in a goroutine
+	srv := &http.Server{
+		Addr:         cfg.RunAddr,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	go func() {
+		sugar.Infof("Running server on %s", cfg.RunAddr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			sugar.Fatalf("Server failed to start: %v", err)
+		}
+	}()
+
+	// Block until a signal is received (context is canceled)
+	<-ctx.Done()
+	sugar.Info("Shutdown signal received")
+
+	// Create a context with timeout for graceful shutdown
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Shutdown the server gracefully
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		sugar.Errorf("Server shutdown error: %v", err)
+	} else {
+		sugar.Info("Server shutdown complete")
+	}
 }

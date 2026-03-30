@@ -6,6 +6,11 @@ type AuthRequest struct {
 }
 
 type AuthResponse struct {
-	Message string `json:"message"`
-	Login   string `json:"login"`
+	Message string `json:"message,omitempty"`
+	Login   string `json:"login,omitempty"`
+	Token   string `json:"token,omitempty"`
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
 }
