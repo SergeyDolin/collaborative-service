@@ -13,15 +13,15 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #eeb344 0%, #9be041 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
             min-height: 100vh;
-            color: #333;
+            color: #4a5568;
         }
 
         .header {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.9);
             padding: 1rem 2rem;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             position: fixed;
             width: 100%;
             top: 0;
@@ -48,7 +48,7 @@
         .logo-icon {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -61,11 +61,11 @@
         .logo-text {
             font-size: 1.2rem;
             font-weight: 600;
-            color: #333;
+            color: #4a5568;
         }
 
         .logo-text span {
-            color: #eeb344;
+            color: #a8c7e0;
         }
 
         .user-info {
@@ -75,14 +75,14 @@
         }
 
         .user-name {
-            color: #666;
+            color: #718096;
             font-weight: 500;
         }
 
         .user-avatar {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -103,7 +103,7 @@
         }
 
         .login-link {
-            color: #666;
+            color: #718096;
             text-decoration: none;
             padding: 8px 16px;
             border-radius: 20px;
@@ -111,11 +111,11 @@
         }
 
         .login-link:hover {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(0, 0, 0, 0.03);
         }
 
         .register-link {
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             padding: 8px 20px;
             border-radius: 20px;
             color: white;
@@ -134,24 +134,25 @@
         }
 
         .welcome-banner {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 16px;
             padding: 40px;
             margin-bottom: 40px;
             text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
             backdrop-filter: blur(10px);
         }
 
         .welcome-banner h1 {
             font-size: 2.5rem;
-            color: #333;
+            color: #4a5568;
             margin-bottom: 15px;
+            font-weight: 300;
         }
 
         .welcome-banner p {
             font-size: 1.2rem;
-            color: #666;
+            color: #718096;
             max-width: 700px;
             margin: 0 auto;
         }
@@ -172,33 +173,33 @@
         }
 
         .menu-item {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(10px);
-            border-radius: 20px;
+            border-radius: 16px;
             padding: 40px 30px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
             text-decoration: none;
-            color: #333;
+            color: #4a5568;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 20px;
-            border: 2px solid transparent;
+            border: 1px solid rgba(0, 0, 0, 0.03);
         }
 
         .menu-item:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-            border-color: #9be041;
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            border-color: #c4d4e8;
         }
 
         .menu-icon {
             width: 80px;
             height: 80px;
-            background: linear-gradient(135deg, #eeb344 0%, #9be041 100%);
+            background: linear-gradient(135deg, #a8c7e0 0%, #c4d4e8 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -209,17 +210,17 @@
         }
 
         .menu-item:hover .menu-icon {
-            transform: scale(1.1);
+            transform: scale(1.05);
         }
 
         .menu-title {
             font-size: 1.5rem;
-            font-weight: 600;
-            color: #333;
+            font-weight: 500;
+            color: #4a5568;
         }
 
         .menu-description {
-            color: #666;
+            color: #718096;
             line-height: 1.6;
         }
 
@@ -231,39 +232,39 @@
         }
 
         .stat-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(10px);
-            border-radius: 15px;
+            border-radius: 12px;
             padding: 25px;
             text-align: center;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         }
 
         .stat-value {
             font-size: 2rem;
-            font-weight: bold;
-            color: #eeb344;
+            font-weight: 300;
+            color: #a8c7e0;
             margin-bottom: 5px;
         }
 
         .stat-label {
-            color: #666;
+            color: #718096;
             font-size: 0.9rem;
         }
 
         .footer {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(10px);
             padding: 20px;
             text-align: center;
             margin-top: 50px;
-            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.03);
         }
 
         .footer-content {
             max-width: 1200px;
             margin: 0 auto;
-            color: #666;
+            color: #718096;
         }
 
         .notification {
@@ -272,8 +273,8 @@
             right: 20px;
             background: white;
             padding: 12px 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             display: none;
             z-index: 1100;
             animation: slideIn 0.3s ease;
@@ -402,23 +403,23 @@
             notification.style.display = 'block';
             setTimeout(() => { notification.style.display = 'none'; }, 3000);
         }
-        
+
         function isAuthenticated() {
             return localStorage.getItem('token') && localStorage.getItem('userLogin');
         }
-        
+
         function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('userLogin');
             updateHeader();
             showNotification('Вы вышли из системы');
         }
-        
+
         function updateHeader() {
             const userInfoDiv = document.getElementById('userInfo');
             const token = localStorage.getItem('token');
             const userLogin = localStorage.getItem('userLogin');
-            
+
             if (token && userLogin) {
                 userInfoDiv.innerHTML = `
                     <span class="user-name">${userLogin}</span>
@@ -429,12 +430,12 @@
                 userInfoDiv.innerHTML = `<div class="auth-buttons"><a href="/login" class="login-link">Вход</a><a href="/register" class="register-link">Регистрация</a></div>`;
             }
         }
-        
+
         function navigateTo(page) {
             const pages = { 'news': 'news.html', 'measurements': 'measurements', 'map': 'map.html', 'profile': 'profile' };
             window.location.href = pages[page] || '/';
         }
-        
+
         document.querySelectorAll('.menu-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -448,7 +449,7 @@
                 navigateTo(page);
             });
         });
-        
+
         updateHeader();
     </script>
 </body>

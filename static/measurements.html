@@ -8,14 +8,14 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #eeb344 0%, #9be041 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
             min-height: 100vh;
-            color: #333;
+            color: #4a5568;
         }
         .header {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.9);
             padding: 1rem 2rem;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             position: fixed;
             width: 100%;
             top: 0;
@@ -38,7 +38,7 @@
         .logo-icon {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -49,8 +49,8 @@
         }
         .logo-text {
             font-size: 1.2rem;
-            font-weight: 600;
-            color: #333;
+            font-weight: 500;
+            color: #4a5568;
         }
         .main-content {
             max-width: 800px;
@@ -58,16 +58,17 @@
             padding: 0 20px;
         }
         .card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
             padding: 40px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
         .card h2 {
             text-align: center;
             margin-bottom: 32px;
-            color: #2c3e2f;
+            color: #4a5568;
             font-size: 1.8rem;
+            font-weight: 300;
         }
         .method-selector {
             display: grid;
@@ -76,21 +77,21 @@
             margin-bottom: 32px;
         }
         .method-option {
-            background: #f5f5f5;
-            border: 2px solid #e0e5e0;
-            border-radius: 16px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
             padding: 24px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         .method-option:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
         }
         .method-option.selected {
-            border-color: #9be041;
-            background: linear-gradient(135deg, rgba(155,224,65,0.1), rgba(238,179,68,0.1));
+            border-color: #a8c7e0;
+            background: linear-gradient(135deg, rgba(168,199,224,0.1), rgba(196,212,232,0.1));
         }
         .method-icon {
             font-size: 48px;
@@ -98,35 +99,35 @@
         }
         .method-title {
             font-size: 1.2rem;
-            font-weight: 600;
+            font-weight: 500;
             margin-bottom: 8px;
-            color: #2c3e2f;
+            color: #4a5568;
         }
         .method-desc {
             font-size: 0.85rem;
-            color: #666;
+            color: #718096;
             line-height: 1.4;
         }
         .method-detail {
-            background: #f8f9fa;
+            background: #f7fafc;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 24px;
         }
         .method-detail h4 {
             margin-bottom: 12px;
-            color: #eeb344;
+            color: #a8c7e0;
         }
         .method-detail ul {
             margin-left: 20px;
-            color: #666;
+            color: #718096;
         }
         .method-detail li {
             margin: 8px 0;
         }
         .file-zone {
-            border: 2px dashed #e0e5e0;
-            border-radius: 16px;
+            border: 2px dashed #e2e8f0;
+            border-radius: 12px;
             padding: 40px;
             text-align: center;
             margin-bottom: 24px;
@@ -134,12 +135,12 @@
             transition: all 0.3s ease;
         }
         .file-zone:hover {
-            border-color: #9be041;
-            background: rgba(155, 224, 65, 0.05);
+            border-color: #a8c7e0;
+            background: rgba(168, 199, 224, 0.03);
         }
         .file-zone.drag-over {
-            border-color: #9be041;
-            background: rgba(155, 224, 65, 0.1);
+            border-color: #a8c7e0;
+            background: rgba(168, 199, 224, 0.05);
         }
         .file-icon {
             font-size: 48px;
@@ -148,23 +149,23 @@
         .file-info {
             margin-top: 16px;
             font-size: 0.9rem;
-            color: #666;
+            color: #718096;
         }
         .btn-primary {
             width: 100%;
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             color: white;
             border: none;
             padding: 14px;
-            border-radius: 12px;
+            border-radius: 8px;
             font-size: 1rem;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(155, 224, 65, 0.3);
+            box-shadow: 0 4px 8px rgba(168, 199, 224, 0.2);
         }
         .btn-primary:disabled {
             opacity: 0.6;
@@ -176,8 +177,8 @@
             border-radius: 8px;
             display: none;
         }
-        .status-success { background: #e6f7e6; color: #2e7d32; }
-        .status-error { background: #fee2e2; color: #c53030; }
+        .status-success { background: #c6f6d5; color: #2f855a; }
+        .status-error { background: #fed7d7; color: #c53030; }
         @media (max-width: 768px) {
             .method-selector { grid-template-columns: 1fr; }
         }
@@ -285,7 +286,7 @@
             if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
         });
         document.getElementById('fileInput').addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
-        
+
         function handleFile(file) {
             selectedFile = file;
             const fileInfo = document.getElementById('fileInfo');
@@ -294,7 +295,7 @@
             fileInfo.style.color = '#2e7d32';
             updateButtonState();
         }
-        
+
         async function startProcessing() {
             if (!selectedMethod || !selectedFile) return;
             const btn = document.getElementById('processBtn');

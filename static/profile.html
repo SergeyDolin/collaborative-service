@@ -13,9 +13,9 @@
 
         body {
             font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #eeb344 0%, #9be041 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
             min-height: 100vh;
-            color: #2c3e2f;
+            color: #4a5568;
         }
 
         .container {
@@ -29,7 +29,7 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             padding: 1rem 2rem;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             position: fixed;
             width: 100%;
             top: 0;
@@ -55,7 +55,7 @@
         .logo-icon {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -67,8 +67,8 @@
 
         .logo-text {
             font-size: 1.2rem;
-            font-weight: 600;
-            color: #333;
+            font-weight: 500;
+            color: #4a5568;
         }
 
         .user-menu {
@@ -78,13 +78,13 @@
         }
 
         .user-name {
-            color: #666;
+            color: #718096;
             font-weight: 500;
         }
 
         .logout-btn {
             padding: 8px 16px;
-            background: #fee2e2;
+            background: #fed7d7;
             color: #c53030;
             border: none;
             border-radius: 8px;
@@ -106,20 +106,20 @@
         /* Приветственная карточка */
         .welcome-card {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
+            border-radius: 12px;
             padding: 32px;
             margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
         .welcome-card h1 {
             font-size: 2rem;
             margin-bottom: 8px;
-            color: #2c3e2f;
+            color: #4a5568;
         }
 
         .welcome-card p {
-            color: #6c7a6e;
+            color: #718096;
             font-size: 1rem;
         }
 
@@ -146,12 +146,12 @@
         .stat-value {
             font-size: 2rem;
             font-weight: bold;
-            color: #eeb344;
+            color: #a8c7e0;
             margin-bottom: 8px;
         }
 
         .stat-label {
-            color: #6c7a6e;
+            color: #718096;
             font-size: 0.9rem;
         }
 
@@ -174,7 +174,7 @@
 
         .action-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .action-icon {
@@ -184,13 +184,13 @@
 
         .action-title {
             font-size: 1.2rem;
-            font-weight: 600;
+            font-weight: 500;
             margin-bottom: 8px;
-            color: #2c3e2f;
+            color: #4a5568;
         }
 
         .action-description {
-            color: #6c7a6e;
+            color: #718096;
             font-size: 0.9rem;
             line-height: 1.5;
         }
@@ -198,7 +198,7 @@
         /* История обработок */
         .history-section {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
+            border-radius: 12px;
             padding: 32px;
         }
 
@@ -212,11 +212,11 @@
         }
 
         .history-section h3 {
-            color: #2c3e2f;
+            color: #4a5568;
         }
 
         .btn-history {
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             color: white;
             border: none;
             padding: 10px 24px;
@@ -229,7 +229,7 @@
 
         .btn-history:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(155, 224, 65, 0.3);
+            box-shadow: 0 4px 12px rgba(168, 199, 224, 0.3);
         }
 
         .history-list {
@@ -246,7 +246,7 @@
         }
 
         .history-item:hover {
-            background: #eef2ee;
+            background: #e2e8f0;
             transform: translateX(4px);
         }
 
@@ -265,13 +265,13 @@
 
         .history-date {
             font-size: 0.85rem;
-            color: #666;
+            color: #718096;
         }
 
         .history-method {
-            font-weight: 600;
+            font-weight: 500;
             margin-top: 4px;
-            color: #2c3e2f;
+            color: #4a5568;
         }
 
         .history-file {
@@ -287,18 +287,18 @@
         .status-badge {
             display: inline-block;
             padding: 4px 12px;
-            border-radius: 20px;
+            border-radius: 12px;
             font-size: 0.75rem;
             font-weight: 500;
         }
 
         .status-completed {
-            background: #e6f7e6;
-            color: #2e7d32;
+            background: #c6f6d5;
+            color: #2f855a;
         }
 
         .status-failed {
-            background: #fee2e2;
+            background: #fed7d7;
             color: #c53030;
         }
 
@@ -316,12 +316,12 @@
         .result-block {
             margin-top: 12px;
             padding-top: 10px;
-            border-top: 1px solid #e0e5e0;
+            border-top: 1px solid #e2e8f0;
         }
 
         .solution-line {
-            background: #2c3e2f;
-            color: #9be041;
+            background: #4a5568;
+            color: #c4d4e8;
             padding: 10px;
             border-radius: 6px;
             font-family: 'Courier New', monospace;
@@ -333,7 +333,7 @@
 
         .coords-info {
             font-size: 0.8rem;
-            color: #eeb344;
+            color: #a8c7e0;
             margin-bottom: 8px;
         }
 
@@ -343,7 +343,7 @@
             flex-wrap: wrap;
             margin-bottom: 8px;
             font-size: 0.75rem;
-            color: #666;
+            color: #718096;
         }
 
         .stat-item {
@@ -360,7 +360,7 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             color: white;
             padding: 6px 12px;
             border-radius: 6px;
@@ -371,7 +371,7 @@
 
         .download-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(155, 224, 65, 0.3);
+            box-shadow: 0 2px 8px rgba(168, 199, 224, 0.3);
         }
 
         .expiry-info {
@@ -381,7 +381,7 @@
         }
 
         .error-msg {
-            background: #fee2e2;
+            background: #fed7d7;
             color: #c53030;
             padding: 6px 10px;
             border-radius: 6px;
@@ -421,7 +421,7 @@
 
         .modal-content {
             background: white;
-            border-radius: 20px;
+            border-radius: 12px;
             padding: 32px;
             max-width: 400px;
             width: 90%;
@@ -429,13 +429,13 @@
 
         .modal-content h3 {
             margin-bottom: 16px;
-            color: #2c3e2f;
+            color: #4a5568;
         }
 
         .modal-content input {
             width: 100%;
             padding: 12px;
-            border: 1.5px solid #e0e5e0;
+            border: 1.5px solid #e2e8f0;
             border-radius: 10px;
             margin: 16px 0;
             font-size: 1rem;
@@ -443,7 +443,7 @@
 
         .modal-content input:focus {
             outline: none;
-            border-color: #9be041;
+            border-color: #c4d4e8;
         }
 
         .modal-buttons {
@@ -569,8 +569,8 @@
             <input type="password" id="newPassword" placeholder="Введите новый пароль (мин. 8 символов)">
             <div id="settingsError" class="error-message" style="display: none;"></div>
             <div class="modal-buttons">
-                <button onclick="closeSettings()" style="background: #e0e5e0;">Отмена</button>
-                <button onclick="updatePassword()" style="background: #9be041; color: white;">Сохранить</button>
+                <button onclick="closeSettings()" style="background: #e2e8f0;">Отмена</button>
+                <button onclick="updatePassword()" style="background: #c4d4e8; color: white;">Сохранить</button>
             </div>
         </div>
     </div>
@@ -695,25 +695,25 @@
         // Загрузка истории обработок с пагинацией
         async function loadProcessingHistory(resetPage = true) {
             if (isLoading) return;
-            
+
             if (resetPage) {
                 currentPage = 0;
                 document.getElementById('processingHistory').innerHTML = '<div class="loading">⏳ Загрузка истории...</div>';
             }
-            
+
             const token = localStorage.getItem('token');
             const container = document.getElementById('processingHistory');
-            
+
             isLoading = true;
-            
+
             try {
                 const response = await fetch(`/api/measurements/history?limit=${pageSize}&offset=${currentPage * pageSize}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                
+
                 if (response.ok) {
                     const tasks = await response.json();
-                    
+
                     if (!tasks || tasks.length === 0) {
                         if (currentPage === 0) {
                             container.innerHTML = '<div class="empty-history">📭 Нет выполненных обработок</div>';
@@ -723,7 +723,7 @@
                         isLoading = false;
                         return;
                     }
-                    
+
                     const historyHtml = tasks.map(task => {
                         const date = new Date(task.createdAt).toLocaleString();
                         const method = getMethodName(task.config?.method);
@@ -732,13 +732,13 @@
                         const statusText = getStatusText(status);
                         const fileType = task.fileType || (task.config?.mode === 'static' ? 'static' : 'kinematic');
                         const modeText = fileType === 'static' ? 'Статика' : 'Кинематика';
-                        
+
                         // Формируем блок результата в зависимости от типа
                         let resultHtml = '';
-                        
+
                         if (status === 'completed' && task.result) {
                             const result = task.result;
-                            
+
                             // Статистика
                             let statsHtml = '';
                             if (result.q !== undefined || result.nSat !== undefined || result.rms !== undefined) {
@@ -750,7 +750,7 @@
                                     </div>
                                 `;
                             }
-                            
+
                             // Координаты
                             let coordsHtml = '';
                             if (result.latitude && result.longitude) {
@@ -758,7 +758,7 @@
                             } else if (result.x && result.y && result.z) {
                                 coordsHtml = `<div class="coords-info">📍 X: ${result.x.toFixed(2)}м, Y: ${result.y.toFixed(2)}м, Z: ${result.z.toFixed(2)}м</div>`;
                             }
-                            
+
                             // Для статики - показываем последнюю строку решения
                             if (fileType === 'static' && result.lastSolutionLine) {
                                 resultHtml = `
@@ -771,7 +771,7 @@
                                         </div>
                                     </div>
                                 `;
-                            } 
+                            }
                             // Для кинематики - показываем кнопку скачивания
                             else if (fileType === 'kinematic') {
                                 resultHtml = `
@@ -795,13 +795,13 @@
                                 `;
                             }
                         }
-                        
+
                         // Блок с ошибкой
                         let errorHtml = '';
                         if (status === 'failed' && task.errorMessage) {
                             errorHtml = `<div class="error-msg">❌ ${task.errorMessage}</div>`;
                         }
-                        
+
                         return `
                             <div class="history-item">
                                 <div class="history-header-row">
@@ -819,13 +819,13 @@
                             </div>
                         `;
                     }).join('');
-                    
+
                     if (currentPage === 0) {
                         container.innerHTML = historyHtml;
                     } else {
                         container.innerHTML += historyHtml;
                     }
-                    
+
                     // Добавляем кнопку "Загрузить еще" если есть еще записи
                     if (tasks.length === pageSize) {
                         const loadMoreBtn = document.createElement('button');
@@ -856,7 +856,7 @@
         // Загрузка статистики пользователя (демо-данные)
         async function loadUserStats() {
             const token = localStorage.getItem('token');
-            
+
             try {
                 // В реальном приложении здесь будет запрос к API
                 // const response = await fetch('/api/profile/stats', {
@@ -866,7 +866,7 @@
                 // document.getElementById('measurementsCount').textContent = stats.measurements || 0;
                 // document.getElementById('collaborationsCount').textContent = stats.collaborations || 0;
                 // document.getElementById('activeDays').textContent = stats.activeDays || 0;
-                
+
                 // Пока используем демо-данные
                 document.getElementById('measurementsCount').textContent = '12';
                 document.getElementById('collaborationsCount').textContent = '3';
@@ -881,16 +881,16 @@
             setInterval(async () => {
                 const token = localStorage.getItem('token');
                 if (!token) return;
-                
+
                 try {
                     const response = await fetch('/api/measurements/history?limit=5&offset=0', {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
-                    
+
                     if (response.ok) {
                         const tasks = await response.json();
                         const hasProcessing = tasks.some(task => task.status === 'processing' || task.status === 'pending');
-                        
+
                         if (!hasProcessing && document.querySelector('.status-processing')) {
                             loadProcessingHistory(true);
                         }

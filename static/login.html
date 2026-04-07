@@ -8,25 +8,25 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #eeb344 0%, #9be041 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #2c3e2f;
+            color: #4a5568;
         }
         .auth-container { width: 100%; max-width: 440px; padding: 20px; }
         .auth-card {
-            background: rgba(255, 255, 255, 0.98);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
-            border-radius: 24px;
+            border-radius: 16px;
             padding: 40px 32px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
         .logo { text-align: center; margin-bottom: 32px; }
         .logo-icon {
             width: 56px; height: 56px;
-            background: linear-gradient(135deg, #eeb344, #9be041);
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             border-radius: 14px;
             display: inline-flex;
             align-items: center;
@@ -36,31 +36,31 @@
             font-size: 28px;
             margin-bottom: 16px;
         }
-        .logo h1 { font-size: 1.5rem; font-weight: 600; color: #2c3e2f; margin-bottom: 8px; }
-        .logo p { color: #6c7a6e; font-size: 0.9rem; }
+        .logo h1 { font-size: 1.5rem; font-weight: 500; color: #4a5568; margin-bottom: 8px; }
+        .logo p { color: #718096; font-size: 0.9rem; }
         .form-group { margin-bottom: 24px; }
-        label { display: block; margin-bottom: 8px; font-weight: 500; color: #2c3e2f; font-size: 0.9rem; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; color: #4a5568; font-size: 0.9rem; }
         input {
             width: 100%; padding: 12px 16px;
-            border: 1.5px solid #e0e5e0; border-radius: 12px;
+            border: 1px solid #e2e8f0; border-radius: 8px;
             font-size: 1rem; font-family: inherit; background: white;
         }
-        input:focus { outline: none; border-color: #9be041; box-shadow: 0 0 0 3px rgba(155, 224, 65, 0.1); }
+        input:focus { outline: none; border-color: #a8c7e0; box-shadow: 0 0 0 3px rgba(168, 199, 224, 0.1); }
         .btn {
             width: 100%; padding: 12px;
-            background: linear-gradient(135deg, #eeb344, #9be041);
-            color: white; border: none; border-radius: 12px;
-            font-size: 1rem; font-weight: 600; cursor: pointer;
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
+            color: white; border: none; border-radius: 8px;
+            font-size: 1rem; font-weight: 500; cursor: pointer;
         }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(155, 224, 65, 0.3); }
-        .auth-footer { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #eef2ee; }
-        .auth-footer a { color: #9be041; text-decoration: none; font-weight: 500; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(168, 199, 224, 0.2); }
+        .auth-footer { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; }
+        .auth-footer a { color: #a8c7e0; text-decoration: none; font-weight: 500; }
         .error-message, .success-message {
-            padding: 12px; border-radius: 10px; margin-bottom: 20px;
+            padding: 12px; border-radius: 8px; margin-bottom: 20px;
             font-size: 0.85rem; display: none;
         }
-        .error-message { background: #fee2e2; color: #c53030; }
-        .success-message { background: #e6f7e6; color: #2e7d32; }
+        .error-message { background: #fed7d7; color: #c53030; }
+        .success-message { background: #c6f6d5; color: #2f855a; }
     </style>
 </head>
 <body>
