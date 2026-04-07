@@ -37,7 +37,7 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, erpFile, dc
 	}
 
 	if navFile != "" {
-		args = append(args, navFile)
+		args = append(args, navFile, sp3File, clkFile)
 	}
 
 	r.logger.Infof("Running PPP with command: %s", strings.Join(args, " "))

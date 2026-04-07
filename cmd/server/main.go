@@ -97,9 +97,10 @@ func main() {
 	configGenerator := services.NewConfigGenerator(configDir, workDir, sugar)
 	downloader := services.NewFileDownloader(workDir, sugar)
 	rtkService := services.NewRTKService("./cmd/solver/app", workDir, sugar)
+	converterService := services.NewConverterService("./cmd/solver/app", sugar)
 
 	measurementHandler := handlers.NewMeasurementHandler(
-		dbStor, taskStorage, configGenerator, downloader, rtkService, workDir, sugar,
+		dbStor, taskStorage, configGenerator, downloader, converterService, rtkService, workDir, sugar,
 	)
 
 	// В main.go добавьте периодическую очистку старых временных файлов

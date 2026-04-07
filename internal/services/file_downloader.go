@@ -253,29 +253,6 @@ func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, err
 	return outFile, nil
 }
 
-// DownloadBaseStation скачивает наблюдения с базовой станции
-func (d *FileDownloader) DownloadBaseStation(stationID string, date time.Time, taskID string) (string, error) {
-	year, doy := getYearDay(date)
-	stationID = strings.ToUpper(stationID)
-
-	url := fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/%03d/%s%03d0.%02do.gz",
-		year, doy, strings.ToLower(stationID), doy, year%100)
-
-	filename := filepath.Join(d.workDir, fmt.Sprintf("%s_base.obs.gz", taskID))
-
-	if err := d.downloadFile(url, filename); err != nil {
-		return "", fmt.Errorf("failed to download base station data: %w", err)
-	}
-
-	unpacked := filename[:len(filename)-3]
-	if err := d.gunzipFile(filename, unpacked); err != nil {
-		return "", err
-	}
-
-	d.logger.Infof("Downloaded base station: %s", unpacked)
-	return unpacked, nil
-}
-
 // downloadFile скачивает файл по URL.
 // Проверяет Content-Type — CDDIS без авторизации возвращает text/html при HTTP 200.
 func (d *FileDownloader) downloadFile(url, destPath string) error {
@@ -350,4 +327,69 @@ func (d *FileDownloader) gunzipFile(src, dst string) error {
 
 	d.logger.Infof("Unpacked: %s -> %s", src, dst)
 	return nil
+}
+
+// DownloadBaseStation скачивает наблюдения с базовой станции
+// Автоматически конвертирует CRX в RINEX если необходимо
+func (d *FileDownloader) DownloadBaseStation(stationID string, date time.Time, taskID string, converter *ConverterService) (string, error) {
+	year, doy := getYearDay(date)
+	stationID = strings.ToUpper(stationID)
+
+	// Пробуем RINEX 2.x формат .o
+	urlRinex2 := fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/%03d/%s%03d0.%02do.gz",
+		year, doy, strings.ToLower(stationID), doy, year%100)
+
+	// Пробуем Hatanaka сжатый формат .crx
+	urlCrx := fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/%03d/%s%03d0.%02dcrx.gz",
+		year, doy, strings.ToLower(stationID), doy, year%100)
+
+	filename := filepath.Join(d.workDir, fmt.Sprintf("%s_base", taskID))
+	gzFile := filename + ".gz"
+
+	// Сначала пробуем скачать .crx.gz
+	err := d.downloadFile(urlCrx, gzFile)
+	if err == nil {
+		d.logger.Infof("Downloaded CRX file: %s", gzFile)
+
+		// Распаковываем gz
+		crxFile := filename + ".crx"
+		if err := d.gunzipFile(gzFile, crxFile); err != nil {
+			return "", err
+		}
+		os.Remove(gzFile)
+
+		// Конвертируем CRX в RNX
+		rnxFile := filename + ".obs"
+		if converter != nil {
+			if err := converter.ConvertCRX2RNX(crxFile, rnxFile); err != nil {
+				d.logger.Warnf("CRX conversion failed: %v, trying RINEX2 fallback", err)
+				os.Remove(crxFile)
+				// Пробуем RINEX2 формат
+				return d.downloadBaseStationRinex2(urlRinex2, filename, taskID)
+			}
+		}
+		os.Remove(crxFile)
+		d.logger.Infof("Converted to RINEX: %s", rnxFile)
+		return rnxFile, nil
+	}
+
+	// Fallback на RINEX 2.x
+	return d.downloadBaseStationRinex2(urlRinex2, filename, taskID)
+}
+
+func (d *FileDownloader) downloadBaseStationRinex2(url, filename, taskID string) (string, error) {
+	gzFile := filename + ".gz"
+
+	if err := d.downloadFile(url, gzFile); err != nil {
+		return "", fmt.Errorf("failed to download base station data: %w", err)
+	}
+
+	unpacked := filename + ".obs"
+	if err := d.gunzipFile(gzFile, unpacked); err != nil {
+		return "", err
+	}
+	os.Remove(gzFile)
+
+	d.logger.Infof("Downloaded base station RINEX: %s", unpacked)
+	return unpacked, nil
 }

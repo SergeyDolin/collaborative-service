@@ -205,6 +205,7 @@ type MeasurementHandler struct {
 	taskStorage     *storage.TaskStorage
 	configGenerator *services.ConfigGenerator
 	downloader      *services.FileDownloader
+	converter       *services.ConverterService
 	rtkService      *services.RTKService
 	historyCache    *cache.HistoryCache
 	workDir         string
@@ -217,6 +218,7 @@ func NewMeasurementHandler(
 	taskStorage *storage.TaskStorage,
 	configGenerator *services.ConfigGenerator,
 	downloader *services.FileDownloader,
+	converter *services.ConverterService,
 	rtkService *services.RTKService,
 	workDir string,
 	logger *zap.SugaredLogger,
@@ -231,6 +233,7 @@ func NewMeasurementHandler(
 		taskStorage:     taskStorage,
 		configGenerator: configGenerator,
 		downloader:      downloader,
+		converter:       converter,
 		rtkService:      rtkService,
 		historyCache:    historyCache,
 		workDir:         workDir,
@@ -572,12 +575,19 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 		return
 	}
 
-	// 2. Конвертируем в RINEX (упрощенно - копируем)
-	rinexPath := filepath.Join(workDir, "observation.obs")
-	if err := os.WriteFile(rinexPath, fileData, 0644); err != nil {
-		h.updateTaskError(taskID, login, fmt.Sprintf("Conversion: %v", err))
+	// После сохранения файла, добавьте проверку
+	h.logger.Infof("Original file: %s, size: %d bytes", obsPath, len(fileData))
+
+	// Конвертируем файл с помощью converter
+	convertedPath, err := h.converter.ConvertFile(obsPath, workDir)
+	if err != nil {
+		h.updateTaskError(taskID, login, fmt.Sprintf("File conversion: %v", err))
 		return
 	}
+	h.logger.Infof("Converted to: %s", convertedPath)
+
+	// Используем convertedPath вместо obsPath
+	rinexPath := convertedPath
 
 	// 3. Определяем дату из RINEX
 	date, err := parseRinexDate(rinexPath)
@@ -597,15 +607,15 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	case model.MethodPPP:
 		files.EphemerisFile, _ = h.downloader.DownloadPreciseEphemeris(date, taskID)
 		files.ClockFile, _ = h.downloader.DownloadPreciseClock(date, taskID)
-		files.ERPFile, _ = h.downloader.DownloadERP(date, taskID)
-		files.DCBFile, _ = h.downloader.DownloadDCB(date, taskID)
+		// files.ERPFile, _ = h.downloader.DownloadERP(date, taskID)
+		// files.DCBFile, _ = h.downloader.DownloadDCB(date, taskID)
 
 		convFiles := &services.ProcessingFiles{
 			NavigationFile: files.NavigationFile,
 			EphemerisFile:  files.EphemerisFile,
 			ClockFile:      files.ClockFile,
-			DCBFile:        files.DCBFile,
-			ERPFile:        files.ERPFile,
+			// DCBFile:        files.DCBFile,
+			// ERPFile: files.ERPFile,
 		}
 
 		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)
