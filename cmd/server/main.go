@@ -34,14 +34,6 @@ func main() {
 	var dbStor *storage.DBStorage
 	var taskStorage *storage.TaskStorage
 
-	if dbStor != nil {
-		taskStorage = storage.NewTaskStorage(dbStor.Pool())
-		if err := taskStorage.InitTaskSchema(); err != nil {
-			sugar.Errorf("Failed to init task schema: %v", err)
-		}
-		sugar.Info("Task storage initialized")
-	}
-
 	if cfg.DSN != "" {
 		sugar.Infof("Initializing PostgresSQL storage with DSN: %s", cfg.DSN)
 		dbStor, err = storage.NewDBStorage(cfg.DSN)
@@ -103,22 +95,41 @@ func main() {
 		dbStor, taskStorage, configGenerator, downloader, converterService, rtkService, workDir, sugar,
 	)
 
-	// В main.go добавьте периодическую очистку старых временных файлов
-	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			// Удаляем папки старше 24 часов
-			entries, _ := os.ReadDir(workDir)
-			for _, entry := range entries {
-				if entry.IsDir() {
-					info, _ := entry.Info()
-					if info != nil && time.Since(info.ModTime()) > 24*time.Hour {
-						os.RemoveAll(filepath.Join(workDir, entry.Name()))
-					}
+	// Периодическая очистка tmp: и осиротевшие папки задач, и .pos старше 24 часов
+	cleanupTmp := func() {
+		entries, err := os.ReadDir(workDir)
+		if err != nil {
+			return
+		}
+		cutoff := 24 * time.Hour
+		for _, entry := range entries {
+			info, err := entry.Info()
+			if err != nil || time.Since(info.ModTime()) <= cutoff {
+				continue
+			}
+			path := filepath.Join(workDir, entry.Name())
+			if entry.IsDir() {
+				if err := os.RemoveAll(path); err != nil {
+					sugar.Warnf("Failed to remove old tmp dir %s: %v", path, err)
+				} else {
+					sugar.Debugf("Removed old tmp dir: %s", path)
+				}
+			} else {
+				if err := os.Remove(path); err != nil {
+					sugar.Warnf("Failed to remove old tmp file %s: %v", path, err)
+				} else {
+					sugar.Debugf("Removed old tmp file: %s", path)
 				}
 			}
+		}
+	}
+
+	go func() {
+		cleanupTmp() // первый прогон сразу при старте
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			cleanupTmp()
 		}
 	}()
 

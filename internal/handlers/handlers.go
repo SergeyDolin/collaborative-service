@@ -411,8 +411,14 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
+	login, ok := middlewares.GetUserFromContext(r.Context())
+	if !ok {
+		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+		return
+	}
+
 	task, err := h.taskStorage.GetTaskByID(taskID)
-	if err != nil || task == nil {
+	if err != nil || task == nil || task.UserLogin != login {
 		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
 		return
 	}
@@ -672,24 +678,25 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 		h.logger.Errorf("Failed to save result: %v", err)
 	}
 
-	// Обновляем задачу как завершенную
+	// Перемещаем результат ДО обновления БД и удаления workDir
 	completedAt := time.Now()
+	permanentPath := filepath.Join(h.workDir, taskID+".pos")
+	if err := os.Rename(outputPath, permanentPath); err != nil {
+		h.logger.Warnf("Failed to move result file to permanent path: %v", err)
+		permanentPath = outputPath // fallback, чтобы хоть что-то осталось
+	}
+
 	task = &model.ProcessingTask{
 		ID:            taskID,
 		Status:        model.StatusCompleted,
-		OutputPath:    outputPath,
+		OutputPath:    permanentPath,
 		CompletedAt:   &completedAt,
 		ProcessingSec: completedAt.Sub(now).Seconds(),
 	}
 	h.taskStorage.UpdateTask(task)
-
-	// Инвалидируем кэш для пользователя
 	h.historyCache.Invalidate(login)
 
-	h.logger.Infof("Task %s completed successfully in %.2f seconds, output: %s", taskID, task.ProcessingSec, outputPath)
-
-	permanentPath := filepath.Join(h.workDir, taskID+".pos")
-	os.Rename(outputPath, permanentPath)
+	h.logger.Infof("Task %s completed in %.2fs, output: %s", taskID, task.ProcessingSec, permanentPath)
 	os.RemoveAll(workDir)
 }
 
