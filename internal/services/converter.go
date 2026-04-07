@@ -125,14 +125,115 @@ func (c *ConverterService) ConvertCRX2RNX(inputPath, outputPath string) error {
 	return nil
 }
 
+// ConvertRINEX3to2 конвертирует RINEX версии 3 в версию 2 используя convbin
+func (c *ConverterService) ConvertRINEX3to2(inputPath, outputPath string) error {
+	c.logger.Infof("Converting RINEX 3 to RINEX 2: %s -> %s", inputPath, outputPath)
+
+	// Проверяем входной файл
+	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+		return fmt.Errorf("input file not found: %s", inputPath)
+	}
+
+	// Ищем convbin
+	pathsToTry := []string{
+		filepath.Join(c.rtklibPath, "convbin"),
+		"./cmd/solver/app/convbin",
+		"/usr/local/bin/convbin",
+		"/opt/homebrew/bin/convbin",
+	}
+
+	// Добавляем PATH
+	if pathEnv := os.Getenv("PATH"); pathEnv != "" {
+		for _, dir := range strings.Split(pathEnv, ":") {
+			pathsToTry = append(pathsToTry, filepath.Join(dir, "convbin"))
+		}
+	}
+
+	var convbinPath string
+
+	for _, path := range pathsToTry {
+		if _, err := os.Stat(path); err == nil {
+			convbinPath = path
+			c.logger.Infof("Found convbin at: %s", convbinPath)
+			break
+		}
+	}
+
+	if convbinPath == "" {
+		// Пробуем выполнить команду
+		if path, err := exec.LookPath("convbin"); err == nil {
+			convbinPath = path
+			c.logger.Infof("Found convbin in PATH: %s", convbinPath)
+		} else {
+			c.logger.Warnf("convbin not found, skipping RINEX 3 to 2 conversion")
+			// Не падаем с ошибкой, так как это опциональная конвертация
+			return nil
+		}
+	}
+
+	// Делаем файл исполняемым
+	if err := os.Chmod(convbinPath, 0755); err != nil {
+		c.logger.Warnf("Failed to chmod convbin: %v", err)
+	}
+
+	// Запускаем конвертацию
+	// convbin -r rinex3 -o rinex2 input.rnx
+	cmd := exec.Command(convbinPath, "-r", "rinex3", "-o", "rinex2", inputPath)
+
+	// Получаем вывод для отладки
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		c.logger.Errorf("convbin failed with error: %v", err)
+		c.logger.Errorf("Command output: %s", string(output))
+		return fmt.Errorf("convbin conversion failed: %w", err)
+	}
+
+	c.logger.Infof("Successfully converted RINEX 3 to 2: %s", inputPath)
+
+	// convbin переименовывает файл добавляя расширение .rnx
+	// Нам нужно переместить результат в нужное место
+	expectedOutput := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".rnx"
+
+	if _, err := os.Stat(expectedOutput); err == nil {
+		// Переименовываем в нужный путь
+		if err := os.Rename(expectedOutput, outputPath); err != nil {
+			c.logger.Errorf("Failed to rename converted file: %v", err)
+			return fmt.Errorf("failed to move converted file: %w", err)
+		}
+		c.logger.Infof("Moved converted file to: %s", outputPath)
+	} else {
+		c.logger.Warnf("Expected output file not found at: %s", expectedOutput)
+		// Если convbin вывел в inputPath, то просто копируем
+		if err := os.Rename(inputPath, outputPath); err != nil {
+			c.logger.Errorf("Failed to rename file: %v", err)
+			return fmt.Errorf("failed to move file: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // ConvertFile автоматически определяет тип файла и конвертирует если нужно
 func (c *ConverterService) ConvertFile(filePath, workDir string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
-	// Уже RINEX
-	if ext == ".obs" || ext == ".rnx" || ext == ".o" {
-		c.logger.Infof("File already in RINEX format: %s", filePath)
+	// Уже RINEX 2.x
+	if ext == ".obs" || ext == ".o" {
+		c.logger.Infof("File already in RINEX 2 format: %s", filePath)
 		return filePath, nil
+	}
+
+	// RINEX 3.x - нужна конвертация
+	if ext == ".rnx" {
+		c.logger.Infof("File is RINEX 3.x, converting to RINEX 2...")
+		outputPath := filepath.Join(workDir, "converted.obs")
+		if err := c.ConvertRINEX3to2(filePath, outputPath); err != nil {
+			// Не падаем если convbin недоступен, используем как есть
+			c.logger.Warnf("RINEX 3 to 2 conversion failed: %v, using RINEX 3", err)
+			return filePath, nil
+		}
+		return outputPath, nil
 	}
 
 	// Hatanaka CRX
@@ -141,7 +242,8 @@ func (c *ConverterService) ConvertFile(filePath, workDir string) (string, error)
 		if err := c.ConvertCRX2RNX(filePath, outputPath); err != nil {
 			return "", err
 		}
-		return outputPath, nil
+		// После конвертации CRX->RNX, проверяем версию и конвертируем если нужно
+		return c.ConvertFile(outputPath, workDir)
 	}
 
 	// GZ архив
@@ -155,14 +257,24 @@ func (c *ConverterService) ConvertFile(filePath, workDir string) (string, error)
 		// Проверяем распакованный файл
 		newExt := strings.ToLower(filepath.Ext(unpackedPath))
 		if newExt == ".crx" {
-			// Конвертируем CRX в RINEX
+			// Конвертируем CRX в RNX
 			outputPath := filepath.Join(workDir, "converted.obs")
 			if err := c.ConvertCRX2RNX(unpackedPath, outputPath); err != nil {
 				return "", err
 			}
 			os.Remove(unpackedPath)
+			// После конвертации CRX->RNX, проверяем версию
+			return c.ConvertFile(outputPath, workDir)
+		} else if newExt == ".rnx" {
+			// Это RINEX 3, конвертируем в RINEX 2
+			outputPath := filepath.Join(workDir, "converted.obs")
+			if err := c.ConvertRINEX3to2(unpackedPath, outputPath); err != nil {
+				c.logger.Warnf("RINEX 3 to 2 conversion failed, using RINEX 3")
+				return unpackedPath, nil
+			}
+			os.Remove(unpackedPath)
 			return outputPath, nil
-		} else if newExt == ".obs" || newExt == ".rnx" || newExt == ".o" {
+		} else if newExt == ".obs" || newExt == ".o" {
 			return unpackedPath, nil
 		}
 	}

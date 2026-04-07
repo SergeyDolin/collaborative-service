@@ -583,7 +583,7 @@ func parseFirstObsLine(line string) (time.Time, error) {
 	return t, nil
 }
 
-// processTask обрабатывает задачу (обновленная версия с сохранением в БД)
+// processTask обрабатывает задачу с полной очисткой временных файлов
 func (h *MeasurementHandler) processTask(taskID, login string, config model.UserProcessingConfig, fileData []byte, filename string) {
 	h.logger.Infof("Starting processing for task %s, method: %s", taskID, config.Method)
 
@@ -600,6 +600,16 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	workDir := filepath.Join(h.workDir, taskID)
 	os.MkdirAll(workDir, 0755)
 
+	// Отложенная очистка: удаляем всю папку с временными файлами в конце
+	defer func() {
+		h.logger.Debugf("Cleaning up temporary directory: %s", workDir)
+		if err := os.RemoveAll(workDir); err != nil {
+			h.logger.Warnf("Failed to remove work directory %s: %v", workDir, err)
+		} else {
+			h.logger.Infof("Successfully cleaned up work directory: %s", workDir)
+		}
+	}()
+
 	// 1. Сохраняем файл
 	obsPath := filepath.Join(workDir, filename)
 	if err := os.WriteFile(obsPath, fileData, 0644); err != nil {
@@ -607,7 +617,6 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 		return
 	}
 
-	// После сохранения файла, добавьте проверку
 	h.logger.Infof("Original file: %s, size: %d bytes", obsPath, len(fileData))
 
 	// Конвертируем файл с помощью converter
@@ -628,7 +637,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 		date = time.Now()
 	}
 
-	// 4. Скачиваем необходимые файлы
+	// 4. Скачиваем необходимые файлы (в основной tmp, не в workDir)
 	files := &ProcessingFiles{}
 	files.NavigationFile, _ = h.downloader.DownloadBroadcastEphemeris(date, taskID)
 
@@ -686,7 +695,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 		outputData = []byte("")
 	}
 
-	// Парсим результат (передаем []byte, а не путь)
+	// Парсим результат
 	result := h.parseResult(outputData, taskID, login, config)
 
 	// Для кинематики сохраняем полный файл в БД
@@ -708,7 +717,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	permanentPath := filepath.Join(h.workDir, taskID+".pos")
 	if err := os.Rename(outputPath, permanentPath); err != nil {
 		h.logger.Warnf("Failed to move result file to permanent path: %v", err)
-		permanentPath = outputPath // fallback, чтобы хоть что-то осталось
+		permanentPath = outputPath
 	}
 
 	task = &model.ProcessingTask{
@@ -722,7 +731,32 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	h.historyCache.Invalidate(login)
 
 	h.logger.Infof("Task %s completed in %.2fs, output: %s", taskID, task.ProcessingSec, permanentPath)
-	os.RemoveAll(workDir)
+
+	// ВАЖНО: После функции автоматически вызовется defer и удалит workDir
+	// Но нам нужно удалить и загруженные файлы из tmp
+	h.cleanupDownloadedFiles(taskID)
+}
+
+// cleanupDownloadedFiles удаляет все загруженные файлы для задачи из tmp
+func (h *MeasurementHandler) cleanupDownloadedFiles(taskID string) {
+	// Удаляем все файлы в tmp, которые начинаются с taskID
+	entries, err := os.ReadDir(h.workDir)
+	if err != nil {
+		h.logger.Warnf("Failed to read work directory for cleanup: %v", err)
+		return
+	}
+
+	for _, entry := range entries {
+		// Ищем файлы, которые относятся к этой задаче
+		if strings.HasPrefix(entry.Name(), taskID) && !entry.IsDir() {
+			filePath := filepath.Join(h.workDir, entry.Name())
+			if err := os.Remove(filePath); err != nil {
+				h.logger.Warnf("Failed to remove file %s: %v", filePath, err)
+			} else {
+				h.logger.Infof("Removed temporary file: %s", filePath)
+			}
+		}
+	}
 }
 
 func (h *MeasurementHandler) updateTaskError(taskID, login, errMsg string) {
