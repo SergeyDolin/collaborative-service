@@ -383,6 +383,28 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 	return tasks, nil
 }
 
+// GetSystemStats возвращает общую статистику системы
+func (s *TaskStorage) GetSystemStats() (map[string]interface{}, error) {
+	query := `
+		SELECT 
+			(SELECT COUNT(DISTINCT user_login) FROM processing_tasks) as total_users,
+			(SELECT COUNT(*) FROM processing_tasks WHERE DATE(created_at) = CURRENT_DATE) as today_tasks
+	`
+
+	var totalUsers int
+	var todayTasks int
+
+	err := s.pool.QueryRow(context.Background(), query).Scan(&totalUsers, &todayTasks)
+	if err != nil {
+		return nil, fmt.Errorf("get stats: %w", err)
+	}
+
+	return map[string]interface{}{
+		"activeUsers":       totalUsers,
+		"measurementsToday": todayTasks,
+	}, nil
+}
+
 // CleanExpiredResults удаляет устаревшие результаты
 func (s *TaskStorage) CleanExpiredResults() error {
 	_, err := s.pool.Exec(context.Background(), `

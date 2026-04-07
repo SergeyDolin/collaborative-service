@@ -147,6 +147,7 @@ func main() {
 	// Public API routes
 	router.Post("/api/register", handlers.RegisterHandler(dbStor, sugar))
 	router.Post("/api/login", handlers.LoginHandler(dbStor, jwtService, sugar))
+	router.Get("/api/stats", measurementHandler.GetSystemStatsHandler)
 
 	// Protected API routes
 	router.Group(func(r chi.Router) {

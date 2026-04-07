@@ -197,6 +197,23 @@
     <main class="main-content">
         <div class="card">
             <h2>📡 Обработка спутниковых измерений</h2>
+
+            <div style="margin-bottom: 32px;">
+                <label style="display: block; margin-bottom: 12px; font-weight: 500; color: #4a5568;">Режим обработки:</label>
+                <div class="method-selector" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="method-option" data-mode="kinematic" onclick="selectMode('kinematic')">
+                        <div class="method-icon">🚗</div>
+                        <div class="method-title">Кинематика</div>
+                        <div class="method-desc">Для движущихся объектов</div>
+                    </div>
+                    <div class="method-option" data-mode="static" onclick="selectMode('static')">
+                        <div class="method-icon">🏠</div>
+                        <div class="method-title">Статика</div>
+                        <div class="method-desc">Для неподвижных объектов</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="method-selector">
                 <div class="method-option" data-method="single" onclick="selectMethod('single')">
                     <div class="method-icon">📍</div>
@@ -206,7 +223,7 @@
                 <div class="method-option" data-method="relative" onclick="selectMethod('relative')">
                     <div class="method-icon">📡📡</div>
                     <div class="method-title">Относительный метод</div>
-                    <div class="method-desc">Differential / RTK</div>
+                    <div class="method-desc">Relative positioning</div>
                 </div>
                 <div class="method-option" data-method="ppp" onclick="selectMethod('ppp')">
                     <div class="method-icon">🎯</div>
@@ -228,6 +245,7 @@
 
     <script>
         let selectedMethod = null;
+        let selectedMode = 'kinematic'; // по умолчанию кинематика
         let selectedFile = null;
 
         const methodDetails = {
@@ -251,9 +269,26 @@
             }
         };
 
+        function selectMode(mode) {
+            selectedMode = mode;
+            document.querySelectorAll('[data-mode]').forEach(opt => opt.classList.remove('selected'));
+            document.querySelector(`[data-mode="${mode}"]`).classList.add('selected');
+
+            // Обновляем режим во всех конфигурациях
+            for (let key in methodDetails) {
+                methodDetails[key].config.mode = mode;
+            }
+
+            // Обновляем описание метода, если он выбран
+            if (selectedMethod) {
+                const detail = methodDetails[selectedMethod];
+                document.getElementById('methodDetail').innerHTML = `<h4>${detail.title}</h4><p>${detail.description}</p><ul>${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>`;
+            }
+        }
+
         function selectMethod(method) {
             selectedMethod = method;
-            document.querySelectorAll('.method-option').forEach(opt => opt.classList.remove('selected'));
+            document.querySelectorAll('.method-option[data-method]').forEach(opt => opt.classList.remove('selected'));
             document.querySelector(`[data-method="${method}"]`).classList.add('selected');
             const detail = methodDetails[method];
             document.getElementById('methodDetail').innerHTML = `<h4>${detail.title}</h4><p>${detail.description}</p><ul>${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>`;

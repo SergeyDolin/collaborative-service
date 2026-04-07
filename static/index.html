@@ -226,9 +226,12 @@
 
         .stats-section {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 30px;
             margin-top: 50px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .stat-card {
@@ -344,25 +347,15 @@
     <main class="main-content">
         <div class="welcome-banner">
             <h1>Сервис коллаборативного позиционирования</h1>
-            <p>Точное позиционирование через коллаборативные вычисления</p>
+            <p>Дай прикурить!</p>
         </div>
 
         <div class="menu-container">
             <div class="menu-grid">
-                <div class="menu-item" data-page="news">
-                    <div class="menu-icon">📰</div>
-                    <div class="menu-title">Новости</div>
-                    <div class="menu-description">Последние обновления системы и новости коллаборативного позиционирования</div>
-                </div>
                 <div class="menu-item" data-page="measurements" data-protected="true">
                     <div class="menu-icon">📊</div>
                     <div class="menu-title">Обработка измерений</div>
                     <div class="menu-description">Анализ и обработка данных позиционирования в реальном времени</div>
-                </div>
-                <div class="menu-item" data-page="map" data-protected="true">
-                    <div class="menu-icon">🗺️</div>
-                    <div class="menu-title">Карта пользователей</div>
-                    <div class="menu-description">Интерактивная карта с отображением всех активных пользователей</div>
                 </div>
                 <div class="menu-item" data-page="profile" data-protected="true">
                     <div class="menu-icon">👤</div>
@@ -374,16 +367,12 @@
 
         <div class="stats-section">
             <div class="stat-card">
-                <div class="stat-value" id="activeUsers">127</div>
+                <div class="stat-value" id="activeUsers">0</div>
                 <div class="stat-label">Активных пользователей</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="measurementsToday">1,284</div>
-                <div class="stat-label">Измерений сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="accuracy">±0.3м</div>
-                <div class="stat-label">Точность позиционирования</div>
+                <div class="stat-value" id="measurementsToday">0</div>
+                <div class="stat-label">Обработано сегодня</div>
             </div>
         </div>
     </main>
@@ -432,8 +421,49 @@
         }
 
         function navigateTo(page) {
-            const pages = { 'news': 'news.html', 'measurements': 'measurements', 'map': 'map.html', 'profile': 'profile' };
+            const pages = { 'measurements': 'measurements', 'profile': 'profile' };
             window.location.href = pages[page] || '/';
+        }
+
+        // Анимация счетчиков
+        function animateValue(element, start, end, duration) {
+            if (!element) return;
+            const range = end - start;
+            const increment = range / (duration / 10);
+            let current = start;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                    current = end;
+                    clearInterval(timer);
+                }
+                element.textContent = Math.round(current);
+            }, 10);
+        }
+
+        // Загрузка статистики с сервера
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    const activeUsers = stats.activeUsers || 0;
+                    const measurementsToday = stats.measurementsToday || 0;
+                    
+                    // Анимируем счетчики
+                    animateValue(document.getElementById('activeUsers'), 0, activeUsers, 1000);
+                    animateValue(document.getElementById('measurementsToday'), 0, measurementsToday, 1000);
+                } else {
+                    console.warn('Failed to load stats, using defaults');
+                    document.getElementById('activeUsers').textContent = '0';
+                    document.getElementById('measurementsToday').textContent = '0';
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                document.getElementById('activeUsers').textContent = '0';
+                document.getElementById('measurementsToday').textContent = '0';
+            }
         }
 
         document.querySelectorAll('.menu-item').forEach(item => {
@@ -450,7 +480,9 @@
             });
         });
 
+        // Инициализация
         updateHeader();
+        loadStats();
     </script>
 </body>
 </html>
