@@ -22,7 +22,6 @@ func NewTaskStorage(pool *pgxpool.Pool) *TaskStorage {
 
 // InitTaskSchema создает таблицы для задач и результатов
 func (s *TaskStorage) InitTaskSchema() error {
-	// Создаем таблицу задач
 	_, err := s.pool.Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS processing_tasks (
 			id VARCHAR(36) PRIMARY KEY,
@@ -44,7 +43,6 @@ func (s *TaskStorage) InitTaskSchema() error {
 		return fmt.Errorf("create tasks table: %w", err)
 	}
 
-	// Создаем таблицу результатов с полями для статики/кинематики
 	_, err = s.pool.Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS processing_results (
 			id SERIAL PRIMARY KEY,
@@ -74,7 +72,6 @@ func (s *TaskStorage) InitTaskSchema() error {
 		return fmt.Errorf("create results table: %w", err)
 	}
 
-	// Создаем индексы
 	_, err = s.pool.Exec(context.Background(), `
 		CREATE INDEX IF NOT EXISTS idx_tasks_user ON processing_tasks(user_login);
 		CREATE INDEX IF NOT EXISTS idx_tasks_status ON processing_tasks(status);
@@ -87,7 +84,6 @@ func (s *TaskStorage) InitTaskSchema() error {
 		return fmt.Errorf("create indexes: %w", err)
 	}
 
-	// Создаем функцию для автоматического удаления старых записей
 	_, err = s.pool.Exec(context.Background(), `
 		CREATE OR REPLACE FUNCTION delete_expired_results()
 		RETURNS TRIGGER AS $$
@@ -103,7 +99,6 @@ func (s *TaskStorage) InitTaskSchema() error {
 		EXECUTE FUNCTION delete_expired_results();
 	`)
 	if err != nil {
-		// Игнорируем ошибку, если триггер уже существует
 		fmt.Printf("Trigger creation warning: %v\n", err)
 	}
 
@@ -161,7 +156,6 @@ func (s *TaskStorage) UpdateTask(task *model.ProcessingTask) error {
 }
 
 func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
-	// Устанавливаем время удаления через 24 часа
 	if result.ExpiresAt.IsZero() {
 		result.ExpiresAt = time.Now().Add(24 * time.Hour)
 	}
@@ -328,7 +322,8 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		var (
 			id, userLogin, filename, status, errorMessage, lastSolutionLine, fileType string
 			configJSON                                                                []byte
-			createdAt, completedAt                                                    time.Time
+			createdAt                                                                 time.Time
+			completedAt                                                               *time.Time // FIX: *time.Time чтобы корректно обрабатывать NULL
 			processingSec                                                             *float64
 			x, y, z, lat, lon, height                                                 float64
 			q, nSat                                                                   int
@@ -350,14 +345,18 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		}
 
 		task := map[string]interface{}{
-			"id":          id,
-			"userLogin":   userLogin,
-			"config":      config,
-			"filename":    filename,
-			"status":      status,
-			"createdAt":   createdAt,
-			"completedAt": completedAt,
-			"fileType":    fileType,
+			"id":        id,
+			"userLogin": userLogin,
+			"config":    config,
+			"filename":  filename,
+			"status":    status,
+			"createdAt": createdAt,
+			"fileType":  fileType,
+		}
+
+		// completedAt добавляем только если не NULL
+		if completedAt != nil {
+			task["completedAt"] = completedAt
 		}
 
 		if errorMessage != "" {
@@ -367,14 +366,12 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 			task["processingSec"] = *processingSec
 		}
 
-		// Добавляем результат
 		result := map[string]interface{}{
 			"x": x, "y": y, "z": z,
 			"latitude": lat, "longitude": lon, "height": height,
 			"q": q, "nSat": nSat,
 		}
 
-		// Для статики показываем последнюю строку
 		if fileType == "static" && lastSolutionLine != "" {
 			result["lastSolutionLine"] = lastSolutionLine
 		}

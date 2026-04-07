@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"collaborative/internal/auth"
 	"collaborative/internal/cache"
 	"collaborative/internal/middlewares"
@@ -436,6 +437,117 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 	w.Write(fileData)
 }
 
+// parseRinexDate извлекает дату первого наблюдения из заголовка RINEX-файла.
+// Поддерживает RINEX 2.x и RINEX 3.x.
+// Возвращает ошибку, если файл не является валидным RINEX или дата не найдена.
+func parseRinexDate(filePath string) (time.Time, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("open rinex file: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Заголовок заканчивается на этой метке
+		if strings.Contains(line, "END OF HEADER") {
+			break
+		}
+
+		// Поле присутствует в обоих версиях: RINEX 2 и RINEX 3
+		// Формат RINEX 2: "  1980     1     6     0     0    0.0000000     GPS         TIME OF FIRST OBS"
+		// Формат RINEX 3: "  2024   097     0     0    0.0000000     GPS             TIME OF FIRST OBS"
+		if strings.Contains(line, "TIME OF FIRST OBS") {
+			t, err := parseFirstObsLine(line)
+			if err != nil {
+				return time.Time{}, fmt.Errorf("parse TIME OF FIRST OBS: %w", err)
+			}
+			return t, nil
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return time.Time{}, fmt.Errorf("read rinex file: %w", err)
+	}
+
+	return time.Time{}, fmt.Errorf("TIME OF FIRST OBS not found in RINEX header")
+}
+
+// parseFirstObsLine парсит строку "TIME OF FIRST OBS" из заголовка RINEX.
+// RINEX 2/3 формат: 6 числовых полей по 6 символов: год, месяц, день, час, мин, сек.
+func parseFirstObsLine(line string) (time.Time, error) {
+	// Первые 60 символов — данные, остальное — метка
+	if len(line) < 48 {
+		return time.Time{}, fmt.Errorf("line too short: %q", line)
+	}
+
+	data := line[:48]
+	fields := strings.Fields(data)
+
+	// Ожидаем минимум 5 полей: год, месяц, день, час, минута
+	if len(fields) < 5 {
+		return time.Time{}, fmt.Errorf("expected at least 5 fields, got %d: %q", len(fields), data)
+	}
+
+	year, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse year %q: %w", fields[0], err)
+	}
+
+	month, err := strconv.Atoi(fields[1])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse month %q: %w", fields[1], err)
+	}
+
+	day, err := strconv.Atoi(fields[2])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse day %q: %w", fields[2], err)
+	}
+
+	hour, err := strconv.Atoi(fields[3])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse hour %q: %w", fields[3], err)
+	}
+
+	minute, err := strconv.Atoi(fields[4])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse minute %q: %w", fields[4], err)
+	}
+
+	// Секунды опциональны и могут быть дробными
+	sec := 0.0
+	if len(fields) >= 6 {
+		sec, err = strconv.ParseFloat(fields[5], 64)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("parse seconds %q: %w", fields[5], err)
+		}
+	}
+
+	// RINEX 2.x использует 2-значный год: 80–99 → 1980–1999, 00–79 → 2000–2079
+	if year >= 0 && year <= 79 {
+		year += 2000
+	} else if year >= 80 && year <= 99 {
+		year += 1900
+	}
+
+	// Базовая валидация
+	if month < 1 || month > 12 {
+		return time.Time{}, fmt.Errorf("invalid month: %d", month)
+	}
+	if day < 1 || day > 31 {
+		return time.Time{}, fmt.Errorf("invalid day: %d", day)
+	}
+
+	wholeSeconds := int(sec)
+	nanoseconds := int((sec - float64(wholeSeconds)) * 1e9)
+
+	t := time.Date(year, time.Month(month), day, hour, minute, wholeSeconds, nanoseconds, time.UTC)
+	return t, nil
+}
+
 // processTask обрабатывает задачу (обновленная версия с сохранением в БД)
 func (h *MeasurementHandler) processTask(taskID, login string, config model.UserProcessingConfig, fileData []byte, filename string) {
 	h.logger.Infof("Starting processing for task %s, method: %s", taskID, config.Method)
@@ -452,24 +564,27 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 
 	workDir := filepath.Join(h.workDir, taskID)
 	os.MkdirAll(workDir, 0755)
-	defer os.RemoveAll(workDir)
 
 	// 1. Сохраняем файл
 	obsPath := filepath.Join(workDir, filename)
 	if err := os.WriteFile(obsPath, fileData, 0644); err != nil {
-		h.updateTaskError(taskID, err.Error())
+		h.updateTaskError(taskID, login, err.Error())
 		return
 	}
 
 	// 2. Конвертируем в RINEX (упрощенно - копируем)
 	rinexPath := filepath.Join(workDir, "observation.obs")
 	if err := os.WriteFile(rinexPath, fileData, 0644); err != nil {
-		h.updateTaskError(taskID, fmt.Sprintf("Conversion: %v", err))
+		h.updateTaskError(taskID, login, fmt.Sprintf("Conversion: %v", err))
 		return
 	}
 
-	// 3. Определяем дату из RINEX (упрощенно - текущая)
-	date := time.Now()
+	// 3. Определяем дату из RINEX
+	date, err := parseRinexDate(rinexPath)
+	if err != nil {
+		h.logger.Warnf("Failed to parse RINEX date: %v, using current time", err)
+		date = time.Now()
+	}
 
 	// 4. Скачиваем необходимые файлы
 	files := &ProcessingFiles{}
@@ -495,7 +610,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 
 		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)
 		if cfgErr != nil {
-			h.updateTaskError(taskID, fmt.Sprintf("Config generation: %v", cfgErr))
+			h.updateTaskError(taskID, login, fmt.Sprintf("Config generation: %v", cfgErr))
 			return
 		}
 
@@ -509,7 +624,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 
 		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)
 		if cfgErr != nil {
-			h.updateTaskError(taskID, fmt.Sprintf("Config generation: %v", cfgErr))
+			h.updateTaskError(taskID, login, fmt.Sprintf("Config generation: %v", cfgErr))
 			return
 		}
 
@@ -517,7 +632,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	}
 
 	if procErr != nil {
-		h.updateTaskError(taskID, fmt.Sprintf("Processing: %v", procErr))
+		h.updateTaskError(taskID, login, fmt.Sprintf("Processing: %v", procErr))
 		return
 	}
 
@@ -560,9 +675,13 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	h.historyCache.Invalidate(login)
 
 	h.logger.Infof("Task %s completed successfully in %.2f seconds, output: %s", taskID, task.ProcessingSec, outputPath)
+
+	permanentPath := filepath.Join(h.workDir, taskID+".pos")
+	os.Rename(outputPath, permanentPath)
+	os.RemoveAll(workDir)
 }
 
-func (h *MeasurementHandler) updateTaskError(taskID, errMsg string) {
+func (h *MeasurementHandler) updateTaskError(taskID, login, errMsg string) {
 	h.logger.Errorf("Task %s failed: %s", taskID, errMsg)
 
 	task := &model.ProcessingTask{
@@ -572,10 +691,7 @@ func (h *MeasurementHandler) updateTaskError(taskID, errMsg string) {
 	}
 	h.taskStorage.UpdateTask(task)
 
-	// Инвалидируем кэш
-	if task.UserLogin != "" {
-		h.historyCache.Invalidate(task.UserLogin)
-	}
+	h.historyCache.Invalidate(login)
 }
 
 func (h *MeasurementHandler) parseResult(outputData []byte, taskID, login string, config model.UserProcessingConfig) *model.ProcessingResult {

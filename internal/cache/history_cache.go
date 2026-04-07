@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"strings"
 	"sync"
 	"time"
 )
@@ -15,8 +16,8 @@ type CacheEntry struct {
 type HistoryCache struct {
 	cache   map[string]*CacheEntry
 	mu      sync.RWMutex
-	ttl     time.Duration // время жизни кэша
-	maxSize int           // максимальный размер кэша
+	ttl     time.Duration
+	maxSize int
 }
 
 // NewHistoryCache создает новый кэш
@@ -26,10 +27,7 @@ func NewHistoryCache(ttl time.Duration, maxSize int) *HistoryCache {
 		ttl:     ttl,
 		maxSize: maxSize,
 	}
-
-	// Запускаем фоновую очистку устаревших записей
 	go cache.cleanup()
-
 	return cache
 }
 
@@ -43,7 +41,6 @@ func (c *HistoryCache) Get(key string) (interface{}, bool) {
 		return nil, false
 	}
 
-	// Проверяем не истекло ли время
 	if time.Now().After(entry.ExpiresAt) {
 		return nil, false
 	}
@@ -56,7 +53,6 @@ func (c *HistoryCache) Set(key string, data interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Если кэш переполнен, удаляем самую старую запись
 	if len(c.cache) >= c.maxSize {
 		c.evictOldest()
 	}
@@ -67,23 +63,28 @@ func (c *HistoryCache) Set(key string, data interface{}) {
 	}
 }
 
-// Invalidate инвалидирует кэш для пользователя
+// Invalidate удаляет все записи кэша для данного пользователя.
+// Ключи имеют формат "login:limit:offset", поэтому ищем по префиксу "login:".
 func (c *HistoryCache) Invalidate(userLogin string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	delete(c.cache, userLogin)
+	prefix := userLogin + ":"
+	for key := range c.cache {
+		if strings.HasPrefix(key, prefix) {
+			delete(c.cache, key)
+		}
+	}
 }
 
 // InvalidateAll очищает весь кэш
 func (c *HistoryCache) InvalidateAll() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
 	c.cache = make(map[string]*CacheEntry)
 }
 
-// cleanup удаляет устаревшие записи
+// cleanup удаляет устаревшие записи каждые 5 минут
 func (c *HistoryCache) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
@@ -100,7 +101,7 @@ func (c *HistoryCache) cleanup() {
 	}
 }
 
-// evictOldest удаляет самую старую запись (при переполнении)
+// evictOldest удаляет самую старую запись при переполнении
 func (c *HistoryCache) evictOldest() {
 	var oldestKey string
 	var oldestTime time.Time

@@ -197,7 +197,7 @@
         <div class="card">
             <h2>📡 Обработка спутниковых измерений</h2>
             <div class="method-selector">
-                <div class="method-option" data-method="absolute" onclick="selectMethod('absolute')">
+                <div class="method-option" data-method="single" onclick="selectMethod('single')">
                     <div class="method-icon">📍</div>
                     <div class="method-title">Абсолютный метод</div>
                     <div class="method-desc">Single Point Positioning</div>
@@ -230,11 +230,11 @@
         let selectedFile = null;
 
         const methodDetails = {
-            absolute: {
+            single: {
                 title: "📌 Абсолютный метод (SPP)",
                 description: "Одиночное точечное позиционирование с использованием только псевдодальностей",
                 features: ["✅ Не требует базовой станции", "✅ Точность: 3-10 метров", "✅ Использует широковещательные эфемериды", "✅ Быстрая обработка"],
-                config: { method: "absolute", mode: "kinematic", frequency: "l1+l2", elevationMask: 10, ionoModel: "brdc", tropModel: "saas", arMode: "off", dynamics: false, tideCorr: false, usePreciseEphemeris: false, usePreciseClock: false, useDcb: false, useErp: false, satelliteSystem: 1 }
+                config: { method: "single", mode: "kinematic", frequency: "l1+l2", elevationMask: 10, ionoModel: "brdc", tropModel: "saas", arMode: "off", dynamics: false, tideCorr: false, usePreciseEphemeris: false, usePreciseClock: false, useDcb: false, useErp: false, satelliteSystem: 1 }
             },
             relative: {
                 title: "🔗 Относительный метод (Differential)",

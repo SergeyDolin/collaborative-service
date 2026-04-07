@@ -34,21 +34,6 @@ func main() {
 	var dbStor *storage.DBStorage
 	var taskStorage *storage.TaskStorage
 
-	if taskStorage != nil {
-		// Запускаем фоновую очистку старых записей каждый час
-		go func() {
-			ticker := time.NewTicker(1 * time.Hour)
-			defer ticker.Stop()
-
-			for range ticker.C {
-				if err := taskStorage.CleanExpiredResults(); err != nil {
-					sugar.Errorf("Failed to clean expired results: %v", err)
-				} else {
-					sugar.Debug("Cleaned expired results")
-				}
-			}
-		}()
-	}
 	if dbStor != nil {
 		taskStorage = storage.NewTaskStorage(dbStor.Pool())
 		if err := taskStorage.InitTaskSchema(); err != nil {
@@ -74,6 +59,21 @@ func main() {
 		if err := taskStorage.InitTaskSchema(); err != nil {
 			sugar.Fatalf("Failed to init task schema: %v", err)
 		}
+	}
+	if taskStorage != nil {
+		// Запускаем фоновую очистку старых записей каждый час
+		go func() {
+			ticker := time.NewTicker(1 * time.Hour)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				if err := taskStorage.CleanExpiredResults(); err != nil {
+					sugar.Errorf("Failed to clean expired results: %v", err)
+				} else {
+					sugar.Debug("Cleaned expired results")
+				}
+			}
+		}()
 	}
 
 	// init JWT services
@@ -153,6 +153,7 @@ func main() {
 		r.Get("/api/profile", handlers.ProfileHandler(sugar))
 		r.Post("/api/measurements/process", measurementHandler.ProcessMeasurementHandler)
 		r.Get("/api/measurements/history", measurementHandler.GetHistoryHandler)
+		r.Get("/api/measurements/status", measurementHandler.GetTaskStatusHandler)
 		r.Get("/api/measurements/download", measurementHandler.DownloadResultHandler)
 	})
 
@@ -162,8 +163,8 @@ func main() {
 	srv := &http.Server{
 		Addr:         cfg.RunAddr,
 		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 

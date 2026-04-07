@@ -4,11 +4,9 @@ package model
 type ProcessingMethod string
 
 const (
-	MethodSingle       ProcessingMethod = "single"
-	MethodRelative     ProcessingMethod = "static"
-	MethodPPP          ProcessingMethod = "ppp-static"
-	MethodRelativeKine ProcessingMethod = "kinematic"
-	MethodPPPKine      ProcessingMethod = "ppp-kine"
+	MethodSingle   ProcessingMethod = "single"
+	MethodRelative ProcessingMethod = "relative"
+	MethodPPP      ProcessingMethod = "ppp"
 )
 
 // ProcessingMode mode of adjustment
