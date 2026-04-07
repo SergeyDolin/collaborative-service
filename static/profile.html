@@ -49,6 +49,7 @@
             align-items: center;
             gap: 10px;
             text-decoration: none;
+            cursor: pointer;
         }
 
         .logo-icon {
@@ -94,9 +95,9 @@
 
         .logout-btn:hover {
             background: #fecaca;
+            transform: translateY(-1px);
         }
 
-        /* Основной контент */
         .main-content {
             margin-top: 100px;
             padding: 20px;
@@ -105,7 +106,6 @@
         /* Приветственная карточка */
         .welcome-card {
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 32px;
             margin-bottom: 30px;
@@ -133,10 +133,10 @@
 
         .stat-card {
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
             border-radius: 16px;
             padding: 24px;
             transition: transform 0.2s ease;
+            text-align: center;
         }
 
         .stat-card:hover {
@@ -160,18 +160,16 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
+            margin-bottom: 30px;
         }
 
         .action-card {
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
             border-radius: 16px;
             padding: 24px;
             cursor: pointer;
             transition: all 0.2s ease;
-            text-decoration: none;
-            color: inherit;
-            display: block;
+            text-align: center;
         }
 
         .action-card:hover {
@@ -195,6 +193,216 @@
             color: #6c7a6e;
             font-size: 0.9rem;
             line-height: 1.5;
+        }
+
+        /* История обработок */
+        .history-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 32px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .history-section h3 {
+            color: #2c3e2f;
+        }
+
+        .btn-history {
+            background: linear-gradient(135deg, #eeb344, #9be041);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-history:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(155, 224, 65, 0.3);
+        }
+
+        .history-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .history-item:hover {
+            background: #eef2ee;
+            transform: translateX(4px);
+        }
+
+        .history-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .history-info {
+            flex: 1;
+        }
+
+        .history-date {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .history-method {
+            font-weight: 600;
+            margin-top: 4px;
+            color: #2c3e2f;
+        }
+
+        .history-file {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .history-status {
+            text-align: right;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-completed {
+            background: #e6f7e6;
+            color: #2e7d32;
+        }
+
+        .status-failed {
+            background: #fee2e2;
+            color: #c53030;
+        }
+
+        .status-processing {
+            background: #fff3e0;
+            color: #ed6c02;
+        }
+
+        .status-pending {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        /* Блок результата */
+        .result-block {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #e0e5e0;
+        }
+
+        .solution-line {
+            background: #2c3e2f;
+            color: #9be041;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .coords-info {
+            font-size: 0.8rem;
+            color: #eeb344;
+            margin-bottom: 8px;
+        }
+
+        .stats-info {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .stat-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .download-section {
+            margin-top: 10px;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #eeb344, #9be041);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(155, 224, 65, 0.3);
+        }
+
+        .expiry-info {
+            font-size: 0.65rem;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .error-msg {
+            background: #fee2e2;
+            color: #c53030;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            margin-top: 8px;
+        }
+
+        .empty-history {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .loading, .error {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .error {
+            color: #c53030;
         }
 
         /* Модальное окно */
@@ -221,6 +429,7 @@
 
         .modal-content h3 {
             margin-bottom: 16px;
+            color: #2c3e2f;
         }
 
         .modal-content input {
@@ -229,6 +438,12 @@
             border: 1.5px solid #e0e5e0;
             border-radius: 10px;
             margin: 16px 0;
+            font-size: 1rem;
+        }
+
+        .modal-content input:focus {
+            outline: none;
+            border-color: #9be041;
         }
 
         .modal-buttons {
@@ -242,25 +457,35 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            font-size: 0.9rem;
         }
 
-        .error-message {
-            background: #fee2e2;
-            color: #c53030;
-            padding: 12px;
-            border-radius: 10px;
-            margin-top: 16px;
-            font-size: 0.85rem;
-            display: none;
-        }
-
+        /* Адаптивность */
         @media (max-width: 768px) {
             .main-content {
                 margin-top: 120px;
             }
-            
+
             .welcome-card h1 {
                 font-size: 1.5rem;
+            }
+
+            .history-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn-history {
+                width: 100%;
+            }
+
+            .history-header-row {
+                flex-direction: column;
+            }
+
+            .history-status {
+                text-align: left;
+                margin-top: 8px;
             }
         }
     </style>
@@ -268,10 +493,10 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <a href="/" class="logo">
+            <div class="logo" onclick="window.location.href='/'">
                 <div class="logo-icon">📡</div>
                 <div class="logo-text">Collab<span>Service</span></div>
-            </a>
+            </div>
             <div class="user-menu">
                 <span class="user-name" id="userName">Пользователь</span>
                 <button class="logout-btn" onclick="logout()">Выйти</button>
@@ -302,7 +527,7 @@
             </div>
 
             <div class="actions-grid">
-                <div class="action-card" onclick="navigateTo('measurements')">
+                <div class="action-card" onclick="goToMeasurements()">
                     <div class="action-icon">📊</div>
                     <div class="action-title">Обработка измерений</div>
                     <div class="action-description">Загрузка и анализ данных позиционирования</div>
@@ -323,6 +548,16 @@
                     <div class="action-description">Последние обновления и новости</div>
                 </div>
             </div>
+
+            <div class="history-section">
+                <div class="history-header">
+                    <h3>📊 История обработок</h3>
+                    <button class="btn-history" onclick="loadProcessingHistory(true)">🔄 Обновить историю</button>
+                </div>
+                <div id="processingHistory" class="history-list">
+                    <div class="empty-history">Нажмите "Обновить историю" для загрузки</div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -331,69 +566,77 @@
         <div class="modal-content">
             <h3>Настройки профиля</h3>
             <label for="newPassword">Новый пароль</label>
-            <input type="password" id="newPassword" placeholder="Введите новый пароль">
-            <div id="settingsError" class="error-message"></div>
+            <input type="password" id="newPassword" placeholder="Введите новый пароль (мин. 8 символов)">
+            <div id="settingsError" class="error-message" style="display: none;"></div>
             <div class="modal-buttons">
-                <button onclick="closeSettings()">Отмена</button>
+                <button onclick="closeSettings()" style="background: #e0e5e0;">Отмена</button>
                 <button onclick="updatePassword()" style="background: #9be041; color: white;">Сохранить</button>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = window.location.origin;
-        
+        let currentPage = 0;
+        const pageSize = 20;
+        let isLoading = false;
+
         // Проверка авторизации
         function checkAuth() {
             const token = localStorage.getItem('token');
             const login = localStorage.getItem('userLogin');
-            
             if (!token || !login) {
                 window.location.href = '/login';
                 return false;
             }
-            
             document.getElementById('userName').textContent = login;
             document.getElementById('welcomeTitle').textContent = `Добро пожаловать, ${login}!`;
             return true;
         }
-        
+
         // Выход из системы
         function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('userLogin');
             window.location.href = '/';
         }
-        
+
         // Навигация
         function navigateTo(page) {
-            alert(`Переход к разделу "${page}"\nФункционал в разработке`);
-            // Здесь будет реальная навигация
+            if (page === 'measurements') {
+                window.location.href = '/measurements';
+            } else {
+                alert(`Переход к разделу "${page}"\nФункционал в разработке`);
+            }
         }
-        
+
+        // Переход на страницу обработки измерений
+        function goToMeasurements() {
+            window.location.href = '/measurements';
+        }
+
         // Открытие настроек
         function openSettings() {
             document.getElementById('settingsModal').style.display = 'flex';
         }
-        
+
         function closeSettings() {
             document.getElementById('settingsModal').style.display = 'none';
             document.getElementById('settingsError').style.display = 'none';
             document.getElementById('newPassword').value = '';
         }
-        
+
         // Обновление пароля
         async function updatePassword() {
             const newPassword = document.getElementById('newPassword').value;
             const token = localStorage.getItem('token');
             const errorDiv = document.getElementById('settingsError');
-            
+
             if (!newPassword || newPassword.length < 8) {
                 errorDiv.textContent = 'Пароль должен содержать минимум 8 символов';
                 errorDiv.style.display = 'block';
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/profile/password', {
                     method: 'PUT',
@@ -403,7 +646,7 @@
                     },
                     body: JSON.stringify({ password: newPassword })
                 });
-                
+
                 if (response.ok) {
                     alert('Пароль успешно изменен');
                     closeSettings();
@@ -415,20 +658,214 @@
             } catch (error) {
                 errorDiv.textContent = 'Ошибка соединения с сервером';
                 errorDiv.style.display = 'block';
-                console.error('Password update error:', error);
             }
         }
-        
-        // Загрузка статистики пользователя
+
+        // Получение названия метода
+        function getMethodName(method) {
+            const methods = {
+                'absolute': '📍 Абсолютный метод (SPP)',
+                'relative': '🔗 Относительный метод (Differential)',
+                'ppp': '🎯 PPP метод'
+            };
+            return methods[method] || method || 'Неизвестный метод';
+        }
+
+        // Получение текста статуса
+        function getStatusText(status) {
+            const statuses = {
+                'pending': '⏳ В очереди',
+                'processing': '🔄 Обработка...',
+                'completed': '✅ Завершено',
+                'failed': '❌ Ошибка'
+            };
+            return statuses[status] || status;
+        }
+
+        // Форматирование строки решения (обрезаем до читаемого вида)
+        function formatSolutionLine(line) {
+            if (!line) return '';
+            // Если строка слишком длинная, обрезаем
+            if (line.length > 200) {
+                return line.substring(0, 200) + '...';
+            }
+            return line;
+        }
+
+        // Загрузка истории обработок с пагинацией
+        async function loadProcessingHistory(resetPage = true) {
+            if (isLoading) return;
+            
+            if (resetPage) {
+                currentPage = 0;
+                document.getElementById('processingHistory').innerHTML = '<div class="loading">⏳ Загрузка истории...</div>';
+            }
+            
+            const token = localStorage.getItem('token');
+            const container = document.getElementById('processingHistory');
+            
+            isLoading = true;
+            
+            try {
+                const response = await fetch(`/api/measurements/history?limit=${pageSize}&offset=${currentPage * pageSize}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const tasks = await response.json();
+                    
+                    if (!tasks || tasks.length === 0) {
+                        if (currentPage === 0) {
+                            container.innerHTML = '<div class="empty-history">📭 Нет выполненных обработок</div>';
+                        } else {
+                            container.innerHTML += '<div class="empty-history">📭 Больше нет записей</div>';
+                        }
+                        isLoading = false;
+                        return;
+                    }
+                    
+                    const historyHtml = tasks.map(task => {
+                        const date = new Date(task.createdAt).toLocaleString();
+                        const method = getMethodName(task.config?.method);
+                        const filename = task.filename || 'файл';
+                        const status = task.status || 'pending';
+                        const statusText = getStatusText(status);
+                        const fileType = task.fileType || (task.config?.mode === 'static' ? 'static' : 'kinematic');
+                        const modeText = fileType === 'static' ? 'Статика' : 'Кинематика';
+                        
+                        // Формируем блок результата в зависимости от типа
+                        let resultHtml = '';
+                        
+                        if (status === 'completed' && task.result) {
+                            const result = task.result;
+                            
+                            // Статистика
+                            let statsHtml = '';
+                            if (result.q !== undefined || result.nSat !== undefined || result.rms !== undefined) {
+                                statsHtml = `
+                                    <div class="stats-info">
+                                        ${result.q !== undefined ? `<span class="stat-item">🎯 Q: ${result.q}</span>` : ''}
+                                        ${result.nSat !== undefined ? `<span class="stat-item">🛰️ Спутников: ${result.nSat}</span>` : ''}
+                                        ${result.rms !== undefined ? `<span class="stat-item">📊 RMS: ${result.rms.toFixed(3)}м</span>` : ''}
+                                    </div>
+                                `;
+                            }
+                            
+                            // Координаты
+                            let coordsHtml = '';
+                            if (result.latitude && result.longitude) {
+                                coordsHtml = `<div class="coords-info">📍 ${result.latitude.toFixed(6)}°, ${result.longitude.toFixed(6)}° ${result.height ? `, h: ${result.height.toFixed(2)}м` : ''}</div>`;
+                            } else if (result.x && result.y && result.z) {
+                                coordsHtml = `<div class="coords-info">📍 X: ${result.x.toFixed(2)}м, Y: ${result.y.toFixed(2)}м, Z: ${result.z.toFixed(2)}м</div>`;
+                            }
+                            
+                            // Для статики - показываем последнюю строку решения
+                            if (fileType === 'static' && result.lastSolutionLine) {
+                                resultHtml = `
+                                    <div class="result-block">
+                                        ${statsHtml}
+                                        ${coordsHtml}
+                                        <div class="solution-line">
+                                            <strong>📋 Последняя строка решения:</strong><br>
+                                            ${formatSolutionLine(result.lastSolutionLine)}
+                                        </div>
+                                    </div>
+                                `;
+                            } 
+                            // Для кинематики - показываем кнопку скачивания
+                            else if (fileType === 'kinematic') {
+                                resultHtml = `
+                                    <div class="result-block">
+                                        ${statsHtml}
+                                        ${coordsHtml}
+                                        <div class="download-section">
+                                            <a href="/api/measurements/download?id=${task.id}" class="download-btn">📥 Скачать полный файл решения</a>
+                                            <div class="expiry-info">⏰ Файл доступен для скачивания в течение 24 часов</div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                            // Общий случай
+                            else if (coordsHtml || statsHtml) {
+                                resultHtml = `
+                                    <div class="result-block">
+                                        ${statsHtml}
+                                        ${coordsHtml}
+                                    </div>
+                                `;
+                            }
+                        }
+                        
+                        // Блок с ошибкой
+                        let errorHtml = '';
+                        if (status === 'failed' && task.errorMessage) {
+                            errorHtml = `<div class="error-msg">❌ ${task.errorMessage}</div>`;
+                        }
+                        
+                        return `
+                            <div class="history-item">
+                                <div class="history-header-row">
+                                    <div class="history-info">
+                                        <div class="history-date">📅 ${date}</div>
+                                        <div class="history-method">${method} (${modeText})</div>
+                                        <div class="history-file">📁 ${filename}</div>
+                                    </div>
+                                    <div class="history-status">
+                                        <span class="status-badge status-${status}">${statusText}</span>
+                                    </div>
+                                </div>
+                                ${resultHtml}
+                                ${errorHtml}
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    if (currentPage === 0) {
+                        container.innerHTML = historyHtml;
+                    } else {
+                        container.innerHTML += historyHtml;
+                    }
+                    
+                    // Добавляем кнопку "Загрузить еще" если есть еще записи
+                    if (tasks.length === pageSize) {
+                        const loadMoreBtn = document.createElement('button');
+                        loadMoreBtn.textContent = '📥 Загрузить еще';
+                        loadMoreBtn.className = 'btn-history';
+                        loadMoreBtn.style.marginTop = '20px';
+                        loadMoreBtn.style.width = '100%';
+                        loadMoreBtn.onclick = () => {
+                            currentPage++;
+                            loadProcessingHistory(false);
+                            loadMoreBtn.remove();
+                        };
+                        container.appendChild(loadMoreBtn);
+                    }
+                } else if (response.status === 401) {
+                    container.innerHTML = '<div class="error">🔒 Сессия истекла. <a href="/login">Войдите снова</a></div>';
+                } else {
+                    container.innerHTML = '<div class="error">❌ Ошибка загрузки истории</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load history:', error);
+                container.innerHTML = '<div class="error">❌ Ошибка соединения с сервером</div>';
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        // Загрузка статистики пользователя (демо-данные)
         async function loadUserStats() {
             const token = localStorage.getItem('token');
             
             try {
-                // Пример запроса к API для получения статистики
-                // const response = await fetch('/profile/stats', {
+                // В реальном приложении здесь будет запрос к API
+                // const response = await fetch('/api/profile/stats', {
                 //     headers: { 'Authorization': `Bearer ${token}` }
                 // });
                 // const stats = await response.json();
+                // document.getElementById('measurementsCount').textContent = stats.measurements || 0;
+                // document.getElementById('collaborationsCount').textContent = stats.collaborations || 0;
+                // document.getElementById('activeDays').textContent = stats.activeDays || 0;
                 
                 // Пока используем демо-данные
                 document.getElementById('measurementsCount').textContent = '12';
@@ -438,12 +875,38 @@
                 console.error('Failed to load stats:', error);
             }
         }
-        
+
+        // Автоматическая проверка статуса задач
+        function startStatusPolling() {
+            setInterval(async () => {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+                
+                try {
+                    const response = await fetch('/api/measurements/history?limit=5&offset=0', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (response.ok) {
+                        const tasks = await response.json();
+                        const hasProcessing = tasks.some(task => task.status === 'processing' || task.status === 'pending');
+                        
+                        if (!hasProcessing && document.querySelector('.status-processing')) {
+                            loadProcessingHistory(true);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status poll error:', error);
+                }
+            }, 5000);
+        }
+
         // Инициализация
         if (checkAuth()) {
             loadUserStats();
+            startStatusPolling();
         }
-        
+
         // Закрытие модального окна по клику вне его
         window.onclick = function(event) {
             const modal = document.getElementById('settingsModal');

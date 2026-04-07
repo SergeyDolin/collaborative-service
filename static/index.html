@@ -18,7 +18,6 @@
             color: #333;
         }
 
-        /* Шапка сайта */
         .header {
             background: rgba(255, 255, 255, 0.95);
             padding: 1rem 2rem;
@@ -128,14 +127,12 @@
             transform: translateY(-2px);
         }
 
-        /* Основной контент */
         .main-content {
             max-width: 1200px;
             margin: 100px auto 50px;
             padding: 0 20px;
         }
 
-        /* Приветственный баннер */
         .welcome-banner {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -159,7 +156,6 @@
             margin: 0 auto;
         }
 
-        /* Центральное меню */
         .menu-container {
             display: flex;
             justify-content: center;
@@ -227,7 +223,6 @@
             line-height: 1.6;
         }
 
-        /* Статистика */
         .stats-section {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -256,7 +251,6 @@
             font-size: 0.9rem;
         }
 
-        /* Подвал */
         .footer {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -272,7 +266,6 @@
             color: #666;
         }
 
-        /* Уведомление */
         .notification {
             position: fixed;
             top: 80px;
@@ -297,31 +290,25 @@
             }
         }
 
-        /* Адаптивность */
         @media (max-width: 768px) {
             .menu-grid {
                 grid-template-columns: 1fr;
             }
-
             .stats-section {
                 grid-template-columns: 1fr;
             }
-
             .welcome-banner h1 {
                 font-size: 2rem;
             }
-
             .header-content {
                 flex-direction: column;
                 gap: 10px;
             }
-
             .main-content {
                 margin-top: 120px;
             }
         }
 
-        /* Анимации */
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -336,7 +323,6 @@
         .menu-item, .stat-card {
             animation: fadeIn 0.5s ease-out forwards;
         }
-
         .menu-item:nth-child(1) { animation-delay: 0.1s; }
         .menu-item:nth-child(2) { animation-delay: 0.2s; }
         .menu-item:nth-child(3) { animation-delay: 0.3s; }
@@ -344,69 +330,47 @@
     </style>
 </head>
 <body>
-    <!-- Шапка сайта -->
     <header class="header">
         <div class="header-content">
             <div class="logo" onclick="window.location.href='/'">
                 <div class="logo-icon">📡</div>
                 <div class="logo-text">Collab<span>Service</span></div>
             </div>
-            <div class="user-info" id="userInfo">
-                <!-- Контент будет динамически меняться в зависимости от авторизации -->
-            </div>
+            <div class="user-info" id="userInfo"></div>
         </div>
     </header>
 
-    <!-- Основной контент -->
     <main class="main-content">
-        <!-- Приветственный баннер -->
         <div class="welcome-banner">
             <h1>Сервис коллаборативного позиционирования</h1>
             <p>Точное позиционирование через коллаборативные вычисления</p>
         </div>
 
-        <!-- Центральное меню -->
         <div class="menu-container">
             <div class="menu-grid">
-                <!-- Новости -->
                 <div class="menu-item" data-page="news">
                     <div class="menu-icon">📰</div>
                     <div class="menu-title">Новости</div>
-                    <div class="menu-description">
-                        Последние обновления системы и новости коллаборативного позиционирования
-                    </div>
+                    <div class="menu-description">Последние обновления системы и новости коллаборативного позиционирования</div>
                 </div>
-
-                <!-- Обработка измерений -->
                 <div class="menu-item" data-page="measurements" data-protected="true">
                     <div class="menu-icon">📊</div>
                     <div class="menu-title">Обработка измерений</div>
-                    <div class="menu-description">
-                        Анализ и обработка данных позиционирования в реальном времени
-                    </div>
+                    <div class="menu-description">Анализ и обработка данных позиционирования в реальном времени</div>
                 </div>
-
-                <!-- Карта пользователей -->
                 <div class="menu-item" data-page="map" data-protected="true">
                     <div class="menu-icon">🗺️</div>
                     <div class="menu-title">Карта пользователей</div>
-                    <div class="menu-description">
-                        Интерактивная карта с отображением всех активных пользователей
-                    </div>
+                    <div class="menu-description">Интерактивная карта с отображением всех активных пользователей</div>
                 </div>
-
-                <!-- Личный кабинет -->
                 <div class="menu-item" data-page="profile" data-protected="true">
                     <div class="menu-icon">👤</div>
                     <div class="menu-title">Личный кабинет</div>
-                    <div class="menu-description">
-                        Управление профилем, настройками и персональными данными
-                    </div>
+                    <div class="menu-description">Управление профилем, настройками и персональными данными</div>
                 </div>
             </div>
         </div>
 
-        <!-- Статистика -->
         <div class="stats-section">
             <div class="stat-card">
                 <div class="stat-value" id="activeUsers">127</div>
@@ -423,46 +387,26 @@
         </div>
     </main>
 
-    <!-- Уведомление -->
     <div id="notification" class="notification"></div>
 
-    <!-- Подвал -->
     <footer class="footer">
-        <div class="footer-content">
-            © 2026 Сервис коллаборативного позиционирования. Все права защищены.
-        </div>
+        <div class="footer-content">© 2026 Сервис коллаборативного позиционирования. Все права защищены.</div>
     </footer>
 
     <script>
-        // API URL
-        const API_URL = window.location.origin;
-        
-        // Функция для показа уведомлений
         function showNotification(message, isError = false) {
             const notification = document.getElementById('notification');
             notification.textContent = message;
             notification.style.background = isError ? '#fee2e2' : '#e6f7e6';
             notification.style.color = isError ? '#c53030' : '#2e7d32';
             notification.style.display = 'block';
-            
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, 3000);
+            setTimeout(() => { notification.style.display = 'none'; }, 3000);
         }
         
-        // Проверка авторизации
         function isAuthenticated() {
-            const token = localStorage.getItem('token');
-            const userLogin = localStorage.getItem('userLogin');
-            return token && userLogin;
+            return localStorage.getItem('token') && localStorage.getItem('userLogin');
         }
         
-        // Получение текущего пользователя
-        function getCurrentUser() {
-            return localStorage.getItem('userLogin');
-        }
-        
-        // Выход из системы
         function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('userLogin');
@@ -470,7 +414,6 @@
             showNotification('Вы вышли из системы');
         }
         
-        // Обновление шапки в зависимости от авторизации
         function updateHeader() {
             const userInfoDiv = document.getElementById('userInfo');
             const token = localStorage.getItem('token');
@@ -479,130 +422,34 @@
             if (token && userLogin) {
                 userInfoDiv.innerHTML = `
                     <span class="user-name">${userLogin}</span>
-                    <div class="user-avatar" onclick="window.location.href='/profile'">
-                        ${userLogin.charAt(0).toUpperCase()}
-                    </div>
+                    <div class="user-avatar" onclick="window.location.href='/profile'">${userLogin.charAt(0).toUpperCase()}</div>
                     <button onclick="logout()" style="background: none; border: none; color: #c53030; cursor: pointer; padding: 8px; font-size: 14px;">Выйти</button>
                 `;
             } else {
-                userInfoDiv.innerHTML = `
-                    <div class="auth-buttons">
-                        <a href="/login" class="login-link">Вход</a>
-                        <a href="/register" class="register-link">Регистрация</a>
-                    </div>
-                `;
+                userInfoDiv.innerHTML = `<div class="auth-buttons"><a href="/login" class="login-link">Вход</a><a href="/register" class="register-link">Регистрация</a></div>`;
             }
         }
         
-        // Навигация по страницам
         function navigateTo(page) {
-            switch(page) {
-                case 'news':
-                    window.location.href = 'news.html';
-                    break;
-                case 'measurements':
-                    window.location.href = 'measurements.html';
-                    break;
-                case 'map':
-                    window.location.href = 'map.html';
-                    break;
-                case 'profile':
-                    window.location.href = 'profile';
-                    break;
-                default:
-                    showNotification('Страница в разработке', true);
-            }
+            const pages = { 'news': 'news.html', 'measurements': 'measurements', 'map': 'map.html', 'profile': 'profile' };
+            window.location.href = pages[page] || '/';
         }
         
-        // Обработка кликов по пунктам меню
         document.querySelectorAll('.menu-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 e.preventDefault();
                 const page = this.dataset.page;
                 const isProtected = this.dataset.protected === 'true';
-                
-                // Проверяем, требует ли страница авторизации
                 if (isProtected && !isAuthenticated()) {
                     showNotification('Для доступа к этому разделу необходимо войти в систему', true);
-                    setTimeout(() => {
-                        window.location.href = '/login';
-                    }, 1500);
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
                     return;
                 }
-                
-                // Для неавторизованных пользователей новости доступны
                 navigateTo(page);
             });
         });
         
-        // Обновление статистики (можно заменить на реальные данные с API)
-        function updateStats() {
-            // Здесь можно добавить запрос к API для получения реальной статистики
-            // Пример:
-            // fetch('/api/stats')
-            //     .then(response => response.json())
-            //     .then(data => {
-            //         document.getElementById('activeUsers').textContent = data.activeUsers;
-            //         document.getElementById('measurementsToday').textContent = data.measurementsToday;
-            //         document.getElementById('accuracy').textContent = data.accuracy;
-            //     })
-            //     .catch(error => console.error('Error loading stats:', error));
-        }
-        
-        // Анимация появления элементов при скролле
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }
-            });
-        });
-        
-        document.querySelectorAll('.stat-card').forEach(el => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(20px)';
-            el.style.transition = 'all 0.5s ease-out';
-            observer.observe(el);
-        });
-        
-        // Инициализация страницы
         updateHeader();
-        updateStats();
-        
-        // Анимация счетчиков (опционально)
-        function animateValue(element, start, end, duration) {
-            const range = end - start;
-            const increment = range / (duration / 10);
-            let current = start;
-            
-            const timer = setInterval(() => {
-                current += increment;
-                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-                    current = end;
-                    clearInterval(timer);
-                }
-                element.textContent = Math.round(current);
-            }, 10);
-        }
-        
-        // Запускаем анимацию при загрузке
-        setTimeout(() => {
-            const activeUsersEl = document.getElementById('activeUsers');
-            const measurementsEl = document.getElementById('measurementsToday');
-            
-            if (activeUsersEl) {
-                const finalValue = parseInt(activeUsersEl.textContent);
-                activeUsersEl.textContent = '0';
-                animateValue(activeUsersEl, 0, finalValue, 1000);
-            }
-            
-            if (measurementsEl) {
-                const finalValue = parseInt(measurementsEl.textContent);
-                measurementsEl.textContent = '0';
-                animateValue(measurementsEl, 0, finalValue, 1000);
-            }
-        }, 500);
     </script>
 </body>
 </html>

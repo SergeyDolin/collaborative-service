@@ -14,6 +14,10 @@ type DBStorage struct {
 	pool *pgxpool.Pool
 }
 
+func (stor *DBStorage) Pool() *pgxpool.Pool {
+	return stor.pool
+}
+
 func (stor *DBStorage) initSchema() error {
 	_, err := stor.pool.Exec(context.Background(), `
 	CREATE TABLE IF NOT EXISTS users (
@@ -81,7 +85,7 @@ func (stor *DBStorage) UserExists(login string) (bool, error) {
 func (stor *DBStorage) GetUser(login string) (*model.User, error) {
 	query := `SELECT login, password FROM users WHERE login = $1`
 	var user model.User
-	err := stor.pool.QueryRow(context.Background(), query, login).Scan(&user.Auth.Login, &user.Auth.Password)
+	err := stor.pool.QueryRow(context.Background(), query, login).Scan(&user.Login, &user.Password)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("User %s not found", login)

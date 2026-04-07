@@ -2,13 +2,22 @@ package handlers
 
 import (
 	"collaborative/internal/auth"
+	"collaborative/internal/cache"
 	"collaborative/internal/middlewares"
 	"collaborative/internal/model"
+	"collaborative/internal/services"
 	"collaborative/internal/storage"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,9 +28,7 @@ type ErrorResponse struct {
 
 func SendJSONResponse(res http.ResponseWriter, status int, data interface{}, logger *zap.SugaredLogger) {
 	res.Header().Set("Content-Type", "application/json")
-
 	res.WriteHeader(status)
-
 	if err := json.NewEncoder(res).Encode(data); err != nil {
 		logger.Errorf("Failed to encode response: %v", err)
 	}
@@ -59,6 +66,11 @@ func ProfilePageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 	return ServeStaticFile("profile.html", logger)
 }
 
+func MeasurementsPageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
+	return ServeStaticFile("measurements.html", logger)
+}
+
+// RegisterHandler handles user registration
 func RegisterHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
@@ -66,23 +78,23 @@ func RegisterHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.
 			return
 		}
 
-		var auth model.AuthRequest
-		if err := json.NewDecoder(req.Body).Decode(&auth); err != nil {
+		var authReq model.AuthRequest
+		if err := json.NewDecoder(req.Body).Decode(&authReq); err != nil {
 			SendJSONError(res, "Invalid request", http.StatusBadRequest, logger)
 			return
 		}
 
-		if auth.Login == "" || auth.Password == "" {
+		if authReq.Login == "" || authReq.Password == "" {
 			SendJSONError(res, "Login and password are required", http.StatusBadRequest, logger)
 			return
 		}
 
-		if len(auth.Password) < 8 {
+		if len(authReq.Password) < 8 {
 			SendJSONError(res, "Password must be at least 8 characters", http.StatusBadRequest, logger)
 			return
 		}
 
-		exists, err := dbStor.UserExists(auth.Login)
+		exists, err := dbStor.UserExists(authReq.Login)
 		if err != nil {
 			logger.Errorf("Failed to check user: %v", err)
 			SendJSONError(res, "Internal error", http.StatusInternalServerError, logger)
@@ -93,14 +105,14 @@ func RegisterHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.
 			return
 		}
 
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(auth.Password), bcrypt.DefaultCost)
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(authReq.Password), bcrypt.DefaultCost)
 		if err != nil {
 			logger.Errorf("Failed to hash password")
 			SendJSONError(res, "Internal error", http.StatusInternalServerError, logger)
 			return
 		}
 
-		if err := dbStor.CreateUser(auth.Login, string(hashedPassword)); err != nil {
+		if err := dbStor.CreateUser(authReq.Login, string(hashedPassword)); err != nil {
 			logger.Errorf("Failed to create user: %v", err)
 			SendJSONError(res, "Failed to create user", http.StatusInternalServerError, logger)
 			return
@@ -108,11 +120,12 @@ func RegisterHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.
 
 		SendJSONResponse(res, http.StatusCreated, model.AuthResponse{
 			Message: "User registered successfully",
-			Login:   auth.Login,
+			Login:   authReq.Login,
 		}, logger)
 	}
 }
 
+// LoginHandler handles user login
 func LoginHandler(dbStor *storage.DBStorage, jwtService *auth.JWTService, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
@@ -126,13 +139,11 @@ func LoginHandler(dbStor *storage.DBStorage, jwtService *auth.JWTService, logger
 			return
 		}
 
-		// Validation
 		if authReq.Login == "" || authReq.Password == "" {
 			SendJSONError(res, "Login and password are required", http.StatusBadRequest, logger)
 			return
 		}
 
-		// Get user from DB
 		user, err := dbStor.GetUser(authReq.Login)
 		if err != nil {
 			logger.Errorf("Failed to get user: %v", err)
@@ -140,14 +151,12 @@ func LoginHandler(dbStor *storage.DBStorage, jwtService *auth.JWTService, logger
 			return
 		}
 
-		// Check password - user.Auth.Password должен существовать
-		if err := bcrypt.CompareHashAndPassword([]byte(user.Auth.Password), []byte(authReq.Password)); err != nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(authReq.Password)); err != nil {
 			logger.Warnf("Failed login attempt for user: %s", authReq.Login)
 			SendJSONError(res, "Invalid credentials", http.StatusUnauthorized, logger)
 			return
 		}
 
-		// Generate JWT token
 		token, err := jwtService.GenerateToken(authReq.Login)
 		if err != nil {
 			logger.Errorf("Failed to generate token: %v", err)
@@ -155,7 +164,6 @@ func LoginHandler(dbStor *storage.DBStorage, jwtService *auth.JWTService, logger
 			return
 		}
 
-		// Sending response with token
 		SendJSONResponse(res, http.StatusOK, model.AuthResponse{
 			Message: "Login successful",
 			Login:   authReq.Login,
@@ -164,9 +172,9 @@ func LoginHandler(dbStor *storage.DBStorage, jwtService *auth.JWTService, logger
 	}
 }
 
+// ProfileHandler returns user profile data
 func ProfileHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		// Get user from context
 		login, ok := middlewares.GetUserFromContext(req.Context())
 		if !ok {
 			SendJSONError(res, "Unauthorized", http.StatusUnauthorized, logger)
@@ -177,5 +185,466 @@ func ProfileHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 			"login":   login,
 			"message": "Welcome to your profile!",
 		}, logger)
+	}
+}
+
+// ProcessingFiles holds paths to downloaded files
+type ProcessingFiles struct {
+	NavigationFile string
+	EphemerisFile  string
+	ClockFile      string
+	DCBFile        string
+	ERPFile        string
+	BaseStationObs string
+}
+
+// MeasurementHandler handles measurement processing
+type MeasurementHandler struct {
+	dbStorage       *storage.DBStorage
+	taskStorage     *storage.TaskStorage
+	configGenerator *services.ConfigGenerator
+	downloader      *services.FileDownloader
+	rtkService      *services.RTKService
+	historyCache    *cache.HistoryCache
+	workDir         string
+	logger          *zap.SugaredLogger
+}
+
+// NewMeasurementHandler creates a new MeasurementHandler
+func NewMeasurementHandler(
+	dbStorage *storage.DBStorage,
+	taskStorage *storage.TaskStorage,
+	configGenerator *services.ConfigGenerator,
+	downloader *services.FileDownloader,
+	rtkService *services.RTKService,
+	workDir string,
+	logger *zap.SugaredLogger,
+) *MeasurementHandler {
+	os.MkdirAll(workDir, 0755)
+
+	// Создаем кэш с TTL 5 минут и максимальным размером 100 записей
+	historyCache := cache.NewHistoryCache(5*time.Minute, 100)
+
+	return &MeasurementHandler{
+		dbStorage:       dbStorage,
+		taskStorage:     taskStorage,
+		configGenerator: configGenerator,
+		downloader:      downloader,
+		rtkService:      rtkService,
+		historyCache:    historyCache,
+		workDir:         workDir,
+		logger:          logger,
+	}
+}
+
+// ProcessMeasurementHandler handles measurement processing request
+func (h *MeasurementHandler) ProcessMeasurementHandler(w http.ResponseWriter, r *http.Request) {
+	login, ok := middlewares.GetUserFromContext(r.Context())
+	if !ok {
+		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+		return
+	}
+
+	configJSON := r.FormValue("config")
+	if configJSON == "" {
+		SendJSONError(w, "Config required", http.StatusBadRequest, h.logger)
+		return
+	}
+
+	var config model.UserProcessingConfig
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		SendJSONError(w, "Invalid config", http.StatusBadRequest, h.logger)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		SendJSONError(w, "File upload failed", http.StatusBadRequest, h.logger)
+		return
+	}
+	defer file.Close()
+
+	fileData, err := io.ReadAll(file)
+	if err != nil {
+		SendJSONError(w, "Failed to read file", http.StatusInternalServerError, h.logger)
+		return
+	}
+
+	taskID := uuid.New().String()
+
+	// Создаем задачу в БД
+	task := &model.ProcessingTask{
+		ID:        taskID,
+		UserLogin: login,
+		Config:    config,
+		Filename:  header.Filename,
+		Status:    model.StatusPending,
+		CreatedAt: time.Now(),
+	}
+
+	if err := h.taskStorage.CreateTask(task); err != nil {
+		h.logger.Errorf("Failed to create task: %v", err)
+		SendJSONError(w, "Failed to create task", http.StatusInternalServerError, h.logger)
+		return
+	}
+
+	// Инвалидируем кэш для этого пользователя (чтобы при следующем запросе данные обновились)
+	h.historyCache.Invalidate(login)
+
+	// Запускаем асинхронную обработку
+	go h.processTask(taskID, login, config, fileData, header.Filename)
+
+	SendJSONResponse(w, http.StatusAccepted, map[string]interface{}{
+		"taskId":  taskID,
+		"message": "Processing started",
+	}, h.logger)
+}
+
+// GetHistoryHandler returns processing history with caching
+func (h *MeasurementHandler) GetHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	login, ok := middlewares.GetUserFromContext(r.Context())
+	if !ok {
+		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+		return
+	}
+
+	// Проверяем что taskStorage не nil
+	if h.taskStorage == nil {
+		h.logger.Error("TaskStorage is nil")
+		SendJSONError(w, "Storage not initialized", http.StatusInternalServerError, h.logger)
+		return
+	}
+
+	// Параметры пагинации
+	limit := 50
+	offset := 0
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		fmt.Sscanf(limitStr, "%d", &limit)
+	}
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		fmt.Sscanf(offsetStr, "%d", &offset)
+	}
+
+	// Пытаемся получить из кэша
+	cacheKey := fmt.Sprintf("%s:%d:%d", login, limit, offset)
+	if cachedData, found := h.historyCache.Get(cacheKey); found {
+		h.logger.Debugf("Cache hit for user %s", login)
+		SendJSONResponse(w, http.StatusOK, cachedData, h.logger)
+		return
+	}
+
+	h.logger.Debugf("Cache miss for user %s, loading from database", login)
+
+	// Загружаем из БД
+	tasks, err := h.taskStorage.GetUserTasksWithResults(login, limit, offset)
+	if err != nil {
+		h.logger.Errorf("Failed to get history: %v", err)
+		// Возвращаем пустой массив вместо ошибки
+		SendJSONResponse(w, http.StatusOK, []interface{}{}, h.logger)
+		return
+	}
+
+	if tasks == nil {
+		tasks = []map[string]interface{}{}
+	}
+
+	// Сохраняем в кэш
+	h.historyCache.Set(cacheKey, tasks)
+
+	SendJSONResponse(w, http.StatusOK, tasks, h.logger)
+}
+
+// GetTaskStatusHandler returns task status
+func (h *MeasurementHandler) GetTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
+	taskID := r.URL.Query().Get("id")
+	if taskID == "" {
+		SendJSONError(w, "Task ID required", http.StatusBadRequest, h.logger)
+		return
+	}
+
+	task, err := h.taskStorage.GetTaskByID(taskID)
+	if err != nil {
+		h.logger.Errorf("Failed to get task: %v", err)
+		SendJSONError(w, "Failed to get task", http.StatusInternalServerError, h.logger)
+		return
+	}
+
+	if task == nil {
+		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
+		return
+	}
+
+	response := map[string]interface{}{
+		"taskId":        task.ID,
+		"status":        task.Status,
+		"errorMessage":  task.ErrorMessage,
+		"createdAt":     task.CreatedAt,
+		"processingSec": task.ProcessingSec,
+	}
+
+	if task.CompletedAt != nil {
+		response["completedAt"] = task.CompletedAt
+	}
+
+	// Если задача завершена, загружаем результат
+	if task.Status == model.StatusCompleted {
+		result, err := h.taskStorage.GetResultByTaskID(taskID)
+		if err == nil && result != nil {
+			response["result"] = result
+		}
+	}
+
+	SendJSONResponse(w, http.StatusOK, response, h.logger)
+}
+
+// DownloadResultHandler downloads processing result
+func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *http.Request) {
+	taskID := r.URL.Query().Get("id")
+	if taskID == "" {
+		SendJSONError(w, "Task ID required", http.StatusBadRequest, h.logger)
+		return
+	}
+
+	task, err := h.taskStorage.GetTaskByID(taskID)
+	if err != nil || task == nil {
+		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
+		return
+	}
+
+	if task.OutputPath == "" {
+		SendJSONError(w, "Result file not available", http.StatusNotFound, h.logger)
+		return
+	}
+
+	// Проверяем существование файла
+	if _, err := os.Stat(task.OutputPath); os.IsNotExist(err) {
+		SendJSONError(w, "Result file not found", http.StatusNotFound, h.logger)
+		return
+	}
+
+	// Отдаем файл
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pos", taskID))
+
+	fileData, err := os.ReadFile(task.OutputPath)
+	if err != nil {
+		SendJSONError(w, "Failed to read file", http.StatusInternalServerError, h.logger)
+		return
+	}
+
+	w.Write(fileData)
+}
+
+// processTask обрабатывает задачу (обновленная версия с сохранением в БД)
+func (h *MeasurementHandler) processTask(taskID, login string, config model.UserProcessingConfig, fileData []byte, filename string) {
+	h.logger.Infof("Starting processing for task %s, method: %s", taskID, config.Method)
+
+	// Обновляем статус на processing
+	now := time.Now()
+	task := &model.ProcessingTask{
+		ID:        taskID,
+		UserLogin: login,
+		Status:    model.StatusProcessing,
+		StartedAt: &now,
+	}
+	h.taskStorage.UpdateTask(task)
+
+	workDir := filepath.Join(h.workDir, taskID)
+	os.MkdirAll(workDir, 0755)
+	defer os.RemoveAll(workDir)
+
+	// 1. Сохраняем файл
+	obsPath := filepath.Join(workDir, filename)
+	if err := os.WriteFile(obsPath, fileData, 0644); err != nil {
+		h.updateTaskError(taskID, err.Error())
+		return
+	}
+
+	// 2. Конвертируем в RINEX (упрощенно - копируем)
+	rinexPath := filepath.Join(workDir, "observation.obs")
+	if err := os.WriteFile(rinexPath, fileData, 0644); err != nil {
+		h.updateTaskError(taskID, fmt.Sprintf("Conversion: %v", err))
+		return
+	}
+
+	// 3. Определяем дату из RINEX (упрощенно - текущая)
+	date := time.Now()
+
+	// 4. Скачиваем необходимые файлы
+	files := &ProcessingFiles{}
+	files.NavigationFile, _ = h.downloader.DownloadBroadcastEphemeris(date, taskID)
+
+	var outputPath string
+	var procErr error
+
+	switch config.Method {
+	case model.MethodPPP:
+		files.EphemerisFile, _ = h.downloader.DownloadPreciseEphemeris(date, taskID)
+		files.ClockFile, _ = h.downloader.DownloadPreciseClock(date, taskID)
+		files.ERPFile, _ = h.downloader.DownloadERP(date, taskID)
+		files.DCBFile, _ = h.downloader.DownloadDCB(date, taskID)
+
+		convFiles := &services.ProcessingFiles{
+			NavigationFile: files.NavigationFile,
+			EphemerisFile:  files.EphemerisFile,
+			ClockFile:      files.ClockFile,
+			DCBFile:        files.DCBFile,
+			ERPFile:        files.ERPFile,
+		}
+
+		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)
+		if cfgErr != nil {
+			h.updateTaskError(taskID, fmt.Sprintf("Config generation: %v", cfgErr))
+			return
+		}
+
+		outputPath, procErr = h.rtkService.ProcessPPP(rinexPath, files.NavigationFile,
+			files.EphemerisFile, files.ClockFile, files.ERPFile, files.DCBFile, configPath, taskID)
+
+	default:
+		convFiles := &services.ProcessingFiles{
+			NavigationFile: files.NavigationFile,
+		}
+
+		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)
+		if cfgErr != nil {
+			h.updateTaskError(taskID, fmt.Sprintf("Config generation: %v", cfgErr))
+			return
+		}
+
+		outputPath, procErr = h.rtkService.ProcessAbsolute(rinexPath, files.NavigationFile, configPath, taskID)
+	}
+
+	if procErr != nil {
+		h.updateTaskError(taskID, fmt.Sprintf("Processing: %v", procErr))
+		return
+	}
+
+	// Читаем выходной файл
+	outputData, err := os.ReadFile(outputPath)
+	if err != nil {
+		h.logger.Warnf("Failed to read output file: %v", err)
+		outputData = []byte("")
+	}
+
+	// Парсим результат (передаем []byte, а не путь)
+	result := h.parseResult(outputData, taskID, login, config)
+
+	// Для кинематики сохраняем полный файл в БД
+	if config.Mode == model.ModeKinematic {
+		result.FullResultFile = outputData
+		result.FileType = "kinematic"
+	} else {
+		result.FileType = "static"
+	}
+	result.ExpiresAt = time.Now().Add(24 * time.Hour)
+
+	// Сохраняем результат в БД
+	if err := h.taskStorage.SaveResult(result); err != nil {
+		h.logger.Errorf("Failed to save result: %v", err)
+	}
+
+	// Обновляем задачу как завершенную
+	completedAt := time.Now()
+	task = &model.ProcessingTask{
+		ID:            taskID,
+		Status:        model.StatusCompleted,
+		OutputPath:    outputPath,
+		CompletedAt:   &completedAt,
+		ProcessingSec: completedAt.Sub(now).Seconds(),
+	}
+	h.taskStorage.UpdateTask(task)
+
+	// Инвалидируем кэш для пользователя
+	h.historyCache.Invalidate(login)
+
+	h.logger.Infof("Task %s completed successfully in %.2f seconds, output: %s", taskID, task.ProcessingSec, outputPath)
+}
+
+func (h *MeasurementHandler) updateTaskError(taskID, errMsg string) {
+	h.logger.Errorf("Task %s failed: %s", taskID, errMsg)
+
+	task := &model.ProcessingTask{
+		ID:           taskID,
+		Status:       model.StatusFailed,
+		ErrorMessage: errMsg,
+	}
+	h.taskStorage.UpdateTask(task)
+
+	// Инвалидируем кэш
+	if task.UserLogin != "" {
+		h.historyCache.Invalidate(task.UserLogin)
+	}
+}
+
+func (h *MeasurementHandler) parseResult(outputData []byte, taskID, login string, config model.UserProcessingConfig) *model.ProcessingResult {
+	result := &model.ProcessingResult{
+		TaskID:    taskID,
+		UserLogin: login,
+		RawOutput: string(outputData),
+		CreatedAt: time.Now(),
+	}
+
+	lines := strings.Split(string(outputData), "\n")
+	var lastNonCommentLine string
+
+	for _, line := range lines {
+		// Пропускаем комментарии и пустые строки
+		if strings.HasPrefix(line, "%") || strings.HasPrefix(line, "#") || len(strings.TrimSpace(line)) == 0 {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) >= 7 {
+			lastNonCommentLine = line
+
+			// Парсим по позициям для формата: [week] [sow] [lat] [lon] [hgt] [Q] [ns] ...
+			if lat, err := strconv.ParseFloat(fields[2], 64); err == nil {
+				result.Latitude = lat
+			}
+			if lon, err := strconv.ParseFloat(fields[3], 64); err == nil {
+				result.Longitude = lon
+			}
+			if hgt, err := strconv.ParseFloat(fields[4], 64); err == nil {
+				result.Height = hgt
+			}
+			if len(fields) > 5 {
+				if q, err := strconv.Atoi(fields[5]); err == nil {
+					result.Q = q
+				}
+			}
+			if len(fields) > 6 {
+				if ns, err := strconv.Atoi(fields[6]); err == nil {
+					result.NSat = ns
+				}
+			}
+		}
+	}
+
+	// Для статики сохраняем последнюю строку решения
+	if config.Mode == model.ModeStatic && lastNonCommentLine != "" {
+		result.LastSolutionLine = lastNonCommentLine
+	}
+
+	h.logger.Infof("Parsed result: lat=%.6f, lon=%.6f, h=%.2f, Q=%d, ns=%d",
+		result.Latitude, result.Longitude, result.Height, result.Q, result.NSat)
+
+	return result
+}
+
+func (h *MeasurementHandler) findNearestBaseStation(rinexPath string) string {
+	// Заглушка - возвращает известную базовую станцию
+	return "ZIMM"
+}
+
+func (h *MeasurementHandler) convertProcessingFiles(files *ProcessingFiles) *services.ProcessingFiles {
+	return &services.ProcessingFiles{
+		NavigationFile: files.NavigationFile,
+		EphemerisFile:  files.EphemerisFile,
+		ClockFile:      files.ClockFile,
+		DCBFile:        files.DCBFile,
+		ERPFile:        files.ERPFile,
+		BaseStationObs: files.BaseStationObs,
 	}
 }
