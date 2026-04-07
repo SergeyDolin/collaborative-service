@@ -196,6 +196,7 @@ type ProcessingFiles struct {
 	ClockFile      string
 	DCBFile        string
 	ERPFile        string
+	BIAFile        string
 	BaseStationObs string
 }
 
@@ -607,15 +608,16 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	case model.MethodPPP:
 		files.EphemerisFile, _ = h.downloader.DownloadPreciseEphemeris(date, taskID)
 		files.ClockFile, _ = h.downloader.DownloadPreciseClock(date, taskID)
-		// files.ERPFile, _ = h.downloader.DownloadERP(date, taskID)
-		// files.DCBFile, _ = h.downloader.DownloadDCB(date, taskID)
+		files.ERPFile, _ = h.downloader.DownloadERP(date, taskID)
+		files.DCBFile, _ = h.downloader.DownloadDCB(date, taskID)
+		files.BIAFile, _ = h.downloader.DownloadBIA(date, taskID)
 
 		convFiles := &services.ProcessingFiles{
 			NavigationFile: files.NavigationFile,
 			EphemerisFile:  files.EphemerisFile,
 			ClockFile:      files.ClockFile,
-			// DCBFile:        files.DCBFile,
-			// ERPFile: files.ERPFile,
+			DCBFile:        files.DCBFile,
+			ERPFile:        files.ERPFile,
 		}
 
 		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)

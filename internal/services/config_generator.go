@@ -19,6 +19,7 @@ type ProcessingFiles struct {
 	ClockFile      string
 	DCBFile        string
 	ERPFile        string
+	BIAFile        string
 	BaseStationObs string
 }
 
@@ -96,6 +97,9 @@ func (g *ConfigGenerator) replaceParameters(content string, config model.UserPro
 	}
 	if files.ERPFile != "" {
 		replacements["{{ERP_FILE}}"] = files.ERPFile
+	}
+	if files.BIAFile != "" {
+		replacements["{{BIA_FILE}}"] = files.BIAFile
 	}
 
 	for placeholder, value := range replacements {
