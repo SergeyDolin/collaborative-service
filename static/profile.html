@@ -123,78 +123,6 @@
             font-size: 1rem;
         }
 
-        /* Статистика */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 24px;
-            transition: transform 0.2s ease;
-            text-align: center;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #a8c7e0;
-            margin-bottom: 8px;
-        }
-
-        .stat-label {
-            color: #718096;
-            font-size: 0.9rem;
-        }
-
-        /* Панель действий */
-        .actions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .action-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 24px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-align: center;
-        }
-
-        .action-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .action-icon {
-            font-size: 2rem;
-            margin-bottom: 16px;
-        }
-
-        .action-title {
-            font-size: 1.2rem;
-            font-weight: 500;
-            margin-bottom: 8px;
-            color: #4a5568;
-        }
-
-        .action-description {
-            color: #718096;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
         /* История обработок */
         .history-section {
             background: rgba(255, 255, 255, 0.95);
@@ -319,18 +247,6 @@
             border-top: 1px solid #e2e8f0;
         }
 
-        .solution-line {
-            background: #4a5568;
-            color: #c4d4e8;
-            padding: 10px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
         .coords-info {
             font-size: 0.8rem;
             color: #a8c7e0;
@@ -364,14 +280,21 @@
             color: white;
             padding: 6px 12px;
             border-radius: 6px;
+            border: none;
             text-decoration: none;
             font-size: 0.75rem;
             transition: all 0.2s ease;
+            cursor: pointer;
         }
 
         .download-btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(168, 199, 224, 0.3);
+        }
+
+        .download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .expiry-info {
@@ -405,62 +328,6 @@
             color: #c53030;
         }
 
-        /* Модальное окно */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 2000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 12px;
-            padding: 32px;
-            max-width: 400px;
-            width: 90%;
-        }
-
-        .modal-content h3 {
-            margin-bottom: 16px;
-            color: #4a5568;
-        }
-
-        .modal-content input {
-            width: 100%;
-            padding: 12px;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 10px;
-            margin: 16px 0;
-            font-size: 1rem;
-        }
-
-        .modal-content input:focus {
-            outline: none;
-            border-color: #c4d4e8;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-
-        .modal-buttons button {
-            padding: 8px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-        }
-
-        /* Адаптивность */
         @media (max-width: 768px) {
             .main-content {
                 margin-top: 120px;
@@ -511,44 +378,6 @@
                 <p>Ваш личный кабинет в сервисе коллаборативного позиционирования</p>
             </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="measurementsCount">0</div>
-                    <div class="stat-label">Выполненных измерений</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="collaborationsCount">0</div>
-                    <div class="stat-label">Коллабораций</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="activeDays">0</div>
-                    <div class="stat-label">Дней активности</div>
-                </div>
-            </div>
-
-            <div class="actions-grid">
-                <div class="action-card" onclick="goToMeasurements()">
-                    <div class="action-icon">📊</div>
-                    <div class="action-title">Обработка измерений</div>
-                    <div class="action-description">Загрузка и анализ данных позиционирования</div>
-                </div>
-                <div class="action-card" onclick="navigateTo('map')">
-                    <div class="action-icon">🗺️</div>
-                    <div class="action-title">Карта пользователей</div>
-                    <div class="action-description">Просмотр активных пользователей на карте</div>
-                </div>
-                <div class="action-card" onclick="openSettings()">
-                    <div class="action-icon">⚙️</div>
-                    <div class="action-title">Настройки профиля</div>
-                    <div class="action-description">Управление личными данными</div>
-                </div>
-                <div class="action-card" onclick="navigateTo('news')">
-                    <div class="action-icon">📰</div>
-                    <div class="action-title">Новости системы</div>
-                    <div class="action-description">Последние обновления и новости</div>
-                </div>
-            </div>
-
             <div class="history-section">
                 <div class="history-header">
                     <h3>📊 История обработок</h3>
@@ -560,20 +389,6 @@
             </div>
         </div>
     </main>
-
-    <!-- Модальное окно настроек -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <h3>Настройки профиля</h3>
-            <label for="newPassword">Новый пароль</label>
-            <input type="password" id="newPassword" placeholder="Введите новый пароль (мин. 8 символов)">
-            <div id="settingsError" class="error-message" style="display: none;"></div>
-            <div class="modal-buttons">
-                <button onclick="closeSettings()" style="background: #e2e8f0;">Отмена</button>
-                <button onclick="updatePassword()" style="background: #c4d4e8; color: white;">Сохранить</button>
-            </div>
-        </div>
-    </div>
 
     <script>
         let currentPage = 0;
@@ -600,64 +415,83 @@
             window.location.href = '/';
         }
 
-        // Навигация
-        function navigateTo(page) {
-            if (page === 'measurements') {
-                window.location.href = '/measurements';
-            } else {
-                alert(`Переход к разделу "${page}"\nФункционал в разработке`);
-            }
-        }
-
-        // Переход на страницу обработки измерений
-        function goToMeasurements() {
-            window.location.href = '/measurements';
-        }
-
-        // Открытие настроек
-        function openSettings() {
-            document.getElementById('settingsModal').style.display = 'flex';
-        }
-
-        function closeSettings() {
-            document.getElementById('settingsModal').style.display = 'none';
-            document.getElementById('settingsError').style.display = 'none';
-            document.getElementById('newPassword').value = '';
-        }
-
-        // Обновление пароля
-        async function updatePassword() {
-            const newPassword = document.getElementById('newPassword').value;
+        // ГЛАВНАЯ ФУНКЦИЯ - Скачивание файла результата
+        async function downloadResult(taskId) {
             const token = localStorage.getItem('token');
-            const errorDiv = document.getElementById('settingsError');
-
-            if (!newPassword || newPassword.length < 8) {
-                errorDiv.textContent = 'Пароль должен содержать минимум 8 символов';
-                errorDiv.style.display = 'block';
+            
+            // Проверяем токен
+            if (!token) {
+                alert('Сессия истекла. Пожалуйста, войдите снова.');
+                window.location.href = '/login';
                 return;
             }
 
+            console.log('📥 Начинаем скачивание файла для задачи:', taskId);
+            console.log('🔑 Токен доступен:', token.substring(0, 20) + '...');
+
+            const btn = event.target;
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = '⏳ Скачивание...';
+
             try {
-                const response = await fetch('/api/profile/password', {
-                    method: 'PUT',
+                console.log('📡 Отправляем fetch запрос с заголовком Authorization...');
+                
+                const response = await fetch(`/api/measurements/download?id=${taskId}`, {
+                    method: 'GET',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ password: newPassword })
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/octet-stream'
+                    }
+                });
+
+                console.log('📊 Ответ сервера:', response.status, response.statusText);
+                console.log('📋 Заголовки ответа:', {
+                    contentType: response.headers.get('content-type'),
+                    contentLength: response.headers.get('content-length'),
+                    contentDisposition: response.headers.get('content-disposition')
                 });
 
                 if (response.ok) {
-                    alert('Пароль успешно изменен');
-                    closeSettings();
+                    console.log('✅ Ответ успешен, читаем blob...');
+                    const blob = await response.blob();
+                    console.log('📦 Размер файла:', blob.size, 'байт');
+
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${taskId}.pos`;
+                    
+                    console.log('💾 Создаем элемент для скачивания...');
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    console.log('✨ Файл скачан успешно!');
+                    
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    btn.textContent = originalText;
+                } else if (response.status === 401) {
+                    console.error('❌ Ошибка 401: Неавторизован');
+                    alert('Сессия истекла. Пожалуйста, войдите снова.');
+                    window.location.href = '/login';
+                } else if (response.status === 404) {
+                    console.error('❌ Ошибка 404: Файл не найден');
+                    alert('Файл результата не найден или удален.');
+                    btn.textContent = '❌ Файл недоступен';
                 } else {
-                    const data = await response.json();
-                    errorDiv.textContent = data.error || 'Ошибка изменения пароля';
-                    errorDiv.style.display = 'block';
+                    console.error('❌ Ошибка сервера:', response.status);
+                    const errorText = await response.text();
+                    console.error('📄 Ответ сервера:', errorText);
+                    alert(`Ошибка скачивания: ${response.status} ${response.statusText}`);
+                    btn.textContent = originalText;
                 }
             } catch (error) {
-                errorDiv.textContent = 'Ошибка соединения с сервером';
-                errorDiv.style.display = 'block';
+                console.error('❌ Ошибка при скачивании:', error);
+                alert('Ошибка соединения с сервером: ' + error.message);
+                btn.textContent = originalText;
+            } finally {
+                btn.disabled = false;
             }
         }
 
@@ -665,6 +499,7 @@
         function getMethodName(method) {
             const methods = {
                 'absolute': '📍 Абсолютный метод (SPP)',
+                'single': '📍 Абсолютный метод (SPP)',
                 'relative': '🔗 Относительный метод (Differential)',
                 'ppp': '🎯 PPP метод'
             };
@@ -680,16 +515,6 @@
                 'failed': '❌ Ошибка'
             };
             return statuses[status] || status;
-        }
-
-        // Форматирование строки решения (обрезаем до читаемого вида)
-        function formatSolutionLine(line) {
-            if (!line) return '';
-            // Если строка слишком длинная, обрезаем
-            if (line.length > 200) {
-                return line.substring(0, 200) + '...';
-            }
-            return line;
         }
 
         // Загрузка истории обработок с пагинацией
@@ -717,8 +542,6 @@
                     if (!tasks || tasks.length === 0) {
                         if (currentPage === 0) {
                             container.innerHTML = '<div class="empty-history">📭 Нет выполненных обработок</div>';
-                        } else {
-                            container.innerHTML += '<div class="empty-history">📭 Больше нет записей</div>';
                         }
                         isLoading = false;
                         return;
@@ -733,7 +556,6 @@
                         const fileType = task.fileType || (task.config?.mode === 'static' ? 'static' : 'kinematic');
                         const modeText = fileType === 'static' ? 'Статика' : 'Кинематика';
 
-                        // Формируем блок результата в зависимости от типа
                         let resultHtml = '';
 
                         if (status === 'completed' && task.result) {
@@ -741,12 +563,11 @@
 
                             // Статистика
                             let statsHtml = '';
-                            if (result.q !== undefined || result.nSat !== undefined || result.rms !== undefined) {
+                            if (result.q !== undefined || result.nSat !== undefined) {
                                 statsHtml = `
                                     <div class="stats-info">
                                         ${result.q !== undefined ? `<span class="stat-item">🎯 Q: ${result.q}</span>` : ''}
                                         ${result.nSat !== undefined ? `<span class="stat-item">🛰️ Спутников: ${result.nSat}</span>` : ''}
-                                        ${result.rms !== undefined ? `<span class="stat-item">📊 RMS: ${result.rms.toFixed(3)}м</span>` : ''}
                                     </div>
                                 `;
                             }
@@ -755,38 +576,21 @@
                             let coordsHtml = '';
                             if (result.latitude && result.longitude) {
                                 coordsHtml = `<div class="coords-info">📍 ${result.latitude.toFixed(6)}°, ${result.longitude.toFixed(6)}° ${result.height ? `, h: ${result.height.toFixed(2)}м` : ''}</div>`;
-                            } else if (result.x && result.y && result.z) {
-                                coordsHtml = `<div class="coords-info">📍 X: ${result.x.toFixed(2)}м, Y: ${result.y.toFixed(2)}м, Z: ${result.z.toFixed(2)}м</div>`;
                             }
 
-                            // Для статики - показываем последнюю строку решения
-                            if (fileType === 'static' && result.lastSolutionLine) {
-                                resultHtml = `
-                                    <div class="result-block">
-                                        ${statsHtml}
-                                        ${coordsHtml}
-                                        <div class="solution-line">
-                                            <strong>📋 Последняя строка решения:</strong><br>
-                                            ${formatSolutionLine(result.lastSolutionLine)}
-                                        </div>
-                                    </div>
-                                `;
-                            }
                             // Для кинематики - показываем кнопку скачивания
-                            else if (fileType === 'kinematic') {
+                            if (fileType === 'kinematic') {
                                 resultHtml = `
                                     <div class="result-block">
                                         ${statsHtml}
                                         ${coordsHtml}
                                         <div class="download-section">
-                                            <a href="/api/measurements/download?id=${task.id}" class="download-btn">📥 Скачать полный файл решения</a>
+                                            <button class="download-btn" onclick="downloadResult('${task.id}')">📥 Скачать полный файл решения</button>
                                             <div class="expiry-info">⏰ Файл доступен для скачивания в течение 24 часов</div>
                                         </div>
                                     </div>
                                 `;
-                            }
-                            // Общий случай
-                            else if (coordsHtml || statsHtml) {
+                            } else if (coordsHtml || statsHtml) {
                                 resultHtml = `
                                     <div class="result-block">
                                         ${statsHtml}
@@ -825,21 +629,6 @@
                     } else {
                         container.innerHTML += historyHtml;
                     }
-
-                    // Добавляем кнопку "Загрузить еще" если есть еще записи
-                    if (tasks.length === pageSize) {
-                        const loadMoreBtn = document.createElement('button');
-                        loadMoreBtn.textContent = '📥 Загрузить еще';
-                        loadMoreBtn.className = 'btn-history';
-                        loadMoreBtn.style.marginTop = '20px';
-                        loadMoreBtn.style.width = '100%';
-                        loadMoreBtn.onclick = () => {
-                            currentPage++;
-                            loadProcessingHistory(false);
-                            loadMoreBtn.remove();
-                        };
-                        container.appendChild(loadMoreBtn);
-                    }
                 } else if (response.status === 401) {
                     container.innerHTML = '<div class="error">🔒 Сессия истекла. <a href="/login">Войдите снова</a></div>';
                 } else {
@@ -853,66 +642,10 @@
             }
         }
 
-        // Загрузка статистики пользователя (демо-данные)
-        async function loadUserStats() {
-            const token = localStorage.getItem('token');
-
-            try {
-                // В реальном приложении здесь будет запрос к API
-                // const response = await fetch('/api/profile/stats', {
-                //     headers: { 'Authorization': `Bearer ${token}` }
-                // });
-                // const stats = await response.json();
-                // document.getElementById('measurementsCount').textContent = stats.measurements || 0;
-                // document.getElementById('collaborationsCount').textContent = stats.collaborations || 0;
-                // document.getElementById('activeDays').textContent = stats.activeDays || 0;
-
-                // Пока используем демо-данные
-                document.getElementById('measurementsCount').textContent = '12';
-                document.getElementById('collaborationsCount').textContent = '3';
-                document.getElementById('activeDays').textContent = '5';
-            } catch (error) {
-                console.error('Failed to load stats:', error);
-            }
-        }
-
-        // Автоматическая проверка статуса задач
-        function startStatusPolling() {
-            setInterval(async () => {
-                const token = localStorage.getItem('token');
-                if (!token) return;
-
-                try {
-                    const response = await fetch('/api/measurements/history?limit=5&offset=0', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    if (response.ok) {
-                        const tasks = await response.json();
-                        const hasProcessing = tasks.some(task => task.status === 'processing' || task.status === 'pending');
-
-                        if (!hasProcessing && document.querySelector('.status-processing')) {
-                            loadProcessingHistory(true);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Status poll error:', error);
-                }
-            }, 5000);
-        }
-
         // Инициализация
         if (checkAuth()) {
-            loadUserStats();
-            startStatusPolling();
-        }
-
-        // Закрытие модального окна по клику вне его
-        window.onclick = function(event) {
-            const modal = document.getElementById('settingsModal');
-            if (event.target === modal) {
-                closeSettings();
-            }
+            // Загружаем историю сразу
+            loadProcessingHistory(true);
         }
     </script>
 </body>

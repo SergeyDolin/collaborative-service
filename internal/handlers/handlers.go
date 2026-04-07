@@ -413,37 +413,62 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 
 	login, ok := middlewares.GetUserFromContext(r.Context())
 	if !ok {
+		h.logger.Warn("Unauthorized download attempt for task " + taskID)
 		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
 		return
 	}
 
 	task, err := h.taskStorage.GetTaskByID(taskID)
-	if err != nil || task == nil || task.UserLogin != login {
+	if err != nil {
+		h.logger.Errorf("Error retrieving task %s: %v", taskID, err)
+		SendJSONError(w, "Failed to get task", http.StatusInternalServerError, h.logger)
+		return
+	}
+
+	if task == nil {
+		h.logger.Warnf("Task not found: %s", taskID)
 		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
 		return
 	}
 
+	if task.UserLogin != login {
+		h.logger.Warnf("Access denied: task %s belongs to user %s, requested by %s", taskID, task.UserLogin, login)
+		SendJSONError(w, "Access denied", http.StatusForbidden, h.logger)
+		return
+	}
+
 	if task.OutputPath == "" {
+		h.logger.Warnf("No output path for task: %s", taskID)
 		SendJSONError(w, "Result file not available", http.StatusNotFound, h.logger)
 		return
 	}
 
 	// Проверяем существование файла
-	if _, err := os.Stat(task.OutputPath); os.IsNotExist(err) {
+	fileInfo, err := os.Stat(task.OutputPath)
+	if os.IsNotExist(err) {
+		h.logger.Warnf("Output file not found: %s for task %s", task.OutputPath, taskID)
 		SendJSONError(w, "Result file not found", http.StatusNotFound, h.logger)
+		return
+	}
+	if err != nil {
+		h.logger.Errorf("Error checking output file %s: %v", task.OutputPath, err)
+		SendJSONError(w, "Failed to access file", http.StatusInternalServerError, h.logger)
 		return
 	}
 
 	// Отдаем файл
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pos", taskID))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
 
 	fileData, err := os.ReadFile(task.OutputPath)
 	if err != nil {
+		h.logger.Errorf("Failed to read output file %s: %v", task.OutputPath, err)
 		SendJSONError(w, "Failed to read file", http.StatusInternalServerError, h.logger)
 		return
 	}
 
+	h.logger.Infof("Downloaded result for task %s (user: %s, file size: %d bytes)", taskID, login, len(fileData))
 	w.Write(fileData)
 }
 
