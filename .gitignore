@@ -31,4 +31,4 @@ go.work.sum
 # .idea/
 # .vscode/
 
-/cmd/solver
+cmd/solver
