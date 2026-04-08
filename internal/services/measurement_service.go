@@ -132,7 +132,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		files.ERPFile, _ = s.downloader.DownloadERP(date, taskID)
 		files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
 
-		configPath, cfgErr := s.configGen.GenerateConfig(config, taskID, date, files, rinexPath)
+		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
@@ -147,7 +147,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	case model.MethodRelative:
 		s.logger.Infof("Using Relative method for task: %s", taskID)
 
-		configPath, cfgErr := s.configGen.GenerateConfig(config, taskID, date, files, rinexPath)
+		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
@@ -160,7 +160,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	default: // MethodSingle
 		s.logger.Infof("Using Single Point Positioning for task: %s", taskID)
 
-		configPath, cfgErr := s.configGen.GenerateConfig(config, taskID, date, files, rinexPath)
+		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr

@@ -6,6 +6,8 @@ import (
 	"collaborative/internal/model"
 	"collaborative/internal/services"
 	"collaborative/internal/storage"
+	"collaborative/internal/validators"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -320,14 +322,38 @@ func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *htt
 	SendJSONResponse(w, http.StatusOK, stats, h.logger)
 }
 
-// processTaskAsync обрабатывает задачу асинхронно
+// processTaskAsync processes a task in the background using MeasurementService.
+// All heavy-lifting (file I/O, conversion, download, RTK) is delegated to the service.
 func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model.UserProcessingConfig, fileData []byte, filename string) {
 	h.logger.Infof("Starting async processing for task: %s", taskID)
 
-	// TODO: Реализовать полную обработку
-	// 1. Сохранить файл
-	// 2. Конвертировать
-	// 3. Скачать необходимые данные
-	// 4. Запустить обработку
-	// 5. Сохранить результат
+	const (
+		defaultWorkDir   = "./tmp"
+		defaultConfigDir = "./cmd/solver/app"
+	)
+
+	configGen := services.NewConfigGenerator(defaultConfigDir, defaultWorkDir, h.logger)
+	downloader := services.NewFileDownloader(defaultWorkDir, h.logger)
+	converter := services.NewConverterService(defaultConfigDir, h.logger)
+	rtk := services.NewRTKService(defaultConfigDir, defaultWorkDir, h.logger)
+	fileSvc := services.NewFileService(defaultWorkDir, h.logger)
+
+	measurementSvc := services.NewMeasurementService(
+		h.taskStorage,
+		configGen,
+		downloader,
+		converter,
+		rtk,
+		fileSvc,
+		defaultWorkDir,
+		h.logger,
+	)
+
+	ctx := context.Background()
+	if err := measurementSvc.ProcessMeasurement(ctx, taskID, login, &config, fileData, filename); err != nil {
+		h.logger.Errorf("Task %s failed: %v", taskID, err)
+	}
+
+	// Invalidate cache so next history request reflects updated status
+	h.historyCache.Invalidate(login)
 }

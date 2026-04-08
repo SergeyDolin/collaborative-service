@@ -10,7 +10,7 @@ import (
 func ProfileHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Получаем логин из контекста (установлен в AuthMiddleware)
-		login, ok := GetUserFromContext(r.Context())
+		login, ok := GetUserFromContext(r)
 		if !ok {
 			SendJSONError(w, "Unauthorized", http.StatusUnauthorized, logger)
 			return
