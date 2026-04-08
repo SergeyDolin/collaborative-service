@@ -5,13 +5,12 @@ import (
 	"collaborative/internal/config"
 	"collaborative/internal/handlers"
 	"collaborative/internal/middlewares"
-	"collaborative/internal/services"
 	"collaborative/internal/storage"
+	"collaborative/internal/workers"
 	"context"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -19,6 +18,29 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"go.uber.org/zap"
 )
+
+// Constants для magic numbers
+const (
+	ShutdownTimeout     = 5 * time.Second
+	ReadTimeout         = 5 * time.Minute
+	WriteTimeout        = 5 * time.Minute
+	IdleTimeout         = 60 * time.Second
+	CleanupInterval     = 1 * time.Hour
+	ResultExpirationTTL = 24 * time.Hour
+	DefaultWorkDir      = "./tmp"
+	ConfigDir           = "./cmd/solver/app"
+)
+
+// Application представляет приложение с управлением жизненным циклом
+type Application struct {
+	server      *http.Server
+	logger      *zap.SugaredLogger
+	dbStorage   *storage.DBStorage
+	taskStorage *storage.TaskStorage
+	workerMgr   *workers.Manager
+	ctx         context.Context
+	cancel      context.CancelFunc
+}
 
 func main() {
 	cfg := config.LoadConfig()
@@ -30,116 +52,86 @@ func main() {
 	defer logger.Sync()
 	sugar := logger.Sugar()
 
-	// init DB
-	var dbStor *storage.DBStorage
-	var taskStorage *storage.TaskStorage
-
-	if cfg.DSN != "" {
-		sugar.Infof("Initializing PostgresSQL storage with DSN: %s", cfg.DSN)
-		dbStor, err = storage.NewDBStorage(cfg.DSN)
-		if err != nil {
-			sugar.Fatalf("Failed to connect to database: %v", err)
-		}
-		defer func() {
-			if err := dbStor.Close(); err != nil {
-				sugar.Errorf("Failed to close DB connection: %v", err)
-			}
-		}()
-
-		// Инициализируем storage для задач
-		taskStorage = storage.NewTaskStorage(dbStor.Pool())
-		if err := taskStorage.InitTaskSchema(); err != nil {
-			sugar.Fatalf("Failed to init task schema: %v", err)
-		}
-	}
-	if taskStorage != nil {
-		// Запускаем фоновую очистку старых записей каждый час
-		go func() {
-			ticker := time.NewTicker(1 * time.Hour)
-			defer ticker.Stop()
-
-			for range ticker.C {
-				if err := taskStorage.CleanExpiredResults(); err != nil {
-					sugar.Errorf("Failed to clean expired results: %v", err)
-				} else {
-					sugar.Debug("Cleaned expired results")
-				}
-			}
-		}()
+	app, err := NewApplication(cfg, sugar)
+	if err != nil {
+		sugar.Fatalf("Failed to initialize application: %v", err)
 	}
 
-	// init JWT services
-	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.TokenExpiry)
-	sugar.Infof("JWT service initialized with expiry: %d hours", cfg.TokenExpiry)
+	if err := app.Run(); err != nil {
+		sugar.Fatalf("Application error: %v", err)
+	}
+}
 
-	// Initialize services for measurement processing
-	workDir := "./tmp"
-	configDir := "./cmd/solver/app"
+// NewApplication создает и инициализирует приложение
+func NewApplication(cfg *config.Config, logger *zap.SugaredLogger) (*Application, error) {
+	ctx, cancel := context.WithCancel(context.Background())
 
-	if _, err := os.Stat(configDir + "/rnx2rtkp"); os.IsNotExist(err) {
-		sugar.Warnf("rnx2rtkp not found at %s/rnx2rtkp", configDir)
-		sugar.Warnf("Please ensure RTKLIB is installed at: %s", configDir)
-	} else {
-		sugar.Infof("Found rnx2rtkp at: %s/rnx2rtkp", configDir)
+	app := &Application{
+		logger: logger,
+		ctx:    ctx,
+		cancel: cancel,
 	}
 
-	os.MkdirAll(workDir, 0755)
-	os.MkdirAll(configDir, 0755)
+	// Инициализация хранилища
+	if err := app.initStorage(cfg); err != nil {
+		return nil, err
+	}
 
-	configGenerator := services.NewConfigGenerator(configDir, workDir, sugar)
-	downloader := services.NewFileDownloader(workDir, sugar)
-	rtkService := services.NewRTKService("./cmd/solver/app", workDir, sugar)
-	converterService := services.NewConverterService("./cmd/solver/app", sugar)
-
-	measurementHandler := handlers.NewMeasurementHandler(
-		dbStor, taskStorage, configGenerator, downloader, converterService, rtkService, workDir, sugar,
+	// Инициализация сервиса вспомогательных функций
+	app.workerMgr = workers.NewManager(
+		app.logger,
+		app.taskStorage,
+		DefaultWorkDir,
 	)
 
-	// Периодическая очистка tmp: и осиротевшие папки задач, и .pos старше 24 часов
-	cleanupTmp := func() {
-		entries, err := os.ReadDir(workDir)
-		if err != nil {
-			return
-		}
-		cutoff := 24 * time.Hour
-		for _, entry := range entries {
-			info, err := entry.Info()
-			if err != nil || time.Since(info.ModTime()) <= cutoff {
-				continue
-			}
-			path := filepath.Join(workDir, entry.Name())
-			if entry.IsDir() {
-				if err := os.RemoveAll(path); err != nil {
-					sugar.Warnf("Failed to remove old tmp dir %s: %v", path, err)
-				} else {
-					sugar.Debugf("Removed old tmp dir: %s", path)
-				}
-			} else {
-				if err := os.Remove(path); err != nil {
-					sugar.Warnf("Failed to remove old tmp file %s: %v", path, err)
-				} else {
-					sugar.Debugf("Removed old tmp file: %s", path)
-				}
-			}
-		}
+	// Инициализация HTTP маршрутов
+	router := app.setupRoutes(cfg)
+
+	app.server = &http.Server{
+		Addr:         cfg.RunAddr,
+		Handler:      router,
+		ReadTimeout:  ReadTimeout,
+		WriteTimeout: WriteTimeout,
+		IdleTimeout:  IdleTimeout,
 	}
 
-	go func() {
-		cleanupTmp() // первый прогон сразу при старте
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-		for range ticker.C {
-			cleanupTmp()
-		}
-	}()
+	return app, nil
+}
 
+// initStorage инициализирует хранилище
+func (app *Application) initStorage(cfg *config.Config) error {
+	if cfg.DSN == "" {
+		app.logger.Warn("No DSN provided, running without database")
+		return nil
+	}
+
+	dbStor, err := storage.NewDBStorage(cfg.DSN)
+	if err != nil {
+		return err
+	}
+	app.logger.Infof("Connected to database: %s", cfg.DSN)
+
+	app.dbStorage = dbStor
+	app.taskStorage = storage.NewTaskStorage(dbStor.Pool())
+
+	if err := app.taskStorage.InitTaskSchema(); err != nil {
+		return err
+	}
+	app.logger.Info("Task schema initialized")
+
+	return nil
+}
+
+// setupRoutes настраивает все маршруты приложения
+func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	router := chi.NewRouter()
 
+	// Middleware
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
-	router.Use(middlewares.LogMiddleware(sugar))
+	router.Use(middlewares.LogMiddleware(app.logger))
 
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -148,68 +140,94 @@ func main() {
 		http.Error(w, "Invalid path format", http.StatusNotFound)
 	})
 
-	// Public HTML routes
-	router.Get("/", handlers.IndexHandler(sugar))
-	router.Get("/login", handlers.LoginPageHandler(sugar))
-	router.Get("/register", handlers.RegisterPageHandler(sugar))
-	router.Get("/profile", handlers.ProfilePageHandler(sugar))
-	router.Get("/measurements", handlers.MeasurementsPageHandler(sugar))
+	// Инициализация JWT сервиса
+	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.TokenExpiry)
+	app.logger.Infof("JWT service initialized with expiry: %d hours", cfg.TokenExpiry)
+
+	// Public routes
+	router.Get("/", handlers.IndexHandler(app.logger))
+	router.Get("/login", handlers.LoginPageHandler(app.logger))
+	router.Get("/register", handlers.RegisterPageHandler(app.logger))
+	router.Get("/profile", handlers.ProfilePageHandler(app.logger))
+	router.Get("/measurements", handlers.MeasurementsPageHandler(app.logger))
 
 	// Public API routes
-	router.Post("/api/register", handlers.RegisterHandler(dbStor, sugar))
-	router.Post("/api/login", handlers.LoginHandler(dbStor, jwtService, sugar))
-	router.Get("/api/stats", measurementHandler.GetSystemStatsHandler)
+	router.Post("/api/register", handlers.RegisterHandler(app.dbStorage, app.logger))
+	router.Post("/api/login", handlers.LoginHandler(app.dbStorage, jwtService, app.logger))
 
-	// Protected API routes
-	router.Group(func(r chi.Router) {
-		r.Use(middlewares.AuthMiddleware(jwtService, sugar))
-		r.Get("/api/profile", handlers.ProfileHandler(sugar))
-		r.Post("/api/measurements/process", measurementHandler.ProcessMeasurementHandler)
-		r.Get("/api/measurements/history", measurementHandler.GetHistoryHandler)
-		r.Get("/api/measurements/status", measurementHandler.GetTaskStatusHandler)
-		r.Get("/api/measurements/download", measurementHandler.DownloadResultHandler)
-	})
+	// Measurement handler инициализация
+	if app.taskStorage != nil {
+		measurementHandler := handlers.NewMeasurementHandler(
+			app.dbStorage,
+			app.taskStorage,
+			app.logger,
+		)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	defer stop()
+		router.Get("/api/stats", measurementHandler.GetSystemStatsHandler)
 
-	srv := &http.Server{
-		Addr:         cfg.RunAddr,
-		Handler:      router,
-		ReadTimeout:  5 * time.Minute,
-		WriteTimeout: 5 * time.Minute,
-		IdleTimeout:  60 * time.Second,
+		// Protected routes
+		router.Group(func(r chi.Router) {
+			r.Use(middlewares.AuthMiddleware(jwtService, app.logger))
+			r.Get("/api/profile", handlers.ProfileHandler(app.logger))
+			r.Post("/api/measurements/process", measurementHandler.ProcessMeasurementHandler)
+			r.Get("/api/measurements/history", measurementHandler.GetHistoryHandler)
+			r.Get("/api/measurements/status", measurementHandler.GetTaskStatusHandler)
+			r.Get("/api/measurements/download", measurementHandler.DownloadResultHandler)
+		})
 	}
 
-	go func() {
-		sugar.Infof("Running server on %s", cfg.RunAddr)
-		sugar.Infof("Available routes:")
-		sugar.Infof("  GET  /             - Main page")
-		sugar.Infof("  GET  /login        - Login page")
-		sugar.Infof("  GET  /register     - Register page")
-		sugar.Infof("  GET  /profile      - Profile page")
-		sugar.Infof("  GET  /measurements - Measurements page")
-		sugar.Infof("  POST /api/register - Register API")
-		sugar.Infof("  POST /api/login    - Login API")
-		sugar.Infof("  POST /api/measurements/process - Process measurements")
-		sugar.Infof("  GET  /api/measurements/history - Get history (cached)")
-		sugar.Infof("  GET  /api/measurements/status  - Get task status")
-		sugar.Infof("  GET  /api/measurements/download - Download result")
+	return router
+}
 
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			sugar.Fatalf("Server failed to start: %v", err)
+// Run запускает приложение и управляет его жизненным циклом
+func (app *Application) Run() error {
+	// Запуск фоновых рабочих процессов
+	app.workerMgr.Start(app.ctx)
+	app.logger.Info("Background workers started")
+
+	// Запуск сервера
+	go func() {
+		app.logger.Infof("Running server on %s", app.server.Addr)
+		if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			app.logger.Fatalf("Server failed to start: %v", err)
 		}
 	}()
 
-	<-ctx.Done()
-	sugar.Info("Shutdown signal received")
+	// Ожидание сигнала завершения
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	<-sigChan
+	app.logger.Info("Shutdown signal received")
+
+	// Graceful shutdown
+	return app.Shutdown()
+}
+
+// Shutdown корректно завершает приложение
+func (app *Application) Shutdown() error {
+	// Отмена контекста для рабочих процессов
+	app.cancel()
+	app.logger.Info("Background workers stopped")
+
+	// Завершение HTTP сервера
+	ctx, cancel := context.WithTimeout(context.Background(), ShutdownTimeout)
 	defer cancel()
 
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		sugar.Errorf("Server shutdown error: %v", err)
-	} else {
-		sugar.Info("Server shutdown complete")
+	if err := app.server.Shutdown(ctx); err != nil {
+		app.logger.Errorf("Server shutdown error: %v", err)
+		return err
 	}
+	app.logger.Info("Server shutdown complete")
+
+	// Закрытие хранилища
+	if app.dbStorage != nil {
+		if err := app.dbStorage.Close(); err != nil {
+			app.logger.Errorf("Failed to close DB connection: %v", err)
+			return err
+		}
+	}
+
+	app.logger.Info("Application shutdown complete")
+	return nil
 }
