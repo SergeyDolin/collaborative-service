@@ -38,17 +38,16 @@ func NewConfigGenerator(templateDir, workDir string, logger *zap.SugaredLogger) 
 	}
 }
 
-// GenerateConfig генерирует конфиг для обработки с информацией об антенне из RINEX файла
-func (g *ConfigGenerator) GenerateConfig(config model.UserProcessingConfig, taskID string, date time.Time, files *ProcessingFiles) (string, error) {
-	// Ищем RINEX файл в workDir
-	rinexFile := g.findRINEXFile(taskID)
+// GenerateConfig генерирует конфиг с информацией об антенне из RINEX файла
+func (g *ConfigGenerator) GenerateConfig(config model.UserProcessingConfig, taskID string, date time.Time, files *ProcessingFiles, rinexPath string) (string, error) {
 	var antennaType string
 
-	if rinexFile != "" {
-		antennaType = g.extractAntennaType(rinexFile)
+	// Извлекаем тип антенны из переданного RINEX файла
+	if rinexPath != "" {
+		antennaType = g.extractAntennaType(rinexPath)
 		g.logger.Infof("Extracted antenna type from RINEX: %s", antennaType)
 	} else {
-		g.logger.Warnf("Could not find RINEX file for antenna extraction")
+		g.logger.Warnf("No RINEX file provided for antenna extraction")
 		antennaType = "NONE"
 	}
 
@@ -80,6 +79,48 @@ func (g *ConfigGenerator) GenerateConfig(config model.UserProcessingConfig, task
 	return configPath, nil
 }
 
+// extractAntennaType извлекает тип антенны из заголовка RINEX файла
+func (g *ConfigGenerator) extractAntennaType(filePath string) string {
+	f, err := os.Open(filePath)
+	if err != nil {
+		g.logger.Warnf("Failed to open RINEX file for antenna extraction: %v", err)
+		return "NONE"
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+
+	// Ищем строку с типом антенны
+	// Формат: "ANT # / TYPE" или "ANT TYPE / SERIAL NO"
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Заголовок заканчивается на этой метке
+		if strings.Contains(line, "END OF HEADER") {
+			break
+		}
+
+		// Проверяем строку с типом антенны
+		if strings.Contains(line, "ANT") && (strings.Contains(line, "TYPE") || strings.Contains(line, "ANTENNA")) {
+			// Извлекаем первые 20-40 символов, где находится тип антенны
+			if len(line) >= 40 {
+				antennaType := strings.TrimSpace(line[:40])
+				if antennaType != "" && !strings.Contains(antennaType, "ANT") {
+					g.logger.Infof("Found antenna type: %s", antennaType)
+					return antennaType
+				}
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		g.logger.Warnf("Error reading RINEX file: %v", err)
+	}
+
+	g.logger.Infof("Antenna type not found in RINEX header, using NONE")
+	return "NONE"
+}
+
 // findRINEXFile ищет RINEX файл в папке задачи
 func (g *ConfigGenerator) findRINEXFile(taskID string) string {
 	workDir := filepath.Join(g.workDir, taskID)
@@ -108,92 +149,6 @@ func (g *ConfigGenerator) findRINEXFile(taskID string) string {
 	}
 
 	return ""
-}
-
-// extractAntennaType извлекает тип антенны и серийный номер из заголовка RINEX файла
-// Формат: строка 1 имеет тип, строка 2 имеет серийный номер
-// Пример:
-// ANT  TYPE / SERIAL NO    TRM57971.00     NONE
-//
-//	SERIAL123456789
-//
-// Нужно извлечь: "TRM57971.00     NONE" из первой строки
-// и может быть серийный номер из второй строки (если нужно)
-func (g *ConfigGenerator) extractAntennaType(filePath string) string {
-	f, err := os.Open(filePath)
-	if err != nil {
-		g.logger.Warnf("Failed to open RINEX file for antenna extraction: %v", err)
-		return "NONE"
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	var antennaType string
-	var antennaSerial string
-	foundAntenna := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Заголовок заканчивается на этой метке
-		if strings.Contains(line, "END OF HEADER") {
-			break
-		}
-
-		// Проверяем если это строка с типом антенны
-		if strings.Contains(line, "ANT  TYPE") && len(line) >= 60 {
-			foundAntenna = true
-			// Первая строка содержит тип антенны в позициях 0-60
-			antennaType = strings.TrimSpace(line[:60])
-			g.logger.Debugf("Found ANT TYPE line: %s", antennaType)
-			continue
-		}
-
-		// Если мы нашли тип антенны, следующие строки могут содержать серийный номер
-		// Строки после "ANT  TYPE / SERIAL NO" содержат дополнительные данные об антенне
-		if foundAntenna && !strings.Contains(line, "ANT  TYPE") &&
-			!strings.Contains(line, "END OF HEADER") &&
-			len(antennaSerial) == 0 {
-
-			// Проверяем что это не другой заголовок (содержит "/ " в конце)
-			if !strings.Contains(line[50:], "/") {
-				// Это может быть строка серийного номера
-				potentialSerial := strings.TrimSpace(line[:60])
-				if potentialSerial != "" && !strings.Contains(potentialSerial, "/") {
-					antennaSerial = potentialSerial
-					g.logger.Debugf("Found antenna serial/additional: %s", antennaSerial)
-				} else {
-					// Если это не серийный номер, значит это конец информации об антенне
-					break
-				}
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		g.logger.Warnf("Error reading RINEX file: %v", err)
-	}
-
-	// Если не нашли информацию об антенне
-	if antennaType == "" {
-		g.logger.Infof("Antenna type not found in RINEX header, using NONE")
-		return "NONE"
-	}
-
-	// Если данные пусты
-	if antennaType == "" {
-		g.logger.Infof("Antenna data is empty, using NONE")
-		return "NONE"
-	}
-
-	// Проверяем на маркеры смартфонов/неизвестных устройств
-	if g.isUnknownOrSmartphone(antennaType) {
-		g.logger.Infof("Antenna recognized as unknown/smartphone: %s", antennaType)
-		return "NONE"
-	}
-
-	g.logger.Infof("Found antenna type: %s", antennaType)
-	return antennaType
 }
 
 // isUnknownOrSmartphone проверяет, является ли антенна неизвестной или встроенной в смартфон

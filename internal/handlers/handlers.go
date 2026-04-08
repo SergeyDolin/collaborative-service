@@ -601,14 +601,14 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 	os.MkdirAll(workDir, 0755)
 
 	// Отложенная очистка: удаляем всю папку с временными файлами в конце
-	defer func() {
-		h.logger.Debugf("Cleaning up temporary directory: %s", workDir)
-		if err := os.RemoveAll(workDir); err != nil {
-			h.logger.Warnf("Failed to remove work directory %s: %v", workDir, err)
-		} else {
-			h.logger.Infof("Successfully cleaned up work directory: %s", workDir)
-		}
-	}()
+	// defer func() {
+	// 	h.logger.Debugf("Cleaning up temporary directory: %s", workDir)
+	// 	if err := os.RemoveAll(workDir); err != nil {
+	// 		h.logger.Warnf("Failed to remove work directory %s: %v", workDir, err)
+	// 	} else {
+	// 		h.logger.Infof("Successfully cleaned up work directory: %s", workDir)
+	// 	}
+	// }()
 
 	// 1. Сохраняем файл
 	obsPath := filepath.Join(workDir, filename)
@@ -660,7 +660,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 			ERPFile:        files.ERPFile,
 		}
 
-		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)
+		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles, rinexPath)
 		if cfgErr != nil {
 			h.updateTaskError(taskID, login, fmt.Sprintf("Config generation: %v", cfgErr))
 			return
@@ -674,7 +674,7 @@ func (h *MeasurementHandler) processTask(taskID, login string, config model.User
 			NavigationFile: files.NavigationFile,
 		}
 
-		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles)
+		configPath, cfgErr := h.configGenerator.GenerateConfig(config, taskID, date, convFiles, rinexPath)
 		if cfgErr != nil {
 			h.updateTaskError(taskID, login, fmt.Sprintf("Config generation: %v", cfgErr))
 			return
