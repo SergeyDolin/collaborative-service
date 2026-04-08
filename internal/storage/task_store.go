@@ -412,3 +412,16 @@ func (s *TaskStorage) CleanExpiredResults() error {
 	`)
 	return err
 }
+
+// FailStalledTasks marks tasks stuck in "processing" for longer than timeout as failed.
+func (s *TaskStorage) FailStalledTasks(timeout time.Duration) error {
+	cutoff := time.Now().Add(-timeout)
+	_, err := s.pool.Exec(context.Background(), `
+		UPDATE processing_tasks
+		SET status = 'failed',
+		    error_message = 'processing timed out'
+		WHERE status = 'processing'
+		  AND started_at < $1
+	`, cutoff)
+	return err
+}
