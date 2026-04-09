@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Личный кабинет - Сервис коллаборативного позиционирования</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
@@ -18,635 +14,663 @@
             color: #4a5568;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
-        /* Шапка */
         .header {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255,255,255,0.95);
             backdrop-filter: blur(10px);
             padding: 1rem 2rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: fixed; width: 100%; top: 0; z-index: 1000;
         }
 
         .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            max-width: 1200px; margin: 0 auto;
+            display: flex; justify-content: space-between; align-items: center;
         }
 
         .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            cursor: pointer;
+            display: flex; align-items: center; gap: 10px;
+            text-decoration: none; cursor: pointer;
         }
 
         .logo-icon {
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
             border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 20px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 20px;
         }
 
-        .logo-text {
-            font-size: 1.2rem;
-            font-weight: 500;
-            color: #4a5568;
-        }
+        .logo-text { font-size: 1.2rem; font-weight: 500; color: #4a5568; }
 
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .user-name {
-            color: #718096;
-            font-weight: 500;
-        }
+        .user-menu { display: flex; align-items: center; gap: 20px; }
+        .user-name { color: #718096; font-weight: 500; }
 
         .logout-btn {
-            padding: 8px 16px;
-            background: #fed7d7;
-            color: #c53030;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s ease;
+            padding: 8px 16px; background: #fed7d7; color: #c53030;
+            border: none; border-radius: 8px; cursor: pointer;
+            font-size: 0.9rem; transition: all 0.2s ease;
         }
+        .logout-btn:hover { background: #fecaca; transform: translateY(-1px); }
 
-        .logout-btn:hover {
-            background: #fecaca;
-            transform: translateY(-1px);
-        }
+        .main-content { margin-top: 100px; padding: 20px; }
 
-        .main-content {
-            margin-top: 100px;
-            padding: 20px;
-        }
-
-        /* Приветственная карточка */
         .welcome-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 12px;
-            padding: 32px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            background: rgba(255,255,255,0.95); border-radius: 12px;
+            padding: 32px; margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
+        .welcome-card h1 { font-size: 2rem; margin-bottom: 8px; color: #4a5568; }
+        .welcome-card p { color: #718096; }
 
-        .welcome-card h1 {
-            font-size: 2rem;
-            margin-bottom: 8px;
-            color: #4a5568;
-        }
-
-        .welcome-card p {
-            color: #718096;
-            font-size: 1rem;
-        }
-
-        /* История обработок */
         .history-section {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 12px;
-            padding: 32px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 12px; padding: 32px;
         }
 
         .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
         }
 
-        .history-section h3 {
-            color: #4a5568;
-        }
+        .history-section h3 { color: #4a5568; }
+        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
-        .btn-history {
-            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
-            color: white;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
+        .btn {
+            padding: 9px 18px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 0.85rem; font-weight: 500;
+            transition: all 0.2s ease; white-space: nowrap;
         }
+        .btn:hover { transform: translateY(-1px); }
 
-        .btn-history:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(168, 199, 224, 0.3);
-        }
+        .btn-primary { background: linear-gradient(135deg, #a8c7e0, #c4d4e8); color: white; }
+        .btn-primary:hover { box-shadow: 0 4px 10px rgba(168,199,224,0.35); }
 
-        .history-list {
-            max-height: 600px;
-            overflow-y: auto;
+        .btn-select { background: #edf2f7; color: #4a5568; border: 1px solid #e2e8f0; }
+        .btn-select.active { background: #ebf8ff; border-color: #a8c7e0; color: #2b6cb0; }
+
+        .btn-danger { background: #fed7d7; color: #c53030; }
+        .btn-danger:hover { background: #fecaca; box-shadow: 0 4px 10px rgba(197,48,48,0.15); }
+
+        .selection-bar {
+            display: none; align-items: center; gap: 12px;
+            padding: 12px 16px;
+            background: #ebf8ff; border: 1px solid #bee3f8;
+            border-radius: 10px; margin-bottom: 16px; flex-wrap: wrap;
         }
+        .selection-bar.visible { display: flex; }
+        .selection-count { font-size: 0.9rem; color: #2b6cb0; font-weight: 500; }
+
+        .btn-select-all {
+            background: none; border: 1px solid #a8c7e0; color: #2b6cb0;
+            padding: 5px 12px; border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem; transition: all 0.2s;
+        }
+        .btn-select-all:hover { background: #bee3f8; }
+
+        .task-checkbox {
+            display: none; width: 18px; height: 18px;
+            cursor: pointer; accent-color: #a8c7e0;
+            flex-shrink: 0; margin-right: 4px;
+        }
+        .select-mode .task-checkbox { display: block; }
+
+        .history-list { max-height: 660px; overflow-y: auto; }
 
         .history-item {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
-            transition: all 0.2s ease;
+            background: #f8f9fa; border-radius: 12px;
+            padding: 14px 16px; margin-bottom: 10px;
+            transition: all 0.25s ease;
+            border: 2px solid transparent;
+            display: flex; align-items: flex-start; gap: 10px;
+        }
+        .history-item:hover { background: #edf2f7; transform: translateX(3px); }
+        .history-item.selected { border-color: #a8c7e0; background: #ebf8ff; }
+        .history-item.deleting {
+            opacity: 0; transform: translateX(20px);
+            pointer-events: none;
         }
 
-        .history-item:hover {
-            background: #e2e8f0;
-            transform: translateX(4px);
-        }
+        .item-body { flex: 1; min-width: 0; }
 
         .history-header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 8px;
+            display: flex; justify-content: space-between;
+            align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;
         }
 
-        .history-info {
-            flex: 1;
-        }
-
-        .history-date {
-            font-size: 0.85rem;
-            color: #718096;
-        }
-
-        .history-method {
-            font-weight: 500;
-            margin-top: 4px;
-            color: #4a5568;
-        }
-
-        .history-file {
-            font-size: 0.8rem;
-            color: #888;
-            margin-top: 4px;
-        }
-
-        .history-status {
-            text-align: right;
-        }
+        .history-info { flex: 1; }
+        .history-date { font-size: 0.82rem; color: #718096; }
+        .history-method { font-weight: 500; margin-top: 3px; color: #4a5568; }
+        .history-file { font-size: 0.78rem; color: #999; margin-top: 2px; }
+        .history-status { text-align: right; flex-shrink: 0; }
 
         .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
+            display: inline-block; padding: 3px 10px;
+            border-radius: 10px; font-size: 0.72rem; font-weight: 500;
         }
+        .status-completed  { background: #c6f6d5; color: #2f855a; }
+        .status-failed     { background: #fed7d7; color: #c53030; }
+        .status-processing { background: #fff3e0; color: #ed6c02; }
+        .status-pending    { background: #e3f2fd; color: #1565c0; }
 
-        .status-completed {
-            background: #c6f6d5;
-            color: #2f855a;
+        .btn-delete-single {
+            background: none; border: none; color: #c53030;
+            cursor: pointer; font-size: 0.75rem;
+            margin-top: 6px; padding: 2px 6px;
+            border-radius: 4px; transition: background 0.2s;
+            display: block;
         }
+        .btn-delete-single:hover { background: #fed7d7; }
 
-        .status-failed {
-            background: #fed7d7;
-            color: #c53030;
-        }
-
-        .status-processing {
-            background: #fff3e0;
-            color: #ed6c02;
-        }
-
-        .status-pending {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
-
-        /* Блок результата */
         .result-block {
-            margin-top: 12px;
-            padding-top: 10px;
+            margin-top: 10px; padding-top: 8px;
             border-top: 1px solid #e2e8f0;
         }
-
-        .coords-info {
-            font-size: 0.8rem;
-            color: #a8c7e0;
-            margin-bottom: 8px;
-        }
-
+        .coords-info { font-size: 0.78rem; color: #a8c7e0; margin-bottom: 6px; }
         .stats-info {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-bottom: 8px;
-            font-size: 0.75rem;
-            color: #718096;
-        }
-
-        .stat-item {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .download-section {
-            margin-top: 10px;
+            display: flex; gap: 12px; flex-wrap: wrap;
+            margin-bottom: 6px; font-size: 0.73rem; color: #718096;
         }
 
         .download-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
+            display: inline-flex; align-items: center; gap: 4px;
             background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: none;
-            text-decoration: none;
-            font-size: 0.75rem;
+            color: white; padding: 5px 10px; border-radius: 6px;
+            border: none; font-size: 0.73rem; cursor: pointer;
             transition: all 0.2s ease;
-            cursor: pointer;
         }
+        .download-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(168,199,224,0.3); }
+        .download-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        .download-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(168, 199, 224, 0.3);
-        }
-
-        .download-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .expiry-info {
-            font-size: 0.65rem;
-            color: #999;
-            margin-top: 5px;
-        }
-
+        .expiry-info { font-size: 0.63rem; color: #aaa; margin-top: 4px; }
         .error-msg {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            margin-top: 8px;
+            background: #fed7d7; color: #c53030;
+            padding: 5px 9px; border-radius: 6px;
+            font-size: 0.72rem; margin-top: 6px;
         }
 
-        .empty-history {
-            text-align: center;
-            padding: 40px;
-            color: #999;
+        .empty-history, .loading, .error {
+            text-align: center; padding: 40px; color: #999;
         }
+        .error { color: #c53030; }
 
-        .loading, .error {
-            text-align: center;
-            padding: 40px;
-            color: #999;
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35);
+            z-index: 2000; align-items: center; justify-content: center;
         }
+        .modal-overlay.visible { display: flex; }
 
-        .error {
-            color: #c53030;
+        .modal {
+            background: white; border-radius: 14px;
+            padding: 32px 28px; max-width: 420px; width: 90%;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            animation: modalIn 0.2s ease;
         }
+        @keyframes modalIn {
+            from { transform: scale(0.92); opacity: 0; }
+            to   { transform: scale(1);    opacity: 1; }
+        }
+        .modal h3 { margin-bottom: 12px; color: #2d3748; font-size: 1.1rem; }
+        .modal p  { color: #718096; font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+        .btn-cancel {
+            background: #edf2f7; color: #4a5568; border: none;
+            padding: 9px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+        }
+        .btn-cancel:hover { background: #e2e8f0; }
+
+        .btn-confirm-delete {
+            background: #c53030; color: white; border: none;
+            padding: 9px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+        }
+        .btn-confirm-delete:hover { background: #9b2c2c; }
+
+        .toast {
+            position: fixed; bottom: 28px; right: 28px;
+            padding: 12px 20px; border-radius: 10px;
+            font-size: 0.9rem; font-weight: 500;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            z-index: 3000;
+            opacity: 0; transform: translateY(12px);
+            transition: all 0.25s ease; pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: #c6f6d5; color: #2f855a; }
+        .toast.error   { background: #fed7d7; color: #c53030; }
 
         @media (max-width: 768px) {
-            .main-content {
-                margin-top: 120px;
-            }
-
-            .welcome-card h1 {
-                font-size: 1.5rem;
-            }
-
-            .history-header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .btn-history {
-                width: 100%;
-            }
-
-            .history-header-row {
-                flex-direction: column;
-            }
-
-            .history-status {
-                text-align: left;
-                margin-top: 8px;
-            }
+            .main-content { margin-top: 120px; }
+            .welcome-card h1 { font-size: 1.5rem; }
+            .header-actions { width: 100%; }
+            .btn { flex: 1; text-align: center; }
+            .history-header { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="header-content">
-            <div class="logo" onclick="window.location.href='/'">
-                <div class="logo-icon">📡</div>
-                <div class="logo-text">Collab<span>Service</span></div>
+
+<header class="header">
+    <div class="header-content">
+        <div class="logo" onclick="window.location.href='/'">
+            <div class="logo-icon">📡</div>
+            <div class="logo-text">Collab<span>Service</span></div>
+        </div>
+        <div class="user-menu">
+            <span class="user-name" id="userName">Пользователь</span>
+            <button class="logout-btn" onclick="logout()">Выйти</button>
+        </div>
+    </div>
+</header>
+
+<main class="main-content">
+    <div class="container">
+        <div class="welcome-card">
+            <h1 id="welcomeTitle">Добро пожаловать!</h1>
+            <p>Ваш личный кабинет в сервисе коллаборативного позиционирования</p>
+        </div>
+
+        <div class="history-section">
+            <div class="history-header">
+                <h3>📊 История обработок</h3>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="loadProcessingHistory()">🔄 Обновить</button>
+                    <button class="btn btn-select" id="btnSelectMode" onclick="toggleSelectMode()">☑️ Выбрать</button>
+                    <button class="btn btn-danger" id="btnDeleteAll" onclick="confirmDeleteAll()" style="display:none">🗑️ Удалить всё</button>
+                </div>
             </div>
-            <div class="user-menu">
-                <span class="user-name" id="userName">Пользователь</span>
-                <button class="logout-btn" onclick="logout()">Выйти</button>
+
+            <div class="selection-bar" id="selectionBar">
+                <span class="selection-count" id="selectionCount">Выбрано: 0</span>
+                <button class="btn-select-all" id="btnSelectAll" onclick="toggleSelectAll()">Выбрать все</button>
+                <button class="btn btn-danger" onclick="confirmDeleteSelected()"
+                        style="padding:6px 14px; font-size:0.8rem;">🗑️ Удалить выбранные</button>
+                <button class="btn-cancel" onclick="toggleSelectMode()"
+                        style="padding:6px 14px; font-size:0.8rem;">Отмена</button>
+            </div>
+
+            <div id="processingHistory" class="history-list">
+                <div class="empty-history">Нажмите «Обновить» для загрузки истории</div>
             </div>
         </div>
-    </header>
+    </div>
+</main>
 
-    <main class="main-content">
-        <div class="container">
-            <div class="welcome-card">
-                <h1 id="welcomeTitle">Добро пожаловать!</h1>
-                <p>Ваш личный кабинет в сервисе коллаборативного позиционирования</p>
-            </div>
-
-            <div class="history-section">
-                <div class="history-header">
-                    <h3>📊 История обработок</h3>
-                    <button class="btn-history" onclick="loadProcessingHistory(true)">🔄 Обновить историю</button>
-                </div>
-                <div id="processingHistory" class="history-list">
-                    <div class="empty-history">Нажмите "Обновить историю" для загрузки</div>
-                </div>
-            </div>
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <h3 id="modalTitle">Подтверждение удаления</h3>
+        <p id="modalText">Вы уверены?</p>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal()">Отмена</button>
+            <button class="btn-confirm-delete" id="btnModalConfirm">Удалить</button>
         </div>
-    </main>
+    </div>
+</div>
 
-    <script>
-        let currentPage = 0;
-        const pageSize = 20;
-        let isLoading = false;
+<div class="toast" id="toast"></div>
 
-        // Проверка авторизации
-        function checkAuth() {
-            const token = localStorage.getItem('token');
-            const login = localStorage.getItem('userLogin');
-            if (!token || !login) {
-                window.location.href = '/login';
-                return false;
+<script>
+    /* ===== State ===== */
+    let isLoading      = false;
+    let selectMode     = false;
+    let selectedIds    = new Set();
+    let pendingDeleteFn = null;  // всегда функция, никаких динамических onclick
+
+    /* ===== Auth ===== */
+    function checkAuth() {
+        const token = localStorage.getItem('token');
+        const login = localStorage.getItem('userLogin');
+        if (!token || !login) { window.location.href = '/login'; return false; }
+        document.getElementById('userName').textContent = login;
+        document.getElementById('welcomeTitle').textContent = `Добро пожаловать, ${login}!`;
+        return true;
+    }
+
+    function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userLogin');
+        window.location.href = '/';
+    }
+
+    function getToken() { return localStorage.getItem('token'); }
+
+    /* ===== Toast ===== */
+    let toastTimer = null;
+    function showToast(msg, type = 'success') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = `toast ${type} show`;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
+    }
+
+    /* ===== Модалка — единственный обработчик через переменную ===== */
+    function openModal(title, text, onConfirm) {
+        pendingDeleteFn = onConfirm;
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalText').textContent  = text;
+        document.getElementById('modalOverlay').classList.add('visible');
+    }
+
+    function closeModal() {
+        document.getElementById('modalOverlay').classList.remove('visible');
+        pendingDeleteFn = null;
+    }
+
+    document.getElementById('btnModalConfirm').addEventListener('click', () => {
+        if (!pendingDeleteFn) return;
+        const fn = pendingDeleteFn;
+        closeModal();   // сначала закрываем и обнуляем
+        fn();           // потом выполняем
+    });
+
+    document.getElementById('modalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+
+    /* ===== DOM helper: анимированное удаление карточки ===== */
+    function removeItemFromDOM(taskId) {
+        const el = document.querySelector(`.history-item[data-task-id="${taskId}"]`);
+        if (!el) return;
+        el.classList.add('deleting');
+        setTimeout(() => {
+            el.remove();
+            if (!document.querySelector('.history-item')) {
+                document.getElementById('processingHistory').innerHTML =
+                    '<div class="empty-history">📭 История обработок пуста</div>';
+                document.getElementById('btnDeleteAll').style.display = 'none';
             }
-            document.getElementById('userName').textContent = login;
-            document.getElementById('welcomeTitle').textContent = `Добро пожаловать, ${login}!`;
-            return true;
+        }, 270);
+    }
+
+    /* ===== Режим выбора ===== */
+    function toggleSelectMode() {
+        selectMode = !selectMode;
+        selectedIds.clear();
+
+        const list  = document.getElementById('processingHistory');
+        const bar   = document.getElementById('selectionBar');
+        const btn   = document.getElementById('btnSelectMode');
+        const btnDA = document.getElementById('btnDeleteAll');
+        const hasItems = !!document.querySelector('.history-item');
+
+        list.classList.toggle('select-mode', selectMode);
+        bar.classList.toggle('visible', selectMode);
+        btn.classList.toggle('active', selectMode);
+        btn.textContent = selectMode ? '✖ Отмена выбора' : '☑️ Выбрать';
+        btnDA.style.display = (!selectMode && hasItems) ? 'block' : 'none';
+
+        document.querySelectorAll('.history-item').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('.task-checkbox').forEach(cb => { cb.checked = false; });
+        updateSelectionCount();
+    }
+
+    function updateSelectionCount() {
+        document.getElementById('selectionCount').textContent = `Выбрано: ${selectedIds.size}`;
+        const total = document.querySelectorAll('.task-checkbox').length;
+        document.getElementById('btnSelectAll').textContent =
+            (selectedIds.size === total && total > 0) ? 'Снять все' : 'Выбрать все';
+    }
+
+    function toggleSelectAll() {
+        const checkboxes = document.querySelectorAll('.task-checkbox');
+        const allSelected = selectedIds.size === checkboxes.length && checkboxes.length > 0;
+        checkboxes.forEach(cb => {
+            cb.checked = !allSelected;
+            const item = cb.closest('.history-item');
+            const id   = cb.dataset.id;
+            if (!allSelected) { selectedIds.add(id);    item.classList.add('selected'); }
+            else              { selectedIds.delete(id); item.classList.remove('selected'); }
+        });
+        updateSelectionCount();
+    }
+
+    function onCheckboxChange(checkbox) {
+        const id   = checkbox.dataset.id;
+        const item = checkbox.closest('.history-item');
+        if (checkbox.checked) { selectedIds.add(id);    item.classList.add('selected'); }
+        else                  { selectedIds.delete(id); item.classList.remove('selected'); }
+        updateSelectionCount();
+    }
+
+    /* ===== Confirm wrappers ===== */
+    function confirmDeleteAll() {
+        openModal(
+            '🗑️ Удалить всю историю',
+            'Это удалит все задачи и результаты обработок. Действие необратимо.',
+            doDeleteAll
+        );
+    }
+
+    function confirmDeleteSelected() {
+        if (selectedIds.size === 0) { showToast('Ничего не выбрано', 'error'); return; }
+        const n = selectedIds.size;
+        const suffix = n === 1 ? 'ь' : n < 5 ? 'и' : 'ей';
+        openModal(
+            `🗑️ Удалить выбранные (${n})`,
+            `Будет удалено ${n} запис${suffix}. Действие необратимо.`,
+            doDeleteSelected
+        );
+    }
+
+    function confirmDeleteSingle(taskId) {
+        openModal(
+            '🗑️ Удалить запись',
+            'Задача и результат будут удалены безвозвратно.',
+            () => doDeleteSingle(taskId)
+        );
+    }
+
+    /* ===== Исполнители удаления ===== */
+    async function doDeleteSingle(taskId) {
+        // Оптимистично убираем из DOM — пользователь видит мгновенный отклик
+        removeItemFromDOM(taskId);
+        try {
+            const resp = await fetch(`/api/measurements/delete?id=${taskId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (resp.ok || resp.status === 404) {
+                // 404 = уже удалено, не ошибка
+                showToast('Запись удалена');
+            } else {
+                showToast('Ошибка удаления', 'error');
+                loadProcessingHistory(); // возвращаем актуальное состояние
+            }
+        } catch {
+            showToast('Ошибка соединения', 'error');
+            loadProcessingHistory();
+        }
+    }
+
+    async function doDeleteAll() {
+        try {
+            const resp = await fetch('/api/measurements/delete-all', {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                showToast(`Удалено ${data.deleted} записей`);
+            } else {
+                showToast('Ошибка удаления', 'error');
+            }
+        } catch {
+            showToast('Ошибка соединения', 'error');
+        } finally {
+            if (selectMode) toggleSelectMode();
+            loadProcessingHistory();
+        }
+    }
+
+    async function doDeleteSelected() {
+        const ids = [...selectedIds];
+
+        // Оптимистично убираем все выбранные
+        ids.forEach(id => removeItemFromDOM(id));
+        selectedIds.clear();
+        updateSelectionCount();
+
+        const results = await Promise.allSettled(ids.map(id =>
+            fetch(`/api/measurements/delete?id=${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            }).then(r => {
+                if (!r.ok && r.status !== 404) throw new Error(String(r.status));
+            })
+        ));
+
+        const errors  = results.filter(r => r.status === 'rejected').length;
+        const deleted = ids.length - errors;
+
+        if (errors === 0) {
+            showToast(`Удалено ${deleted} записей`);
+        } else {
+            showToast(`Удалено: ${deleted}, ошибок: ${errors}`, 'error');
+            loadProcessingHistory(); // перезагружаем при частичной ошибке
         }
 
-        // Выход из системы
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('userLogin');
-            window.location.href = '/';
-        }
+        if (selectMode) toggleSelectMode();
+    }
 
-        // ГЛАВНАЯ ФУНКЦИЯ - Скачивание файла результата
-        async function downloadResult(taskId) {
-            const token = localStorage.getItem('token');
-            
-            // Проверяем токен
-            if (!token) {
-                alert('Сессия истекла. Пожалуйста, войдите снова.');
-                window.location.href = '/login';
+    /* ===== Загрузка истории ===== */
+    function getMethodName(m) {
+        return { absolute:'📍 SPP', single:'📍 SPP', relative:'🔗 Относительный', ppp:'🎯 PPP' }[m] || m || '—';
+    }
+    function getStatusText(s) {
+        return { pending:'⏳ В очереди', processing:'🔄 Обработка...', completed:'✅ Завершено', failed:'❌ Ошибка' }[s] || s;
+    }
+
+    async function loadProcessingHistory() {
+        if (isLoading) return;
+        isLoading = true;
+        document.getElementById('processingHistory').innerHTML = '<div class="loading">⏳ Загрузка...</div>';
+
+        try {
+            const resp = await fetch('/api/measurements/history?limit=50&offset=0', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+
+            const container = document.getElementById('processingHistory');
+            const btnDA     = document.getElementById('btnDeleteAll');
+
+            if (!resp.ok) {
+                container.innerHTML = resp.status === 401
+                    ? '<div class="error">🔒 Сессия истекла. <a href="/login">Войдите снова</a></div>'
+                    : '<div class="error">❌ Ошибка загрузки</div>';
                 return;
             }
 
-            console.log('📥 Начинаем скачивание файла для задачи:', taskId);
-            console.log('🔑 Токен доступен:', token.substring(0, 20) + '...');
+            const tasks = await resp.json();
 
-            const btn = event.target;
-            btn.disabled = true;
-            const originalText = btn.textContent;
-            btn.textContent = '⏳ Скачивание...';
+            if (!tasks || tasks.length === 0) {
+                container.innerHTML = '<div class="empty-history">📭 История обработок пуста</div>';
+                btnDA.style.display = 'none';
+                return;
+            }
 
-            try {
-                console.log('📡 Отправляем fetch запрос с заголовком Authorization...');
-                
-                const response = await fetch(`/api/measurements/download?id=${taskId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/octet-stream'
+            btnDA.style.display = selectMode ? 'none' : 'block';
+
+            container.innerHTML = tasks.map(task => {
+                const date   = new Date(task.createdAt).toLocaleString('ru');
+                const method = getMethodName(task.config?.method);
+                const mode   = (task.fileType === 'static' || task.config?.mode === 'static') ? 'Статика' : 'Кинематика';
+                const status = task.status || 'pending';
+
+                let resultHtml = '';
+                if (status === 'completed' && task.result) {
+                    const r = task.result;
+                    const coords = (r.latitude && r.longitude)
+                        ? `<div class="coords-info">📍 ${r.latitude.toFixed(6)}°, ${r.longitude.toFixed(6)}°${r.height ? `, h: ${r.height.toFixed(2)} м` : ''}</div>`
+                        : '';
+                    const stats = (r.q !== undefined || r.nSat !== undefined)
+                        ? `<div class="stats-info">
+                            ${r.q    !== undefined ? `<span>🎯 Q: ${r.q}</span>` : ''}
+                            ${r.nSat !== undefined ? `<span>🛰️ Спутников: ${r.nSat}</span>` : ''}
+                           </div>`
+                        : '';
+                    const dl = task.fileType !== 'static'
+                        ? `<div>
+                            <button class="download-btn" onclick="downloadResult('${task.id}', event)">📥 Скачать .pos</button>
+                            <div class="expiry-info">⏰ Файл доступен 24 ч</div>
+                           </div>`
+                        : '';
+                    if (coords || stats || dl) {
+                        resultHtml = `<div class="result-block">${stats}${coords}${dl}</div>`;
                     }
-                });
-
-                console.log('📊 Ответ сервера:', response.status, response.statusText);
-                console.log('📋 Заголовки ответа:', {
-                    contentType: response.headers.get('content-type'),
-                    contentLength: response.headers.get('content-length'),
-                    contentDisposition: response.headers.get('content-disposition')
-                });
-
-                if (response.ok) {
-                    console.log('✅ Ответ успешен, читаем blob...');
-                    const blob = await response.blob();
-                    console.log('📦 Размер файла:', blob.size, 'байт');
-
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${taskId}.pos`;
-                    
-                    console.log('💾 Создаем элемент для скачивания...');
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    console.log('✨ Файл скачан успешно!');
-                    
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    btn.textContent = originalText;
-                } else if (response.status === 401) {
-                    console.error('❌ Ошибка 401: Неавторизован');
-                    alert('Сессия истекла. Пожалуйста, войдите снова.');
-                    window.location.href = '/login';
-                } else if (response.status === 404) {
-                    console.error('❌ Ошибка 404: Файл не найден');
-                    alert('Файл результата не найден или удален.');
-                    btn.textContent = '❌ Файл недоступен';
-                } else {
-                    console.error('❌ Ошибка сервера:', response.status);
-                    const errorText = await response.text();
-                    console.error('📄 Ответ сервера:', errorText);
-                    alert(`Ошибка скачивания: ${response.status} ${response.statusText}`);
-                    btn.textContent = originalText;
                 }
-            } catch (error) {
-                console.error('❌ Ошибка при скачивании:', error);
-                alert('Ошибка соединения с сервером: ' + error.message);
-                btn.textContent = originalText;
-            } finally {
-                btn.disabled = false;
-            }
-        }
 
-        // Получение названия метода
-        function getMethodName(method) {
-            const methods = {
-                'absolute': '📍 Абсолютный метод (SPP)',
-                'single': '📍 Абсолютный метод (SPP)',
-                'relative': '🔗 Относительный метод (Differential)',
-                'ppp': '🎯 PPP метод'
-            };
-            return methods[method] || method || 'Неизвестный метод';
-        }
+                const errorHtml = (status === 'failed' && task.errorMessage)
+                    ? `<div class="error-msg">❌ ${task.errorMessage}</div>` : '';
 
-        // Получение текста статуса
-        function getStatusText(status) {
-            const statuses = {
-                'pending': '⏳ В очереди',
-                'processing': '🔄 Обработка...',
-                'completed': '✅ Завершено',
-                'failed': '❌ Ошибка'
-            };
-            return statuses[status] || status;
-        }
-
-        // Загрузка истории обработок с пагинацией
-        async function loadProcessingHistory(resetPage = true) {
-            if (isLoading) return;
-
-            if (resetPage) {
-                currentPage = 0;
-                document.getElementById('processingHistory').innerHTML = '<div class="loading">⏳ Загрузка истории...</div>';
-            }
-
-            const token = localStorage.getItem('token');
-            const container = document.getElementById('processingHistory');
-
-            isLoading = true;
-
-            try {
-                const response = await fetch(`/api/measurements/history?limit=${pageSize}&offset=${currentPage * pageSize}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (response.ok) {
-                    const tasks = await response.json();
-
-                    if (!tasks || tasks.length === 0) {
-                        if (currentPage === 0) {
-                            container.innerHTML = '<div class="empty-history">📭 Нет выполненных обработок</div>';
-                        }
-                        isLoading = false;
-                        return;
-                    }
-
-                    const historyHtml = tasks.map(task => {
-                        const date = new Date(task.createdAt).toLocaleString();
-                        const method = getMethodName(task.config?.method);
-                        const filename = task.filename || 'файл';
-                        const status = task.status || 'pending';
-                        const statusText = getStatusText(status);
-                        const fileType = task.fileType || (task.config?.mode === 'static' ? 'static' : 'kinematic');
-                        const modeText = fileType === 'static' ? 'Статика' : 'Кинематика';
-
-                        let resultHtml = '';
-
-                        if (status === 'completed' && task.result) {
-                            const result = task.result;
-
-                            // Статистика
-                            let statsHtml = '';
-                            if (result.q !== undefined || result.nSat !== undefined) {
-                                statsHtml = `
-                                    <div class="stats-info">
-                                        ${result.q !== undefined ? `<span class="stat-item">🎯 Q: ${result.q}</span>` : ''}
-                                        ${result.nSat !== undefined ? `<span class="stat-item">🛰️ Спутников: ${result.nSat}</span>` : ''}
-                                    </div>
-                                `;
-                            }
-
-                            // Координаты
-                            let coordsHtml = '';
-                            if (result.latitude && result.longitude) {
-                                coordsHtml = `<div class="coords-info">📍 ${result.latitude.toFixed(6)}°, ${result.longitude.toFixed(6)}° ${result.height ? `, h: ${result.height.toFixed(2)}м` : ''}</div>`;
-                            }
-
-                            // Для кинематики - показываем кнопку скачивания
-                            if (fileType === 'kinematic') {
-                                resultHtml = `
-                                    <div class="result-block">
-                                        ${statsHtml}
-                                        ${coordsHtml}
-                                        <div class="download-section">
-                                            <button class="download-btn" onclick="downloadResult('${task.id}')">📥 Скачать полный файл решения</button>
-                                            <div class="expiry-info">⏰ Файл доступен для скачивания в течение 24 часов</div>
-                                        </div>
-                                    </div>
-                                `;
-                            } else if (coordsHtml || statsHtml) {
-                                resultHtml = `
-                                    <div class="result-block">
-                                        ${statsHtml}
-                                        ${coordsHtml}
-                                    </div>
-                                `;
-                            }
-                        }
-
-                        // Блок с ошибкой
-                        let errorHtml = '';
-                        if (status === 'failed' && task.errorMessage) {
-                            errorHtml = `<div class="error-msg">❌ ${task.errorMessage}</div>`;
-                        }
-
-                        return `
-                            <div class="history-item">
-                                <div class="history-header-row">
-                                    <div class="history-info">
-                                        <div class="history-date">📅 ${date}</div>
-                                        <div class="history-method">${method} (${modeText})</div>
-                                        <div class="history-file">📁 ${filename}</div>
-                                    </div>
-                                    <div class="history-status">
-                                        <span class="status-badge status-${status}">${statusText}</span>
-                                    </div>
-                                </div>
-                                ${resultHtml}
-                                ${errorHtml}
+                return `
+                <div class="history-item" data-task-id="${task.id}">
+                    <input type="checkbox" class="task-checkbox" data-id="${task.id}"
+                           onchange="onCheckboxChange(this)">
+                    <div class="item-body">
+                        <div class="history-header-row">
+                            <div class="history-info">
+                                <div class="history-date">📅 ${date}</div>
+                                <div class="history-method">${method} · ${mode}</div>
+                                <div class="history-file">📁 ${task.filename || '—'}</div>
                             </div>
-                        `;
-                    }).join('');
+                            <div class="history-status">
+                                <span class="status-badge status-${status}">${getStatusText(status)}</span>
+                                <button class="btn-delete-single"
+                                        onclick="confirmDeleteSingle('${task.id}')">🗑️ Удалить</button>
+                            </div>
+                        </div>
+                        ${resultHtml}
+                        ${errorHtml}
+                    </div>
+                </div>`;
+            }).join('');
 
-                    if (currentPage === 0) {
-                        container.innerHTML = historyHtml;
-                    } else {
-                        container.innerHTML += historyHtml;
-                    }
-                } else if (response.status === 401) {
-                    container.innerHTML = '<div class="error">🔒 Сессия истекла. <a href="/login">Войдите снова</a></div>';
-                } else {
-                    container.innerHTML = '<div class="error">❌ Ошибка загрузки истории</div>';
-                }
-            } catch (error) {
-                console.error('Failed to load history:', error);
-                container.innerHTML = '<div class="error">❌ Ошибка соединения с сервером</div>';
-            } finally {
-                isLoading = false;
+            if (selectMode) container.classList.add('select-mode');
+
+        } catch (e) {
+            console.error(e);
+            document.getElementById('processingHistory').innerHTML =
+                '<div class="error">❌ Ошибка соединения</div>';
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    /* ===== Скачивание ===== */
+    async function downloadResult(taskId, event) {
+        const token = getToken();
+        if (!token) { window.location.href = '/login'; return; }
+
+        const btn  = event.target;
+        const orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ Скачивание...';
+
+        try {
+            const resp = await fetch(`/api/measurements/download?id=${taskId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (resp.ok) {
+                const blob = await resp.blob();
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href = url; a.download = `${taskId}.pos`;
+                document.body.appendChild(a); a.click();
+                URL.revokeObjectURL(url); document.body.removeChild(a);
+            } else if (resp.status === 401) {
+                window.location.href = '/login';
+            } else {
+                showToast('Файл недоступен', 'error');
             }
-        }
+        } catch { showToast('Ошибка соединения', 'error'); }
+        finally { btn.disabled = false; btn.textContent = orig; }
+    }
 
-        // Инициализация
-        if (checkAuth()) {
-            // Загружаем историю сразу
-            loadProcessingHistory(true);
-        }
-    </script>
+    /* ===== Init ===== */
+    if (checkAuth()) loadProcessingHistory();
+</script>
 </body>
 </html>

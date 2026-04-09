@@ -425,3 +425,58 @@ func (s *TaskStorage) FailStalledTasks(timeout time.Duration) error {
 	`, cutoff)
 	return err
 }
+
+// DeleteTaskByID удаляет задачу и её результат по ID (только если принадлежит пользователю)
+func (s *TaskStorage) DeleteTaskByID(taskID, userLogin string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Удаляем результат (если есть)
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM processing_results WHERE task_id = $1 AND user_login = $2`,
+		taskID, userLogin,
+	)
+	if err != nil {
+		return fmt.Errorf("delete result: %w", err)
+	}
+
+	// Удаляем саму задачу
+	result, err := s.pool.Exec(ctx,
+		`DELETE FROM processing_tasks WHERE id = $1 AND user_login = $2`,
+		taskID, userLogin,
+	)
+	if err != nil {
+		return fmt.Errorf("delete task: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("task not found or access denied")
+	}
+
+	return nil
+}
+
+// DeleteAllUserTasks удаляет все задачи и результаты пользователя
+func (s *TaskStorage) DeleteAllUserTasks(userLogin string) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Удаляем результаты
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM processing_results WHERE user_login = $1`,
+		userLogin,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("delete results: %w", err)
+	}
+
+	// Удаляем задачи
+	res, err := s.pool.Exec(ctx,
+		`DELETE FROM processing_tasks WHERE user_login = $1`,
+		userLogin,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("delete tasks: %w", err)
+	}
+
+	return res.RowsAffected(), nil
+}

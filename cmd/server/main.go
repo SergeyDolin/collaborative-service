@@ -173,6 +173,9 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Get("/api/measurements/history", measurementHandler.GetHistoryHandler)
 			r.Get("/api/measurements/status", measurementHandler.GetTaskStatusHandler)
 			r.Get("/api/measurements/download", measurementHandler.DownloadResultHandler)
+
+			r.Delete("/api/measurements/delete", measurementHandler.DeleteTaskHandler)
+			r.Delete("/api/measurements/delete-all", measurementHandler.DeleteAllTasksHandler)
 		})
 	}
 
