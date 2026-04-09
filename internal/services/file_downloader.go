@@ -302,13 +302,12 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 // DownloadDCB скачивает Differential Code Bias.
 // CDDIS требует регистрацию на Earthdata — используем открытый CAS/GIPP.
 func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, error) {
-	week, _ := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
 	gzFile := filepath.Join(d.workDir, fmt.Sprintf("%s_dcb.bsx.gz", taskID))
 	outFile := filepath.Join(d.workDir, fmt.Sprintf("%s_dcb.bsx", taskID))
 
-	ftpDir := fmt.Sprintf("/gnss/products/%d", week)
+	ftpDir := fmt.Sprintf("/gnss/products/bias/%d", year)
 
 	type candidate struct {
 		label   string
@@ -318,14 +317,14 @@ func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, err
 
 	candidates := []candidate{
 		{"CDDIS_CAS",
-			ftpDir + fmt.Sprintf("/CAS0MGXRAP_%d%03d0000_01D_01D_DCB.BSX.gz", year, doy),
+			ftpDir + fmt.Sprintf("/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz", year, doy),
 			""},
 		{"CDDIS_CODE",
-			ftpDir + fmt.Sprintf("/COD0MGXFIN_%d%03d0000_01D_01D_DCB.BSX.gz", year, doy),
+			ftpDir + fmt.Sprintf("/COD0OPSFIN_%d%03d0000_01D_01D_DCB.BIA.gz", year, doy),
 			""},
 		{"CAS_HTTP",
 			"",
-			fmt.Sprintf("https://ftp.gipp.org.cn/product/dcb/mgex/%d/CAS0MGXRAP_%d%03d0000_01D_01D_DCB.BSX.gz",
+			fmt.Sprintf("https://ftp.gipp.org.cn/product/dcb/mgex/%d/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz",
 				year, year, doy)},
 	}
 
