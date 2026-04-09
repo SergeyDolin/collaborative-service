@@ -167,7 +167,27 @@
             margin-top: 10px; padding-top: 8px;
             border-top: 1px solid #e2e8f0;
         }
-        .coords-info { font-size: 0.78rem; color: #a8c7e0; margin-bottom: 6px; }
+
+        /* Координаты — моноширинный шрифт для выравнивания цифр */
+        .coords-table {
+            font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
+            font-size: 0.78rem;
+            color: #2b6cb0;
+            margin-bottom: 6px;
+            border-collapse: collapse;
+        }
+        .coords-table td {
+            padding: 1px 8px 1px 0;
+            vertical-align: top;
+            white-space: nowrap;
+        }
+        .coords-table td:first-child {
+            color: #718096;
+            font-size: 0.72rem;
+            padding-right: 6px;
+            user-select: none;
+        }
+
         .stats-info {
             display: flex; gap: 12px; flex-wrap: wrap;
             margin-bottom: 6px; font-size: 0.73rem; color: #718096;
@@ -316,7 +336,7 @@
     let isLoading      = false;
     let selectMode     = false;
     let selectedIds    = new Set();
-    let pendingDeleteFn = null;  // всегда функция, никаких динамических onclick
+    let pendingDeleteFn = null;
 
     /* ===== Auth ===== */
     function checkAuth() {
@@ -346,7 +366,7 @@
         toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
     }
 
-    /* ===== Модалка — единственный обработчик через переменную ===== */
+    /* ===== Модалка ===== */
     function openModal(title, text, onConfirm) {
         pendingDeleteFn = onConfirm;
         document.getElementById('modalTitle').textContent = title;
@@ -362,15 +382,15 @@
     document.getElementById('btnModalConfirm').addEventListener('click', () => {
         if (!pendingDeleteFn) return;
         const fn = pendingDeleteFn;
-        closeModal();   // сначала закрываем и обнуляем
-        fn();           // потом выполняем
+        closeModal();
+        fn();
     });
 
     document.getElementById('modalOverlay').addEventListener('click', function(e) {
         if (e.target === this) closeModal();
     });
 
-    /* ===== DOM helper: анимированное удаление карточки ===== */
+    /* ===== DOM helper ===== */
     function removeItemFromDOM(taskId) {
         const el = document.querySelector(`.history-item[data-task-id="${taskId}"]`);
         if (!el) return;
@@ -465,7 +485,6 @@
 
     /* ===== Исполнители удаления ===== */
     async function doDeleteSingle(taskId) {
-        // Оптимистично убираем из DOM — пользователь видит мгновенный отклик
         removeItemFromDOM(taskId);
         try {
             const resp = await fetch(`/api/measurements/delete?id=${taskId}`, {
@@ -473,11 +492,10 @@
                 headers: { 'Authorization': `Bearer ${getToken()}` }
             });
             if (resp.ok || resp.status === 404) {
-                // 404 = уже удалено, не ошибка
                 showToast('Запись удалена');
             } else {
                 showToast('Ошибка удаления', 'error');
-                loadProcessingHistory(); // возвращаем актуальное состояние
+                loadProcessingHistory();
             }
         } catch {
             showToast('Ошибка соединения', 'error');
@@ -508,7 +526,6 @@
     async function doDeleteSelected() {
         const ids = [...selectedIds];
 
-        // Оптимистично убираем все выбранные
         ids.forEach(id => removeItemFromDOM(id));
         selectedIds.clear();
         updateSelectionCount();
@@ -529,10 +546,31 @@
             showToast(`Удалено ${deleted} записей`);
         } else {
             showToast(`Удалено: ${deleted}, ошибок: ${errors}`, 'error');
-            loadProcessingHistory(); // перезагружаем при частичной ошибке
+            loadProcessingHistory();
         }
 
         if (selectMode) toggleSelectMode();
+    }
+
+    /* ===== Форматирование координат =====
+     * Выводим число как есть — без округления.
+     * Если в числе нет дробной части (например 0), показываем как целое.
+     * Используем String() вместо toFixed() чтобы не терять и не добавлять знаки.
+     */
+    function formatCoord(val) {
+        if (val === null || val === undefined) return '—';
+        // Приводим к Number на случай если пришла строка
+        const n = Number(val);
+        if (isNaN(n)) return String(val);
+        // String(n) даёт все значимые цифры без лишних нулей
+        return String(n);
+    }
+
+    function formatHeight(val) {
+        if (val === null || val === undefined) return null;
+        const n = Number(val);
+        if (isNaN(n) || n === 0) return null;
+        return String(n);
     }
 
     /* ===== Загрузка истории ===== */
@@ -582,23 +620,37 @@
                 let resultHtml = '';
                 if (status === 'completed' && task.result) {
                     const r = task.result;
-                    const coords = (r.latitude && r.longitude)
-                        ? `<div class="coords-info">📍 ${r.latitude.toFixed(6)}°, ${r.longitude.toFixed(6)}°${r.height ? `, h: ${r.height.toFixed(2)} м` : ''}</div>`
+
+                    const hasCoords = r.latitude || r.longitude;
+                    const lat    = formatCoord(r.latitude);
+                    const lon    = formatCoord(r.longitude);
+                    const height = formatHeight(r.height);
+
+                    // Таблица координат — каждая на своей строке, все знаки
+                    const coordsHtml = hasCoords
+                        ? `<table class="coords-table">
+                            <tr><td>φ</td><td>${lat}°</td></tr>
+                            <tr><td>λ</td><td>${lon}°</td></tr>
+                            ${height ? `<tr><td>h</td><td>${height} м</td></tr>` : ''}
+                           </table>`
                         : '';
-                    const stats = (r.q !== undefined || r.nSat !== undefined)
+
+                    const statsHtml = (r.q !== undefined || r.nSat !== undefined)
                         ? `<div class="stats-info">
                             ${r.q    !== undefined ? `<span>🎯 Q: ${r.q}</span>` : ''}
                             ${r.nSat !== undefined ? `<span>🛰️ Спутников: ${r.nSat}</span>` : ''}
                            </div>`
                         : '';
-                    const dl = task.fileType !== 'static'
+
+                    const dlHtml = task.fileType !== 'static'
                         ? `<div>
                             <button class="download-btn" onclick="downloadResult('${task.id}', event)">📥 Скачать .pos</button>
                             <div class="expiry-info">⏰ Файл доступен 24 ч</div>
                            </div>`
                         : '';
-                    if (coords || stats || dl) {
-                        resultHtml = `<div class="result-block">${stats}${coords}${dl}</div>`;
+
+                    if (coordsHtml || statsHtml || dlHtml) {
+                        resultHtml = `<div class="result-block">${statsHtml}${coordsHtml}${dlHtml}</div>`;
                     }
                 }
 

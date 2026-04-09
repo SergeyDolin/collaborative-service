@@ -79,45 +79,90 @@ func (g *ConfigGenerator) GenerateConfig(config model.UserProcessingConfig, task
 	return configPath, nil
 }
 
-// extractAntennaType извлекает тип антенны из заголовка RINEX файла
+// extractAntennaType извлекает тип антенны + купол из строки "ANT # / TYPE"
+// заголовка RINEX 2/3 файла.
+//
+// Формат строки (RINEX 3, фиксированные столбцы по спецификации):
+//
+//	col  0–19  : серийный номер приёмника антенны (20 символов)
+//	col 20–39  : тип антенны (20 символов), например "TRM57971.00     NONE"
+//	col 40–59  : (padding / не используется)
+//	col 60–79  : метка "ANT # / TYPE"
+//
+// Однако на практике некоторые конвертеры (convbin, teqc) записывают поля
+// с отступом отличным от стандарта, поэтому сначала пробуем фиксированные
+// позиции, а если результат пустой — парсим по словам.
 func (g *ConfigGenerator) extractAntennaType(filePath string) string {
 	f, err := os.Open(filePath)
 	if err != nil {
-		g.logger.Warnf("Failed to open RINEX file for antenna extraction: %v", err)
+		g.logger.Warnf("Failed to open file for antenna extraction: %v", err)
 		return "NONE"
 	}
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
-
-	// Ищем строку с типом антенны
-	// Формат: "ANT # / TYPE" или "ANT TYPE / SERIAL NO"
 	for scanner.Scan() {
-		line := scanner.Text()
+		// Убираем \r на случай Windows-переносов строк
+		line := strings.TrimRight(scanner.Text(), "\r")
 
-		// Заголовок заканчивается на этой метке
 		if strings.Contains(line, "END OF HEADER") {
 			break
 		}
 
-		// Проверяем строку с типом антенны
-		if strings.Contains(line, "ANT") && (strings.Contains(line, "TYPE") || strings.Contains(line, "ANTENNA")) {
-			// Извлекаем первые 20-40 символов, где находится тип антенны
-			if len(line) >= 40 {
-				antennaType := strings.TrimSpace(line[:40])
-				if antennaType != "" && !strings.Contains(antennaType, "ANT") {
-					g.logger.Infof("Found antenna type: %s", antennaType)
-					return antennaType
-				}
+		if !strings.Contains(line, "ANT # / TYPE") {
+			continue
+		}
+
+		// --- Метод 1: фиксированные позиции RINEX-спецификации ---
+		// Метка начинается с col 60; поле антенны — col 20..59 (40 символов).
+		if len(line) >= 40 {
+			end := 60
+			if len(line) < end {
+				end = len(line)
+			}
+			// Убираем метку из правой части если строка короче 60 символов
+			fieldArea := line[20:end]
+			// Отрезаем правые пробелы, но сохраняем внутренние
+			// (rtklib читает тип и купол как два слова разделённых пробелами)
+			candidate := strings.TrimRight(fieldArea, " ")
+			if candidate != "" {
+				g.logger.Infof("Antenna type (fixed-col): %q from file %s", candidate, filePath)
+				return candidate
 			}
 		}
+
+		// --- Метод 2: парсинг по словам ---
+		// Отрезаем метку "ANT # / TYPE" и берём остаток слева.
+		// Пример: "1441112501          TRM57971.00     NONE                    ANT # / TYPE"
+		// После отрезания метки: "1441112501          TRM57971.00     NONE                    "
+		labelIdx := strings.Index(line, "ANT # / TYPE")
+		if labelIdx > 0 {
+			beforeLabel := strings.TrimRight(line[:labelIdx], " ")
+			// Теперь разбиваем на слова: [серийник, тип, купол]
+			// Серийник — первое слово (или пустое если нет), тип и купол — следующие
+			words := strings.Fields(beforeLabel)
+			// words[0] = серийник ("1441112501")
+			// words[1] = тип антенны ("TRM57971.00")
+			// words[2] = купол ("NONE") — опционально
+			if len(words) >= 2 {
+				antType := words[1]
+				if len(words) >= 3 {
+					antType = words[1] + "     " + words[2] // сохраняем разделитель для rtklib
+				}
+				g.logger.Infof("Antenna type (word-parse): %q from file %s", antType, filePath)
+				return antType
+			}
+		}
+
+		g.logger.Warnf("ANT # / TYPE line found but could not parse antenna: %q", line)
+		return "NONE"
 	}
 
 	if err := scanner.Err(); err != nil {
-		g.logger.Warnf("Error reading RINEX file: %v", err)
+		g.logger.Warnf("Error reading file %s: %v", filePath, err)
 	}
 
-	g.logger.Infof("Antenna type not found in RINEX header, using NONE")
+	g.logger.Infof("ANT # / TYPE not found in header of %s, using NONE", filePath)
 	return "NONE"
 }
 
