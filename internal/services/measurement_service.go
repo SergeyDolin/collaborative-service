@@ -81,14 +81,6 @@ func (s *MeasurementService) ProcessMeasurement(
 		return err
 	}
 
-	defer func() {
-		// Очищаем временные файлы
-		s.logger.Debugf("Cleaning up work directory: %s", workDir)
-		if err := os.RemoveAll(workDir); err != nil {
-			s.logger.Warnf("Failed to remove work directory: %v", err)
-		}
-	}()
-
 	// Сохраняем файл (потоковое копирование)
 	obsPath := filepath.Join(workDir, filename)
 	if err := os.WriteFile(obsPath, fileData, 0644); err != nil {
@@ -130,7 +122,8 @@ func (s *MeasurementService) ProcessMeasurement(
 		files.EphemerisFile, _ = s.downloader.DownloadPreciseEphemeris(date, taskID)
 		files.ClockFile, _ = s.downloader.DownloadPreciseClock(date, taskID)
 		files.ERPFile, _ = s.downloader.DownloadERP(date, taskID)
-		files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
+		// files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
+		files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
 
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
 		if cfgErr != nil {
@@ -141,7 +134,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		outputPath, procErr = s.rtk.ProcessPPP(
 			rinexPath, files.NavigationFile,
 			files.EphemerisFile, files.ClockFile,
-			files.ERPFile, files.DCBFile, configPath, taskID,
+			files.ERPFile, files.BIAFile, configPath, taskID,
 		)
 
 	case model.MethodRelative:

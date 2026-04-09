@@ -332,6 +332,16 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 		defaultConfigDir = "./cmd/solver/app"
 	)
 
+	// Отложенная очистка: удаляем всю папку с временными файлами в конце
+	defer func() {
+		h.logger.Debugf("Cleaning up temporary directory: %s", defaultWorkDir)
+		if err := os.RemoveAll(defaultWorkDir); err != nil {
+			h.logger.Warnf("Failed to remove work directory %s: %v", defaultWorkDir, err)
+		} else {
+			h.logger.Infof("Successfully cleaned up work directory: %s", defaultWorkDir)
+		}
+	}()
+
 	configGen := services.NewConfigGenerator(defaultConfigDir, defaultWorkDir, h.logger)
 	downloader := services.NewFileDownloader(defaultWorkDir, h.logger)
 	converter := services.NewConverterService(defaultConfigDir, h.logger)

@@ -6,16 +6,16 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/jlaffaye/ftp"
 	"go.uber.org/zap"
 )
 
 const (
-	cddisHost = "gdc.cddis.eosdis.nasa.gov:21"
+	cddisHost = "gdc.cddis.eosdis.nasa.gov"
 	ftpUser   = "anonymous"
 	ftpPass   = "anonymous"
 )
@@ -27,44 +27,37 @@ type FileDownloader struct {
 }
 
 func (d *FileDownloader) downloadFTP(remotePath, destPath string) error {
-	d.logger.Infof("FTP download: ftp://%s%s", cddisHost, remotePath)
-
-	conn, err := ftp.Dial(cddisHost, ftp.DialWithTimeout(5*time.Minute))
-	if err != nil {
-		return fmt.Errorf("FTP connect failed: %w", err)
-	}
-	defer conn.Quit()
-
-	if err := conn.Login(ftpUser, ftpPass); err != nil {
-		return fmt.Errorf("FTP login failed: %w", err)
-	}
-
-	r, err := conn.Retr(remotePath)
-	if err != nil {
-		return fmt.Errorf("FTP RETR %s: %w", remotePath, err)
-	}
-	defer r.Close()
+	url := fmt.Sprintf("ftp://%s:21%s", cddisHost, remotePath)
+	d.logger.Infof("FTP download: %s", url)
 
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return err
 	}
 
-	out, err := os.Create(destPath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
+	cmd := exec.Command("curl",
+		"--ssl-reqd",
+		"-u", ftpUser+":"+ftpPass,
+		"--silent",
+		"--show-error",
+		"--output", destPath,
+		url,
+	)
 
-	written, err := io.Copy(out, r)
-	if err != nil {
-		return err
+	if out, err := cmd.CombinedOutput(); err != nil {
+		os.Remove(destPath)
+		return fmt.Errorf("curl FTP %s: %w: %s", url, err, strings.TrimSpace(string(out)))
 	}
-	if written == 0 {
+
+	info, err := os.Stat(destPath)
+	if err != nil {
+		return fmt.Errorf("FTP stat failed %s: %w", destPath, err)
+	}
+	if info.Size() == 0 {
 		os.Remove(destPath)
 		return fmt.Errorf("FTP: empty file at %s", remotePath)
 	}
 
-	d.logger.Infof("FTP downloaded %s (%d bytes)", destPath, written)
+	d.logger.Infof("FTP downloaded %s (%d bytes)", destPath, info.Size())
 	return nil
 }
 
@@ -140,11 +133,17 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 	}
 
 	candidates := []candidate{
-		{"CDDIS_FINAL", fmt.Sprintf("/pub/gnss/products/%d", week),
+		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
+			fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy)},
+		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
+			fmt.Sprintf("COD0OPSRAP_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy)},
+		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
+			fmt.Sprintf("COD0OPSULT_%d%03d0000_02D_05M_ORB.SP3.gz", year, doy)},
+		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
 			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_RAPID", fmt.Sprintf("/pub/gnss/products/%d", week),
+		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_ULTRA", fmt.Sprintf("/pub/gnss/products/%d", week),
+		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
 			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_15M_ORB.SP3.gz", year, doy)},
 		{"BKG_FINAL", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
@@ -199,11 +198,17 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 	}
 
 	candidates := []candidate{
-		{"CDDIS_FINAL", fmt.Sprintf("/pub/gnss/products/%d", week),
+		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
+			fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy)},
+		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
+			fmt.Sprintf("COD0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy)},
+		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
+			fmt.Sprintf("COD0OPSULT_%d%03d0000_02D_05M_CLK.CLK.gz", year, doy)},
+		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
 			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy)},
-		{"CDDIS_RAPID", fmt.Sprintf("/pub/gnss/products/%d", week),
+		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy)},
-		{"CDDIS_ULTRA", fmt.Sprintf("/pub/gnss/products/%d", week),
+		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
 			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_05M_CLK.CLK.gz", year, doy)},
 		{"BKG_FINAL", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", week, year, doy)},
@@ -297,17 +302,51 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 // DownloadDCB скачивает Differential Code Bias.
 // CDDIS требует регистрацию на Earthdata — используем открытый CAS/GIPP.
 func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, error) {
+	week, _ := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
 	gzFile := filepath.Join(d.workDir, fmt.Sprintf("%s_dcb.bsx.gz", taskID))
 	outFile := filepath.Join(d.workDir, fmt.Sprintf("%s_dcb.bsx", taskID))
 
-	url := fmt.Sprintf("https://ftp.gipp.org.cn/product/dcb/mgex/%d/CAS0MGXRAP_%d%03d0000_01D_01D_DCB.BSX.gz",
-		year, year, doy)
+	ftpDir := fmt.Sprintf("/gnss/products/%d", week)
 
-	if err := d.downloadFile(url, gzFile); err != nil {
-		d.logger.Warnf("Failed to download DCB from CAS: %v", err)
-		return "", fmt.Errorf("failed to download DCB: %w", err)
+	type candidate struct {
+		label   string
+		ftpPath string
+		httpURL string
+	}
+
+	candidates := []candidate{
+		{"CDDIS_CAS",
+			ftpDir + fmt.Sprintf("/CAS0MGXRAP_%d%03d0000_01D_01D_DCB.BSX.gz", year, doy),
+			""},
+		{"CDDIS_CODE",
+			ftpDir + fmt.Sprintf("/COD0MGXFIN_%d%03d0000_01D_01D_DCB.BSX.gz", year, doy),
+			""},
+		{"CAS_HTTP",
+			"",
+			fmt.Sprintf("https://ftp.gipp.org.cn/product/dcb/mgex/%d/CAS0MGXRAP_%d%03d0000_01D_01D_DCB.BSX.gz",
+				year, year, doy)},
+	}
+
+	var lastErr error
+	for _, c := range candidates {
+		var err error
+		if c.ftpPath != "" {
+			err = d.downloadFTP(c.ftpPath, gzFile)
+		} else {
+			err = d.downloadFile(c.httpURL, gzFile)
+		}
+		if err != nil {
+			d.logger.Warnf("Failed to download %s DCB: %v", c.label, err)
+			lastErr = err
+			continue
+		}
+		lastErr = nil
+		break
+	}
+	if lastErr != nil {
+		return "", fmt.Errorf("failed to download DCB: %w", lastErr)
 	}
 
 	if err := d.gunzipFile(gzFile, outFile); err != nil {
@@ -328,15 +367,12 @@ func (d *FileDownloader) DownloadBIA(date time.Time, taskID string) (string, err
 	gzFile := filepath.Join(d.workDir, fmt.Sprintf("%s_bia.bia.gz", taskID))
 	outFile := filepath.Join(d.workDir, fmt.Sprintf("%s_bia.bia", taskID))
 
-	ftpDir := fmt.Sprintf("/pub/gnss/products/%d", week)
+	ftpDir := fmt.Sprintf("/gnss/products/%d", week)
 
 	candidates := []struct {
 		label    string
 		filename string
 	}{
-		{"CNES_FINAL", fmt.Sprintf("GRG0MGXFIN_%d%03d0000_01D_01D_OSB.BIA.gz", year, doy)},
-		{"CNES_RAPID", fmt.Sprintf("GRG0MGXRAP_%d%03d0000_01D_01D_OSB.BIA.gz", year, doy)},
-		{"CAS", fmt.Sprintf("CAS0MGXRAP_%d%03d0000_01D_01D_OSB.BIA.gz", year, doy)},
 		{"CODE", fmt.Sprintf("COD0MGXFIN_%d%03d0000_01D_01D_OSB.BIA.gz", year, doy)},
 	}
 
