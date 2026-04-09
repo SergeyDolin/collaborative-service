@@ -26,7 +26,7 @@ func NewRTKService(rtklibPath, workDir string, logger *zap.SugaredLogger) *RTKSe
 }
 
 // ProcessPPP запускает PPP обработку с использованием точных файлов
-func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, erpFile, dcbFile, configPath, taskID string) (string, error) {
+func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath, taskID string) (string, error) {
 	outputFile := filepath.Join(r.workDir, fmt.Sprintf("%s_output.pos", taskID))
 
 	// Формируем команду для rnx2rtkp с PPP опциями

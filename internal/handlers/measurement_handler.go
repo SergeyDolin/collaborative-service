@@ -244,7 +244,6 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 
 	login, ok := middlewares.GetUserFromContext(r.Context())
 	if !ok {
-		h.logger.Warn("Unauthorized download attempt")
 		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
 		return
 	}
@@ -254,49 +253,31 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 		SendJSONError(w, "Failed to get task", http.StatusInternalServerError, h.logger)
 		return
 	}
-
 	if task == nil {
 		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
 		return
 	}
-
-	// Проверяем права доступа
 	if task.UserLogin != login {
 		h.logger.Warnf("Access denied: task %s belongs to %s, requested by %s", taskID, task.UserLogin, login)
 		SendJSONError(w, "Access denied", http.StatusForbidden, h.logger)
 		return
 	}
 
-	if task.OutputPath == "" {
+	result, err := h.taskStorage.GetResultByTaskID(taskID)
+	if err != nil || result == nil {
+		SendJSONError(w, "Result not found", http.StatusNotFound, h.logger)
+		return
+	}
+	if len(result.FullResultFile) == 0 {
 		SendJSONError(w, "Result file not available", http.StatusNotFound, h.logger)
 		return
 	}
 
-	// Проверяем наличие файла
-	fileInfo, err := os.Stat(task.OutputPath)
-	if os.IsNotExist(err) {
-		SendJSONError(w, "Result file not found", http.StatusNotFound, h.logger)
-		return
-	}
-	if err != nil {
-		SendJSONError(w, "Failed to access file", http.StatusInternalServerError, h.logger)
-		return
-	}
-
-	// Отправляем файл
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pos", taskID))
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
-
-	fileData, err := os.ReadFile(task.OutputPath)
-	if err != nil {
-		h.logger.Errorf("Failed to read output file: %v", err)
-		SendJSONError(w, "Failed to read file", http.StatusInternalServerError, h.logger)
-		return
-	}
-
-	h.logger.Infof("Downloaded result for task %s (user: %s, size: %d bytes)", taskID, login, len(fileData))
-	w.Write(fileData)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(result.FullResultFile)))
+	h.logger.Infof("Downloaded result for task %s (user: %s, size: %d bytes)", taskID, login, len(result.FullResultFile))
+	w.Write(result.FullResultFile)
 }
 
 // GetSystemStatsHandler возвращает системную статистику

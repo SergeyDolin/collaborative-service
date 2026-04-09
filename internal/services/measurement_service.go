@@ -123,7 +123,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		files.ClockFile, _ = s.downloader.DownloadPreciseClock(date, taskID)
 		files.ERPFile, _ = s.downloader.DownloadERP(date, taskID)
 		// files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
-		files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
+		// files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
 
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
 		if cfgErr != nil {
@@ -134,8 +134,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		outputPath, procErr = s.rtk.ProcessPPP(
 			rinexPath, files.NavigationFile,
 			files.EphemerisFile, files.ClockFile,
-			files.ERPFile, files.BIAFile, configPath, taskID,
-		)
+			configPath, taskID)
 
 	case model.MethodRelative:
 		s.logger.Infof("Using Relative method for task: %s", taskID)
@@ -186,19 +185,15 @@ func (s *MeasurementService) ProcessMeasurement(
 		return err
 	}
 
-	// Перемещаем результат в постоянное хранилище
-	completedAt := time.Now()
-	permanentPath := filepath.Join(s.workDir, taskID+".pos")
-	if err := os.Rename(outputPath, permanentPath); err != nil {
-		s.logger.Warnf("Failed to move result file: %v", err)
-		permanentPath = outputPath
+	// Удаляем временную директорию задачи — файл хранится в БД
+	if err := os.RemoveAll(workDir); err != nil {
+		s.logger.Warnf("Failed to remove work directory %s: %v", workDir, err)
 	}
 
-	// Обновляем задачу как завершенную
+	completedAt := time.Now()
 	task = &model.ProcessingTask{
 		ID:            taskID,
 		Status:        model.StatusCompleted,
-		OutputPath:    permanentPath,
 		CompletedAt:   &completedAt,
 		ProcessingSec: completedAt.Sub(now).Seconds(),
 	}
