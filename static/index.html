@@ -331,6 +331,28 @@
         .menu-item:nth-child(2) { animation-delay: 0.2s; }
         .menu-item:nth-child(3) { animation-delay: 0.3s; }
         .menu-item:nth-child(4) { animation-delay: 0.4s; }
+        .menu-item.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            pointer-events: none;
+            filter: grayscale(0.5);
+        }
+        
+        .menu-item.disabled:hover {
+            transform: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-color: rgba(0, 0, 0, 0.03);
+        }
+        
+        .badge-coming-soon {
+            background: #a8c7e0;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            margin-top: 8px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -338,7 +360,7 @@
         <div class="header-content">
             <div class="logo" onclick="window.location.href='/'">
                 <div class="logo-icon">📡</div>
-                <div class="logo-text">Collab<span>Service</span></div>
+                <div class="logo-text"><span>Collaborative</span>PositioningService</div>
             </div>
             <div class="user-info" id="userInfo"></div>
         </div>
@@ -355,12 +377,13 @@
                 <div class="menu-item" data-page="measurements" data-protected="true">
                     <div class="menu-icon">📊</div>
                     <div class="menu-title">Обработка измерений</div>
-                    <div class="menu-description">Анализ и обработка данных позиционирования в реальном времени</div>
+                    <div class="menu-description">Обработка ГНСС-измерений с любого устройства</div>
                 </div>
-                <div class="menu-item" data-page="profile" data-protected="true">
-                    <div class="menu-icon">👤</div>
-                    <div class="menu-title">Личный кабинет</div>
-                    <div class="menu-description">Управление профилем, настройками и персональными данными</div>
+                <div class="menu-item disabled">
+                    <div class="menu-icon">🤝</div>
+                    <div class="menu-title">Коллаборативное позиционирование</div>
+                    <div class="menu-description">Высокоточное позиционирование в реальном времени</div>
+                    <div class="badge-coming-soon">Скоро</div>
                 </div>
             </div>
         </div>
@@ -384,6 +407,20 @@
     </footer>
 
     <script>
+        document.querySelectorAll('.menu-item:not(.disabled)').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = this.dataset.page;
+                const isProtected = this.dataset.protected === 'true';
+                if (isProtected && !isAuthenticated()) {
+                    showNotification('Для доступа к этому разделу необходимо войти в систему', true);
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    return;
+                }
+                navigateTo(page);
+            });
+        });
+
         function showNotification(message, isError = false) {
             const notification = document.getElementById('notification');
             notification.textContent = message;

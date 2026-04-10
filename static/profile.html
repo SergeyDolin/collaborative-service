@@ -64,6 +64,24 @@
         .welcome-card h1 { font-size: 2rem; margin-bottom: 8px; color: #4a5568; }
         .welcome-card p { color: #718096; }
 
+        .btn-new-measurement {
+            background: linear-gradient(135deg, #a8c7e0, #c4d4e8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-new-measurement:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(168, 199, 224, 0.3);
+        }
+
         .history-section {
             background: rgba(255,255,255,0.95);
             border-radius: 12px; padding: 32px;
@@ -92,6 +110,24 @@
 
         .btn-danger { background: #fed7d7; color: #c53030; }
         .btn-danger:hover { background: #fecaca; box-shadow: 0 4px 10px rgba(197,48,48,0.15); }
+
+        .btn-transform {
+            background: linear-gradient(135deg, #68d391, #48bb78);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-transform:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+        }
 
         .selection-bar {
             display: none; align-items: center; gap: 12px;
@@ -168,7 +204,6 @@
             border-top: 1px solid #e2e8f0;
         }
 
-        /* Координаты — моноширинный шрифт для выравнивания цифр */
         .coords-table {
             font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
             font-size: 0.78rem;
@@ -215,6 +250,7 @@
         }
         .error { color: #c53030; }
 
+        /* Модальные окна */
         .modal-overlay {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,0.35);
@@ -228,10 +264,18 @@
             box-shadow: 0 8px 30px rgba(0,0,0,0.15);
             animation: modalIn 0.2s ease;
         }
+
+        .transform-modal .modal {
+            max-width: 650px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
         @keyframes modalIn {
             from { transform: scale(0.92); opacity: 0; }
             to   { transform: scale(1);    opacity: 1; }
         }
+
         .modal h3 { margin-bottom: 12px; color: #2d3748; font-size: 1.1rem; }
         .modal p  { color: #718096; font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
@@ -248,6 +292,106 @@
         }
         .btn-confirm-delete:hover { background: #9b2c2c; }
 
+        /* Стили для модалки трансформации */
+        .transform-section {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .transform-section h5 {
+            margin-bottom: 12px;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .crs-select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .coord-type-select {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .coord-type-select label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .height-section {
+            margin-top: 10px;
+        }
+
+        .height-section select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            font-size: 0.85rem;
+        }
+
+        .swap-btn {
+            display: flex;
+            justify-content: center;
+            margin: 10px 0;
+        }
+
+        .swap-btn button {
+            background: #edf2f7;
+            border: 1px solid #e2e8f0;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.2s;
+        }
+
+        .swap-btn button:hover {
+            background: #e2e8f0;
+            transform: rotate(180deg);
+        }
+
+        .transform-result {
+            background: #ebf8ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .transform-result.visible {
+            display: block;
+        }
+
+        .coordinate-value {
+            font-family: 'Consolas', 'Menlo', monospace;
+            font-size: 1rem;
+            color: #2b6cb0;
+            margin: 5px 0;
+        }
+
+        .source-coords-info {
+            background: #f7fafc;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
         .toast {
             position: fixed; bottom: 28px; right: 28px;
             padding: 12px 20px; border-radius: 10px;
@@ -261,12 +405,33 @@
         .toast.success { background: #c6f6d5; color: #2f855a; }
         .toast.error   { background: #fed7d7; color: #c53030; }
 
+        .action-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
         @media (max-width: 768px) {
             .main-content { margin-top: 120px; }
             .welcome-card h1 { font-size: 1.5rem; }
             .header-actions { width: 100%; }
             .btn { flex: 1; text-align: center; }
             .history-header { flex-direction: column; align-items: stretch; }
+            .welcome-card > div {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .btn-new-measurement {
+                width: 100%;
+                text-align: center;
+            }
+            .coord-type-select {
+                flex-direction: column;
+                gap: 5px;
+            }
         }
     </style>
 </head>
@@ -276,7 +441,7 @@
     <div class="header-content">
         <div class="logo" onclick="window.location.href='/'">
             <div class="logo-icon">📡</div>
-            <div class="logo-text">Collab<span>Service</span></div>
+            <div class="logo-text"><span>Collaborative</span>PositioningService</div>
         </div>
         <div class="user-menu">
             <span class="user-name" id="userName">Пользователь</span>
@@ -288,8 +453,15 @@
 <main class="main-content">
     <div class="container">
         <div class="welcome-card">
-            <h1 id="welcomeTitle">Добро пожаловать!</h1>
-            <p>Ваш личный кабинет в сервисе коллаборативного позиционирования</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 id="welcomeTitle">Добро пожаловать!</h1>
+                    <p>Ваш личный кабинет в сервисе коллаборативного позиционирования</p>
+                </div>
+                <button class="btn-new-measurement" onclick="window.location.href='/measurements'">
+                    🚀 Обработать новое измерение
+                </button>
+            </div>
         </div>
 
         <div class="history-section">
@@ -318,6 +490,7 @@
     </div>
 </main>
 
+<!-- Модальное окно подтверждения удаления -->
 <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
         <h3 id="modalTitle">Подтверждение удаления</h3>
@@ -325,6 +498,97 @@
         <div class="modal-actions">
             <button class="btn-cancel" onclick="closeModal()">Отмена</button>
             <button class="btn-confirm-delete" id="btnModalConfirm">Удалить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно трансформации координат -->
+<div class="modal-overlay" id="transformModalOverlay">
+    <div class="modal transform-modal">
+        <h3>🔄 Пересчет координат через geocentric.xyz</h3>
+        
+        <div id="sourceCoordsInfo" class="source-coords-info">
+            <!-- Заполняется динамически -->
+        </div>
+        
+        <!-- Исходная система -->
+        <div class="transform-section">
+            <h5>Исходная система координат</h5>
+            <select id="sourceCRS" class="crs-select">
+                <option value="WGS84(G1150)">WGS84 (G1150)</option>
+                <option value="ITRF2020">ITRF2020</option>
+                <option value="ITRF2014">ITRF2014</option>
+                <option value="ITRF2008">ITRF2008</option>
+                <option value="ITRF2005">ITRF2005</option>
+                <option value="ГСК-2011">ГСК-2011</option>
+                <option value="ПЗ-90.11">ПЗ-90.11</option>
+                <option value="СК-42">СК-42</option>
+                <option value="СК-95">СК-95</option>
+            </select>
+            
+            <div class="coord-type-select">
+                <label>
+                    <input type="radio" name="sourceCoordType" value="BLH" checked> B,L,H (геодезические)
+                </label>
+                <label>
+                    <input type="radio" name="sourceCoordType" value="XYZ"> X,Y,Z (геоцентрические)
+                </label>
+            </div>
+        </div>
+        
+        <!-- Кнопка обмена -->
+        <div class="swap-btn">
+            <button onclick="swapSystems()" title="Поменять направление">⇅</button>
+        </div>
+        
+        <!-- Целевая система -->
+        <div class="transform-section">
+            <h5>Целевая система координат</h5>
+            <select id="targetCRS" class="crs-select">
+                <option value="WGS84(G1150)">WGS84 (G1150)</option>
+                <option value="ITRF2020">ITRF2020</option>
+                <option value="ITRF2014">ITRF2014</option>
+                <option value="ITRF2008">ITRF2008</option>
+                <option value="ITRF2005">ITRF2005</option>
+                <option value="ГСК-2011">ГСК-2011</option>
+                <option value="ПЗ-90.11">ПЗ-90.11</option>
+                <option value="СК-42">СК-42</option>
+                <option value="СК-95">СК-95</option>
+            </select>
+            
+            <div class="coord-type-select">
+                <label>
+                    <input type="radio" name="targetCoordType" value="BLH" checked> B,L,H (геодезические)
+                </label>
+                <label>
+                    <input type="radio" name="targetCoordType" value="XYZ"> X,Y,Z (геоцентрические)
+                </label>
+            </div>
+        </div>
+        
+        <!-- Настройки высоты -->
+        <div class="transform-section height-section">
+            <h5>Отсчетная поверхность для высоты</h5>
+            <select id="heightSurface">
+                <option value="ELLIPSOID" selected>Эллипсоид</option>
+                <option value="EGM96">Геоид EGM96</option>
+                <option value="EGM2008">Геоид EGM2008</option>
+            </select>
+        </div>
+        
+        <div id="transformResult" class="transform-result">
+            <h5 style="margin-bottom: 10px;">Результат пересчета:</h5>
+            <div id="transformedCoordinates"></div>
+            <div style="font-size: 0.75rem; color: #718096; margin-top: 10px;">
+                Сервис: <a href="https://geocentric.xyz" target="_blank" style="color: #a8c7e0;">geocentric.xyz</a>
+            </div>
+        </div>
+        
+        <div class="modal-actions" style="margin-top: 20px;">
+            <button class="btn-cancel" onclick="closeTransformModal()">Закрыть</button>
+            <button class="btn-primary" onclick="performTransform()" id="btnPerformTransform">
+                🔄 Пересчитать
+            </button>
         </div>
     </div>
 </div>
@@ -337,6 +601,7 @@
     let selectMode     = false;
     let selectedIds    = new Set();
     let pendingDeleteFn = null;
+    let currentTransformCoords = null;
 
     /* ===== Auth ===== */
     function checkAuth() {
@@ -366,7 +631,7 @@
         toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
     }
 
-    /* ===== Модалка ===== */
+    /* ===== Модалка подтверждения ===== */
     function openModal(title, text, onConfirm) {
         pendingDeleteFn = onConfirm;
         document.getElementById('modalTitle').textContent = title;
@@ -389,6 +654,232 @@
     document.getElementById('modalOverlay').addEventListener('click', function(e) {
         if (e.target === this) closeModal();
     });
+
+    /* ===== Модалка трансформации ===== */
+    function openTransformModal(lat, lon, height, taskId) {
+        currentTransformCoords = { lat, lon, height, taskId };
+        
+        const infoDiv = document.getElementById('sourceCoordsInfo');
+        const heightStr = height && height !== 0 ? `<br>h = ${formatHeight(height)} м` : '';
+        infoDiv.innerHTML = `
+            <strong>Исходные координаты:</strong><br>
+            <span style="font-family: 'Consolas', monospace;">
+                B (широта) = ${formatCoord(lat)}°<br>
+                L (долгота) = ${formatCoord(lon)}°${heightStr}
+            </span>
+        `;
+        
+        // Сбрасываем настройки по умолчанию
+        document.getElementById('sourceCRS').value = 'WGS84(G1150)';
+        document.querySelector('input[name="sourceCoordType"][value="BLH"]').checked = true;
+        document.getElementById('targetCRS').value = 'ГСК-2011';
+        document.querySelector('input[name="targetCoordType"][value="BLH"]').checked = true;
+        document.getElementById('heightSurface').value = 'ELLIPSOID';
+        
+        document.getElementById('transformModalOverlay').classList.add('visible');
+        document.getElementById('transformResult').classList.remove('visible');
+    }
+
+    function closeTransformModal() {
+        document.getElementById('transformModalOverlay').classList.remove('visible');
+        currentTransformCoords = null;
+    }
+
+    function swapSystems() {
+        const sourceCRS = document.getElementById('sourceCRS');
+        const targetCRS = document.getElementById('targetCRS');
+        const sourceType = document.querySelector('input[name="sourceCoordType"]:checked').value;
+        const targetType = document.querySelector('input[name="targetCoordType"]:checked').value;
+        
+        // Меняем системы местами
+        const tempCRS = sourceCRS.value;
+        sourceCRS.value = targetCRS.value;
+        targetCRS.value = tempCRS;
+        
+        // Меняем типы координат местами
+        document.querySelector(`input[name="sourceCoordType"][value="${targetType}"]`).checked = true;
+        document.querySelector(`input[name="targetCoordType"][value="${sourceType}"]`).checked = true;
+    }
+
+    async function performTransform() {
+    if (!currentTransformCoords) return;
+    
+    const btn = document.getElementById('btnPerformTransform');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Пересчет...';
+    
+    try {
+        const sourceCRS = document.getElementById('sourceCRS').value;
+        const targetCRS = document.getElementById('targetCRS').value;
+        const sourceType = document.querySelector('input[name="sourceCoordType"]:checked').value;
+        const targetType = document.querySelector('input[name="targetCoordType"]:checked').value;
+        const heightSurface = document.getElementById('heightSurface').value;
+        
+        // Создаем GeoJSON с точкой
+        const coordinates = [currentTransformCoords.lon, currentTransformCoords.lat];
+        if (currentTransformCoords.height && currentTransformCoords.height !== 0) {
+            coordinates.push(currentTransformCoords.height);
+        }
+        
+        const geojson = {
+            type: "FeatureCollection",
+            features: [{
+                type: "Feature",
+                geometry: {
+                    type: "Point",
+                    coordinates: coordinates
+                },
+                properties: {
+                    id: currentTransformCoords.taskId || "1",
+                    name: "Rover position"
+                }
+            }]
+        };
+        
+        // Формируем параметры
+        const params = new URLSearchParams({
+            source_crs: sourceCRS,
+            target_crs: targetCRS,
+            source_coord_type: sourceType,
+            target_coord_type: targetType,
+            height_surface: heightSurface
+        });
+        
+        // Используем наш прокси-эндпоинт
+        const token = getToken();
+        const response = await fetch(`/api/transform/geojson?${params.toString()}`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(geojson)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Transform failed: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        displayTransformResult(result, targetType);
+        
+    } catch (error) {
+        console.error('Transform error:', error);
+        showToast('Ошибка пересчета: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
+async function checkTransformService() {
+    try {
+        const response = await fetch('/api/transform/status', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (response.ok) {
+            const status = await response.json();
+            console.log('Transform service status:', status);
+            return true;
+        }
+    } catch (e) {
+        console.warn('Transform service check failed:', e);
+    }
+    return false;
+}
+
+// Вызывайте при загрузке страницы
+checkTransformService();
+    function displayTransformResult(result, coordType) {
+        const resultDiv = document.getElementById('transformResult');
+        const coordDiv = document.getElementById('transformedCoordinates');
+        
+        let html = '';
+        
+        try {
+            if (result.features && result.features.length > 0) {
+                const feature = result.features[0];
+                const coords = feature.geometry.coordinates;
+                
+                if (coordType === 'BLH') {
+                    html = `
+                        <div class="coordinate-value">B (широта) = ${formatCoord(coords[1])}°</div>
+                        <div class="coordinate-value">L (долгота) = ${formatCoord(coords[0])}°</div>
+                        ${coords[2] ? `<div class="coordinate-value">H (высота) = ${formatHeight(coords[2])} м</div>` : ''}
+                    `;
+                } else {
+                    html = `
+                        <div class="coordinate-value">X = ${formatCoord(coords[0])} м</div>
+                        <div class="coordinate-value">Y = ${formatCoord(coords[1])} м</div>
+                        ${coords[2] ? `<div class="coordinate-value">Z = ${formatCoord(coords[2])} м</div>` : ''}
+                    `;
+                }
+                
+                // Добавляем информацию о системах координат
+                if (result.properties) {
+                    html += `<div style="font-size: 0.75rem; color: #718096; margin-top: 10px;">`;
+                    if (result.properties.source_crs) html += `Из: ${result.properties.source_crs}<br>`;
+                    if (result.properties.target_crs) html += `В: ${result.properties.target_crs}`;
+                    html += `</div>`;
+                }
+                
+                // Кнопка копирования
+                const copyText = coords.map(c => formatCoord(c)).join(', ');
+                html += `
+                    <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
+                        📋 Копировать
+                    </button>
+                `;
+            } else {
+                html = '<div class="coordinate-value">Не удалось получить координаты</div>';
+            }
+        } catch (e) {
+            console.error('Parse result error:', e);
+            html = '<div class="coordinate-value">Ошибка обработки результата</div>';
+        }
+        
+        coordDiv.innerHTML = html;
+        resultDiv.classList.add('visible');
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard?.writeText(text).then(() => {
+            showToast('Координаты скопированы');
+        }).catch(() => {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast('Координаты скопированы');
+        });
+    }
+
+    document.getElementById('transformModalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeTransformModal();
+    });
+
+    /* ===== Форматирование ===== */
+    function formatCoord(val) {
+        if (val === null || val === undefined) return '—';
+        const n = Number(val);
+        if (isNaN(n)) return String(val);
+        // Для координат показываем с точностью до 6 знаков
+        if (Math.abs(n) < 1000 && n % 1 !== 0) {
+            return n.toFixed(8).replace(/\.?0+$/, '');
+        }
+        return String(n);
+    }
+
+    function formatHeight(val) {
+        if (val === null || val === undefined) return null;
+        const n = Number(val);
+        if (isNaN(n) || n === 0) return null;
+        return n.toFixed(3).replace(/\.?0+$/, '');
+    }
 
     /* ===== DOM helper ===== */
     function removeItemFromDOM(taskId) {
@@ -552,33 +1043,25 @@
         if (selectMode) toggleSelectMode();
     }
 
-    /* ===== Форматирование координат =====
-     * Выводим число как есть — без округления.
-     * Если в числе нет дробной части (например 0), показываем как целое.
-     * Используем String() вместо toFixed() чтобы не терять и не добавлять знаки.
-     */
-    function formatCoord(val) {
-        if (val === null || val === undefined) return '—';
-        // Приводим к Number на случай если пришла строка
-        const n = Number(val);
-        if (isNaN(n)) return String(val);
-        // String(n) даёт все значимые цифры без лишних нулей
-        return String(n);
-    }
-
-    function formatHeight(val) {
-        if (val === null || val === undefined) return null;
-        const n = Number(val);
-        if (isNaN(n) || n === 0) return null;
-        return String(n);
-    }
-
     /* ===== Загрузка истории ===== */
     function getMethodName(m) {
-        return { absolute:'📍 SPP', single:'📍 SPP', relative:'🔗 Относительный', ppp:'🎯 PPP' }[m] || m || '—';
+        const methods = {
+            'absolute': '📍 SPP', 
+            'single': '📍 SPP', 
+            'relative': '🔗 Относительный', 
+            'ppp': '🎯 PPP'
+        };
+        return methods[m?.toLowerCase()] || m || '—';
     }
+
     function getStatusText(s) {
-        return { pending:'⏳ В очереди', processing:'🔄 Обработка...', completed:'✅ Завершено', failed:'❌ Ошибка' }[s] || s;
+        const statuses = {
+            'pending': '⏳ В очереди',
+            'processing': '🔄 Обработка...',
+            'completed': '✅ Завершено',
+            'failed': '❌ Ошибка'
+        };
+        return statuses[s] || s;
     }
 
     async function loadProcessingHistory() {
@@ -626,7 +1109,6 @@
                     const lon    = formatCoord(r.longitude);
                     const height = formatHeight(r.height);
 
-                    // Таблица координат — каждая на своей строке, все знаки
                     const coordsHtml = hasCoords
                         ? `<table class="coords-table">
                             <tr><td>φ</td><td>${lat}°</td></tr>
@@ -643,15 +1125,30 @@
                         : '';
 
                     const dlHtml = task.fileType !== 'static'
-                        ? `<div>
-                            <button class="download-btn" onclick="downloadResult('${task.id}', event)">📥 Скачать .pos</button>
-                            <div class="expiry-info">⏰ Файл доступен 24 ч</div>
-                           </div>`
+                        ? `<button class="download-btn" onclick="downloadResult('${task.id}', event)">📥 Скачать .pos</button>`
                         : '';
 
-                    if (coordsHtml || statsHtml || dlHtml) {
-                        resultHtml = `<div class="result-block">${statsHtml}${coordsHtml}${dlHtml}</div>`;
-                    }
+                    const transformBtn = hasCoords
+                        ? `<button class="btn-transform" onclick="openTransformModal(${r.latitude}, ${r.longitude}, ${r.height || 0}, '${task.id}')">
+                            🔄 Пересчитать
+                           </button>`
+                        : '';
+
+                    const expiryHtml = task.fileType !== 'static'
+                        ? '<div class="expiry-info">⏰ Файл доступен 24 ч</div>'
+                        : '';
+
+                    resultHtml = `
+                        <div class="result-block">
+                            ${statsHtml}
+                            ${coordsHtml}
+                            <div class="action-buttons">
+                                ${dlHtml}
+                                ${transformBtn}
+                            </div>
+                            ${expiryHtml}
+                        </div>
+                    `;
                 }
 
                 const errorHtml = (status === 'failed' && task.errorMessage)
@@ -690,9 +1187,106 @@
             isLoading = false;
         }
     }
+    function displayTransformResult(result, targetType) {
+    const resultDiv = document.getElementById('transformResult');
+    const coordDiv = document.getElementById('transformedCoordinates');
+    
+    let html = '';
+    
+    try {
+        // Проверяем наличие трансформированных координат
+        if (result.target_coordinates && Array.isArray(result.target_coordinates) && result.target_coordinates.length >= 2) {
+            const coords = result.target_coordinates;
+            
+            if (targetType === 'BLH') {
+                // Для BLH: [lon, lat, height?]
+                html = `
+                    <div class="coordinate-value">B (широта) = ${formatCoord(coords[1])}°</div>
+                    <div class="coordinate-value">L (долгота) = ${formatCoord(coords[0])}°</div>
+                    ${coords[2] ? `<div class="coordinate-value">H (высота) = ${formatHeight(coords[2])} м</div>` : ''}
+                `;
+            } else {
+                // Для XYZ: [x, y, z]
+                html = `
+                    <div class="coordinate-value">X = ${formatCoord(coords[0])} м</div>
+                    <div class="coordinate-value">Y = ${formatCoord(coords[1])} м</div>
+                    ${coords[2] ? `<div class="coordinate-value">Z = ${formatCoord(coords[2])} м</div>` : ''}
+                `;
+            }
+            
+            // Добавляем информацию о системах координат
+            html += `<div style="font-size: 0.75rem; color: #718096; margin-top: 10px;">`;
+            if (result.source_crs) html += `Из: ${result.source_crs}<br>`;
+            if (result.target_crs) html += `В: ${result.target_crs}`;
+            if (result.operation_code) html += `<br>Код: ${result.operation_code.substring(0, 50)}...`;
+            html += `</div>`;
+            
+            // Кнопка копирования
+            const copyText = coords.map(c => formatCoord(c)).join(', ');
+            html += `
+                <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
+                    📋 Копировать координаты
+                </button>
+            `;
+            
+            showToast('Координаты успешно пересчитаны!', 'success');
+            
+        } else if (result.full_response && result.full_response.target_dataset) {
+            // Пробуем извлечь из полного ответа
+            const targetDataset = result.full_response.target_dataset;
+            if (targetDataset.features && targetDataset.features.length > 0) {
+                const feature = targetDataset.features[0];
+                const coords = feature.geometry.coordinates;
+                
+                if (targetType === 'BLH') {
+                    html = `
+                        <div class="coordinate-value">B (широта) = ${formatCoord(coords[1])}°</div>
+                        <div class="coordinate-value">L (долгота) = ${formatCoord(coords[0])}°</div>
+                        ${coords[2] ? `<div class="coordinate-value">H (высота) = ${formatHeight(coords[2])} м</div>` : ''}
+                    `;
+                } else {
+                    html = `
+                        <div class="coordinate-value">X = ${formatCoord(coords[0])} м</div>
+                        <div class="coordinate-value">Y = ${formatCoord(coords[1])} м</div>
+                        ${coords[2] ? `<div class="coordinate-value">Z = ${formatCoord(coords[2])} м</div>` : ''}
+                    `;
+                }
+                
+                const copyText = coords.map(c => formatCoord(c)).join(', ');
+                html += `
+                    <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
+                        📋 Копировать координаты
+                    </button>
+                `;
+                
+                showToast('Координаты успешно пересчитаны!', 'success');
+            } else {
+                html = '<div class="coordinate-value">Не удалось извлечь координаты из ответа</div>';
+                showToast('Ошибка обработки ответа', 'error');
+            }
+        } else {
+            // Проверяем сообщение в ответе
+            const message = result.full_response?.details?.message || 'Не удалось получить координаты';
+            html = `<div class="coordinate-value">${message}</div>`;
+            
+            // Если есть proj_string, показываем что трансформация возможна
+            if (result.full_response?.details?.proj_string) {
+                html += `<div style="font-size: 0.75rem; color: #718096; margin-top: 10px;">Трансформация настроена, но требует данные в другом формате.</div>`;
+            }
+        }
+    } catch (e) {
+        console.error('Parse result error:', e);
+        html = '<div class="coordinate-value">Ошибка обработки результата</div>';
+        showToast('Ошибка обработки ответа', 'error');
+    }
+    
+    coordDiv.innerHTML = html;
+    resultDiv.classList.add('visible');
+}
 
     /* ===== Скачивание ===== */
     async function downloadResult(taskId, event) {
+        event.stopPropagation();
         const token = getToken();
         if (!token) { window.location.href = '/login'; return; }
 
@@ -709,16 +1303,23 @@
                 const blob = await resp.blob();
                 const url  = URL.createObjectURL(blob);
                 const a    = document.createElement('a');
-                a.href = url; a.download = `${taskId}.pos`;
-                document.body.appendChild(a); a.click();
-                URL.revokeObjectURL(url); document.body.removeChild(a);
+                a.href = url; 
+                a.download = `${taskId}.pos`;
+                document.body.appendChild(a); 
+                a.click();
+                URL.revokeObjectURL(url); 
+                document.body.removeChild(a);
             } else if (resp.status === 401) {
                 window.location.href = '/login';
             } else {
                 showToast('Файл недоступен', 'error');
             }
-        } catch { showToast('Ошибка соединения', 'error'); }
-        finally { btn.disabled = false; btn.textContent = orig; }
+        } catch { 
+            showToast('Ошибка соединения', 'error'); 
+        } finally { 
+            btn.disabled = false; 
+            btn.textContent = orig; 
+        }
     }
 
     /* ===== Init ===== */
