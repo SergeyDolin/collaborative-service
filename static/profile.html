@@ -227,6 +227,16 @@
             display: flex; gap: 12px; flex-wrap: wrap;
             margin-bottom: 6px; font-size: 0.73rem; color: #718096;
         }
+        
+        .fix-badge {
+            color: #2f855a;
+            font-weight: 500;
+        }
+        
+        .float-badge {
+            color: #ed6c02;
+            font-weight: 500;
+        }
 
         .download-btn {
             display: inline-flex; align-items: center; gap: 4px;
@@ -441,7 +451,7 @@
     <div class="header-content">
         <div class="logo" onclick="window.location.href='/'">
             <div class="logo-icon">📡</div>
-            <div class="logo-text"><span>Collaborative</span>PositioningService</div>
+            <div class="logo-text">Collab<span>Service</span></div>
         </div>
         <div class="user-menu">
             <span class="user-name" id="userName">Пользователь</span>
@@ -515,7 +525,7 @@
         <div class="transform-section">
             <h5>Исходная система координат</h5>
             <select id="sourceCRS" class="crs-select">
-                <option value="WGS84(G1150)">WGS84 (G1150)</option>
+                <option value="WGS84(G1150)" selected>WGS84 (G1150)</option>
                 <option value="ITRF2020">ITRF2020</option>
                 <option value="ITRF2014">ITRF2014</option>
                 <option value="ITRF2008">ITRF2008</option>
@@ -550,7 +560,7 @@
                 <option value="ITRF2014">ITRF2014</option>
                 <option value="ITRF2008">ITRF2008</option>
                 <option value="ITRF2005">ITRF2005</option>
-                <option value="ГСК-2011">ГСК-2011</option>
+                <option value="ГСК-2011" selected>ГСК-2011</option>
                 <option value="ПЗ-90.11">ПЗ-90.11</option>
                 <option value="СК-42">СК-42</option>
                 <option value="СК-95">СК-95</option>
@@ -597,9 +607,9 @@
 
 <script>
     /* ===== State ===== */
-    let isLoading      = false;
-    let selectMode     = false;
-    let selectedIds    = new Set();
+    let isLoading = false;
+    let selectMode = false;
+    let selectedIds = new Set();
     let pendingDeleteFn = null;
     let currentTransformCoords = null;
 
@@ -635,7 +645,7 @@
     function openModal(title, text, onConfirm) {
         pendingDeleteFn = onConfirm;
         document.getElementById('modalTitle').textContent = title;
-        document.getElementById('modalText').textContent  = text;
+        document.getElementById('modalText').textContent = text;
         document.getElementById('modalOverlay').classList.add('visible');
     }
 
@@ -655,6 +665,40 @@
         if (e.target === this) closeModal();
     });
 
+    /* ===== Форматирование ===== */
+    function formatCoord(val) {
+        if (val === null || val === undefined) return '—';
+        const n = Number(val);
+        if (isNaN(n)) return String(val);
+        // Показываем 8 знаков после запятой
+        return n.toFixed(8);
+    }
+
+    function formatHeight(val) {
+        if (val === null || val === undefined) return '—';
+        const n = Number(val);
+        if (isNaN(n)) return String(val);
+        return n.toFixed(3);
+    }
+
+    /* ===== Статус решения ===== */
+    function getSolutionStatus(q) {
+        if (q === 1) {
+            return '<span class="fix-badge">🎯 FIX</span>';
+        } else if (q === 2) {
+            return '<span class="float-badge">📊 FLOAT (WL)</span>';
+        } else if (q === 6) {
+            return '<span class="float-badge">📊 FLOAT</span>';
+        } else if (q === 5) {
+            return '<span style="color: #c53030;">⚠️ DGPS</span>';
+        } else if (q === 0) {
+            return '<span style="color: #c53030;">❌ NO SOLUTION</span>';
+        } else if (q) {
+            return '<span>Q=' + q + '</span>';
+        }
+        return '';
+    }
+
     /* ===== Модалка трансформации ===== */
     function openTransformModal(lat, lon, height, taskId) {
         currentTransformCoords = { lat, lon, height, taskId };
@@ -669,7 +713,6 @@
             </span>
         `;
         
-        // Сбрасываем настройки по умолчанию
         document.getElementById('sourceCRS').value = 'WGS84(G1150)';
         document.querySelector('input[name="sourceCoordType"][value="BLH"]').checked = true;
         document.getElementById('targetCRS').value = 'ГСК-2011';
@@ -691,119 +734,109 @@
         const sourceType = document.querySelector('input[name="sourceCoordType"]:checked').value;
         const targetType = document.querySelector('input[name="targetCoordType"]:checked').value;
         
-        // Меняем системы местами
         const tempCRS = sourceCRS.value;
         sourceCRS.value = targetCRS.value;
         targetCRS.value = tempCRS;
         
-        // Меняем типы координат местами
         document.querySelector(`input[name="sourceCoordType"][value="${targetType}"]`).checked = true;
         document.querySelector(`input[name="targetCoordType"][value="${sourceType}"]`).checked = true;
     }
 
     async function performTransform() {
-    if (!currentTransformCoords) return;
-    
-    const btn = document.getElementById('btnPerformTransform');
-    const origText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '⏳ Пересчет...';
-    
-    try {
-        const sourceCRS = document.getElementById('sourceCRS').value;
-        const targetCRS = document.getElementById('targetCRS').value;
-        const sourceType = document.querySelector('input[name="sourceCoordType"]:checked').value;
-        const targetType = document.querySelector('input[name="targetCoordType"]:checked').value;
-        const heightSurface = document.getElementById('heightSurface').value;
+        if (!currentTransformCoords) return;
         
-        // Создаем GeoJSON с точкой
-        const coordinates = [currentTransformCoords.lon, currentTransformCoords.lat];
-        if (currentTransformCoords.height && currentTransformCoords.height !== 0) {
-            coordinates.push(currentTransformCoords.height);
-        }
+        const btn = document.getElementById('btnPerformTransform');
+        const origText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ Пересчет...';
         
-        const geojson = {
-            type: "FeatureCollection",
-            features: [{
-                type: "Feature",
-                geometry: {
-                    type: "Point",
-                    coordinates: coordinates
+        try {
+            const sourceCRS = document.getElementById('sourceCRS').value;
+            const targetCRS = document.getElementById('targetCRS').value;
+            const sourceType = document.querySelector('input[name="sourceCoordType"]:checked').value;
+            const targetType = document.querySelector('input[name="targetCoordType"]:checked').value;
+            const heightSurface = document.getElementById('heightSurface').value;
+            
+            const coordinates = [currentTransformCoords.lon, currentTransformCoords.lat];
+            if (currentTransformCoords.height && currentTransformCoords.height !== 0) {
+                coordinates.push(currentTransformCoords.height);
+            }
+            
+            const geojson = {
+                type: "FeatureCollection",
+                features: [{
+                    type: "Feature",
+                    geometry: {
+                        type: "Point",
+                        coordinates: coordinates
+                    },
+                    properties: {
+                        id: currentTransformCoords.taskId || "1",
+                        name: "Rover position"
+                    }
+                }]
+            };
+            
+            const params = new URLSearchParams({
+                source_crs: sourceCRS,
+                target_crs: targetCRS,
+                source_coord_type: sourceType,
+                target_coord_type: targetType,
+                height_surface: heightSurface
+            });
+            
+            const token = getToken();
+            const response = await fetch(`/api/transform/geojson?${params.toString()}`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
-                properties: {
-                    id: currentTransformCoords.taskId || "1",
-                    name: "Rover position"
-                }
-            }]
-        };
-        
-        // Формируем параметры
-        const params = new URLSearchParams({
-            source_crs: sourceCRS,
-            target_crs: targetCRS,
-            source_coord_type: sourceType,
-            target_coord_type: targetType,
-            height_surface: heightSurface
-        });
-        
-        // Используем наш прокси-эндпоинт
-        const token = getToken();
-        const response = await fetch(`/api/transform/geojson?${params.toString()}`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(geojson)
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Transform failed: ${response.status}`);
+                body: JSON.stringify(geojson)
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Transform failed: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            displayTransformResult(result, targetType);
+            
+        } catch (error) {
+            console.error('Transform error:', error);
+            showToast('Ошибка пересчета: ' + error.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = origText;
         }
-        
-        const result = await response.json();
-        displayTransformResult(result, targetType);
-        
-    } catch (error) {
-        console.error('Transform error:', error);
-        showToast('Ошибка пересчета: ' + error.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = origText;
     }
-}
 
-async function checkTransformService() {
-    try {
-        const response = await fetch('/api/transform/status', {
-            headers: { 'Authorization': `Bearer ${getToken()}` }
-        });
-        if (response.ok) {
-            const status = await response.json();
-            console.log('Transform service status:', status);
-            return true;
-        }
-    } catch (e) {
-        console.warn('Transform service check failed:', e);
-    }
-    return false;
-}
-
-// Вызывайте при загрузке страницы
-checkTransformService();
-    function displayTransformResult(result, coordType) {
+    function displayTransformResult(result, targetType) {
         const resultDiv = document.getElementById('transformResult');
         const coordDiv = document.getElementById('transformedCoordinates');
         
         let html = '';
         
         try {
-            if (result.features && result.features.length > 0) {
-                const feature = result.features[0];
-                const coords = feature.geometry.coordinates;
-                
-                if (coordType === 'BLH') {
+            let coords = result.target_coordinates;
+            
+            if (!coords || coords.length < 2) {
+                if (result.full_response && result.full_response.target_dataset) {
+                    const dataset = result.full_response.target_dataset;
+                    if (typeof dataset === 'string') {
+                        const parsed = JSON.parse(dataset);
+                        if (parsed.features && parsed.features[0]) {
+                            coords = parsed.features[0].geometry.coordinates;
+                        }
+                    } else if (dataset.features && dataset.features[0]) {
+                        coords = dataset.features[0].geometry.coordinates;
+                    }
+                }
+            }
+            
+            if (coords && coords.length >= 2) {
+                if (targetType === 'BLH') {
                     html = `
                         <div class="coordinate-value">B (широта) = ${formatCoord(coords[1])}°</div>
                         <div class="coordinate-value">L (долгота) = ${formatCoord(coords[0])}°</div>
@@ -817,27 +850,22 @@ checkTransformService();
                     `;
                 }
                 
-                // Добавляем информацию о системах координат
-                if (result.properties) {
-                    html += `<div style="font-size: 0.75rem; color: #718096; margin-top: 10px;">`;
-                    if (result.properties.source_crs) html += `Из: ${result.properties.source_crs}<br>`;
-                    if (result.properties.target_crs) html += `В: ${result.properties.target_crs}`;
-                    html += `</div>`;
-                }
-                
-                // Кнопка копирования
                 const copyText = coords.map(c => formatCoord(c)).join(', ');
                 html += `
                     <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
                         📋 Копировать
                     </button>
                 `;
+                
+                showToast('Координаты успешно пересчитаны!', 'success');
             } else {
                 html = '<div class="coordinate-value">Не удалось получить координаты</div>';
+                showToast('Не удалось получить результат', 'error');
             }
         } catch (e) {
             console.error('Parse result error:', e);
             html = '<div class="coordinate-value">Ошибка обработки результата</div>';
+            showToast('Ошибка обработки результата', 'error');
         }
         
         coordDiv.innerHTML = html;
@@ -862,25 +890,6 @@ checkTransformService();
         if (e.target === this) closeTransformModal();
     });
 
-    /* ===== Форматирование ===== */
-    function formatCoord(val) {
-        if (val === null || val === undefined) return '—';
-        const n = Number(val);
-        if (isNaN(n)) return String(val);
-        // Для координат показываем с точностью до 6 знаков
-        if (Math.abs(n) < 1000 && n % 1 !== 0) {
-            return n.toFixed(8).replace(/\.?0+$/, '');
-        }
-        return String(n);
-    }
-
-    function formatHeight(val) {
-        if (val === null || val === undefined) return null;
-        const n = Number(val);
-        if (isNaN(n) || n === 0) return null;
-        return n.toFixed(3).replace(/\.?0+$/, '');
-    }
-
     /* ===== DOM helper ===== */
     function removeItemFromDOM(taskId) {
         const el = document.querySelector(`.history-item[data-task-id="${taskId}"]`);
@@ -901,9 +910,9 @@ checkTransformService();
         selectMode = !selectMode;
         selectedIds.clear();
 
-        const list  = document.getElementById('processingHistory');
-        const bar   = document.getElementById('selectionBar');
-        const btn   = document.getElementById('btnSelectMode');
+        const list = document.getElementById('processingHistory');
+        const bar = document.getElementById('selectionBar');
+        const btn = document.getElementById('btnSelectMode');
         const btnDA = document.getElementById('btnDeleteAll');
         const hasItems = !!document.querySelector('.history-item');
 
@@ -931,47 +940,35 @@ checkTransformService();
         checkboxes.forEach(cb => {
             cb.checked = !allSelected;
             const item = cb.closest('.history-item');
-            const id   = cb.dataset.id;
-            if (!allSelected) { selectedIds.add(id);    item.classList.add('selected'); }
-            else              { selectedIds.delete(id); item.classList.remove('selected'); }
+            const id = cb.dataset.id;
+            if (!allSelected) { selectedIds.add(id); item.classList.add('selected'); }
+            else { selectedIds.delete(id); item.classList.remove('selected'); }
         });
         updateSelectionCount();
     }
 
     function onCheckboxChange(checkbox) {
-        const id   = checkbox.dataset.id;
+        const id = checkbox.dataset.id;
         const item = checkbox.closest('.history-item');
-        if (checkbox.checked) { selectedIds.add(id);    item.classList.add('selected'); }
-        else                  { selectedIds.delete(id); item.classList.remove('selected'); }
+        if (checkbox.checked) { selectedIds.add(id); item.classList.add('selected'); }
+        else { selectedIds.delete(id); item.classList.remove('selected'); }
         updateSelectionCount();
     }
 
     /* ===== Confirm wrappers ===== */
     function confirmDeleteAll() {
-        openModal(
-            '🗑️ Удалить всю историю',
-            'Это удалит все задачи и результаты обработок. Действие необратимо.',
-            doDeleteAll
-        );
+        openModal('🗑️ Удалить всю историю', 'Это удалит все задачи и результаты обработок. Действие необратимо.', doDeleteAll);
     }
 
     function confirmDeleteSelected() {
         if (selectedIds.size === 0) { showToast('Ничего не выбрано', 'error'); return; }
         const n = selectedIds.size;
         const suffix = n === 1 ? 'ь' : n < 5 ? 'и' : 'ей';
-        openModal(
-            `🗑️ Удалить выбранные (${n})`,
-            `Будет удалено ${n} запис${suffix}. Действие необратимо.`,
-            doDeleteSelected
-        );
+        openModal(`🗑️ Удалить выбранные (${n})`, `Будет удалено ${n} запис${suffix}. Действие необратимо.`, doDeleteSelected);
     }
 
     function confirmDeleteSingle(taskId) {
-        openModal(
-            '🗑️ Удалить запись',
-            'Задача и результат будут удалены безвозвратно.',
-            () => doDeleteSingle(taskId)
-        );
+        openModal('🗑️ Удалить запись', 'Задача и результат будут удалены безвозвратно.', () => doDeleteSingle(taskId));
     }
 
     /* ===== Исполнители удаления ===== */
@@ -1030,7 +1027,7 @@ checkTransformService();
             })
         ));
 
-        const errors  = results.filter(r => r.status === 'rejected').length;
+        const errors = results.filter(r => r.status === 'rejected').length;
         const deleted = ids.length - errors;
 
         if (errors === 0) {
@@ -1075,7 +1072,7 @@ checkTransformService();
             });
 
             const container = document.getElementById('processingHistory');
-            const btnDA     = document.getElementById('btnDeleteAll');
+            const btnDA = document.getElementById('btnDeleteAll');
 
             if (!resp.ok) {
                 container.innerHTML = resp.status === 401
@@ -1095,9 +1092,9 @@ checkTransformService();
             btnDA.style.display = selectMode ? 'none' : 'block';
 
             container.innerHTML = tasks.map(task => {
-                const date   = new Date(task.createdAt).toLocaleString('ru');
+                const date = new Date(task.createdAt).toLocaleString('ru');
                 const method = getMethodName(task.config?.method);
-                const mode   = (task.fileType === 'static' || task.config?.mode === 'static') ? 'Статика' : 'Кинематика';
+                const mode = (task.fileType === 'static' || task.config?.mode === 'static') ? 'Статика' : 'Кинематика';
                 const status = task.status || 'pending';
 
                 let resultHtml = '';
@@ -1105,9 +1102,9 @@ checkTransformService();
                     const r = task.result;
 
                     const hasCoords = r.latitude || r.longitude;
-                    const lat    = formatCoord(r.latitude);
-                    const lon    = formatCoord(r.longitude);
-                    const height = formatHeight(r.height);
+                    const lat = formatCoord(r.latitude);
+                    const lon = formatCoord(r.longitude);
+                    const height = r.height ? formatHeight(r.height) : null;
 
                     const coordsHtml = hasCoords
                         ? `<table class="coords-table">
@@ -1117,12 +1114,13 @@ checkTransformService();
                            </table>`
                         : '';
 
-                    const statsHtml = (r.q !== undefined || r.nSat !== undefined)
-                        ? `<div class="stats-info">
-                            ${r.q    !== undefined ? `<span>🎯 Q: ${r.q}</span>` : ''}
-                            ${r.nSat !== undefined ? `<span>🛰️ Спутников: ${r.nSat}</span>` : ''}
-                           </div>`
-                        : '';
+                    const statsHtml = `
+                        <div class="stats-info">
+                            <span>${getSolutionStatus(r.q)}</span>
+                            ${r.nSat ? `<span>🛰️ Спутников: ${r.nSat}</span>` : ''}
+                            ${r.sdx ? `<span>📏 SD: ${r.sdx.toFixed(3)}м</span>` : ''}
+                        </div>
+                    `;
 
                     const dlHtml = task.fileType !== 'static'
                         ? `<button class="download-btn" onclick="downloadResult('${task.id}', event)">📥 Скачать .pos</button>`
@@ -1187,102 +1185,6 @@ checkTransformService();
             isLoading = false;
         }
     }
-    function displayTransformResult(result, targetType) {
-    const resultDiv = document.getElementById('transformResult');
-    const coordDiv = document.getElementById('transformedCoordinates');
-    
-    let html = '';
-    
-    try {
-        // Проверяем наличие трансформированных координат
-        if (result.target_coordinates && Array.isArray(result.target_coordinates) && result.target_coordinates.length >= 2) {
-            const coords = result.target_coordinates;
-            
-            if (targetType === 'BLH') {
-                // Для BLH: [lon, lat, height?]
-                html = `
-                    <div class="coordinate-value">B (широта) = ${formatCoord(coords[1])}°</div>
-                    <div class="coordinate-value">L (долгота) = ${formatCoord(coords[0])}°</div>
-                    ${coords[2] ? `<div class="coordinate-value">H (высота) = ${formatHeight(coords[2])} м</div>` : ''}
-                `;
-            } else {
-                // Для XYZ: [x, y, z]
-                html = `
-                    <div class="coordinate-value">X = ${formatCoord(coords[0])} м</div>
-                    <div class="coordinate-value">Y = ${formatCoord(coords[1])} м</div>
-                    ${coords[2] ? `<div class="coordinate-value">Z = ${formatCoord(coords[2])} м</div>` : ''}
-                `;
-            }
-            
-            // Добавляем информацию о системах координат
-            html += `<div style="font-size: 0.75rem; color: #718096; margin-top: 10px;">`;
-            if (result.source_crs) html += `Из: ${result.source_crs}<br>`;
-            if (result.target_crs) html += `В: ${result.target_crs}`;
-            if (result.operation_code) html += `<br>Код: ${result.operation_code.substring(0, 50)}...`;
-            html += `</div>`;
-            
-            // Кнопка копирования
-            const copyText = coords.map(c => formatCoord(c)).join(', ');
-            html += `
-                <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
-                    📋 Копировать координаты
-                </button>
-            `;
-            
-            showToast('Координаты успешно пересчитаны!', 'success');
-            
-        } else if (result.full_response && result.full_response.target_dataset) {
-            // Пробуем извлечь из полного ответа
-            const targetDataset = result.full_response.target_dataset;
-            if (targetDataset.features && targetDataset.features.length > 0) {
-                const feature = targetDataset.features[0];
-                const coords = feature.geometry.coordinates;
-                
-                if (targetType === 'BLH') {
-                    html = `
-                        <div class="coordinate-value">B (широта) = ${formatCoord(coords[1])}°</div>
-                        <div class="coordinate-value">L (долгота) = ${formatCoord(coords[0])}°</div>
-                        ${coords[2] ? `<div class="coordinate-value">H (высота) = ${formatHeight(coords[2])} м</div>` : ''}
-                    `;
-                } else {
-                    html = `
-                        <div class="coordinate-value">X = ${formatCoord(coords[0])} м</div>
-                        <div class="coordinate-value">Y = ${formatCoord(coords[1])} м</div>
-                        ${coords[2] ? `<div class="coordinate-value">Z = ${formatCoord(coords[2])} м</div>` : ''}
-                    `;
-                }
-                
-                const copyText = coords.map(c => formatCoord(c)).join(', ');
-                html += `
-                    <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
-                        📋 Копировать координаты
-                    </button>
-                `;
-                
-                showToast('Координаты успешно пересчитаны!', 'success');
-            } else {
-                html = '<div class="coordinate-value">Не удалось извлечь координаты из ответа</div>';
-                showToast('Ошибка обработки ответа', 'error');
-            }
-        } else {
-            // Проверяем сообщение в ответе
-            const message = result.full_response?.details?.message || 'Не удалось получить координаты';
-            html = `<div class="coordinate-value">${message}</div>`;
-            
-            // Если есть proj_string, показываем что трансформация возможна
-            if (result.full_response?.details?.proj_string) {
-                html += `<div style="font-size: 0.75rem; color: #718096; margin-top: 10px;">Трансформация настроена, но требует данные в другом формате.</div>`;
-            }
-        }
-    } catch (e) {
-        console.error('Parse result error:', e);
-        html = '<div class="coordinate-value">Ошибка обработки результата</div>';
-        showToast('Ошибка обработки ответа', 'error');
-    }
-    
-    coordDiv.innerHTML = html;
-    resultDiv.classList.add('visible');
-}
 
     /* ===== Скачивание ===== */
     async function downloadResult(taskId, event) {
@@ -1290,7 +1192,7 @@ checkTransformService();
         const token = getToken();
         if (!token) { window.location.href = '/login'; return; }
 
-        const btn  = event.target;
+        const btn = event.target;
         const orig = btn.textContent;
         btn.disabled = true;
         btn.textContent = '⏳ Скачивание...';
@@ -1301,8 +1203,8 @@ checkTransformService();
             });
             if (resp.ok) {
                 const blob = await resp.blob();
-                const url  = URL.createObjectURL(blob);
-                const a    = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
                 a.href = url; 
                 a.download = `${taskId}.pos`;
                 document.body.appendChild(a); 

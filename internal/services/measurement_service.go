@@ -204,6 +204,7 @@ func (s *MeasurementService) ProcessMeasurement(
 }
 
 // parseResult парсит результаты обработки
+// parseResult парсит результаты обработки и находит лучшее решение
 func (s *MeasurementService) parseResult(
 	outputData []byte,
 	taskID string,
@@ -211,57 +212,140 @@ func (s *MeasurementService) parseResult(
 	config *model.UserProcessingConfig,
 ) *model.ProcessingResult {
 	result := &model.ProcessingResult{
-		TaskID:    taskID,
-		UserLogin: login,
-		RawOutput: string(outputData),
-		CreatedAt: time.Now(),
+		TaskID:         taskID,
+		UserLogin:      login,
+		RawOutput:      string(outputData),
+		FullResultFile: outputData,
+		CreatedAt:      time.Now(),
 	}
 
 	lines := strings.Split(string(outputData), "\n")
-	var lastNonCommentLine string
+
+	// Структура для хранения решений
+	type Solution struct {
+		Line   string
+		Lat    float64
+		Lon    float64
+		Height float64
+		Q      int
+		NSat   int
+		SDX    float32
+		SDY    float32
+		SDZ    float32
+	}
+
+	var solutions []Solution
+	var lastSolution *Solution
 
 	for _, line := range lines {
 		// Пропускаем комментарии и пустые строки
-		if strings.HasPrefix(line, "%") || strings.HasPrefix(line, "#") || len(strings.TrimSpace(line)) == 0 {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "%") || strings.HasPrefix(line, "#") {
 			continue
 		}
 
 		fields := strings.Fields(line)
+		if len(fields) < 7 {
+			continue
+		}
+
+		// Парсим значения
+		var sol Solution
+		sol.Line = line
+
+		// Формат RTKLIB .pos:
+		// Date(YYYY/MM/DD) Time(HH:MM:SS.SSS) Lat/Lon/Height or X/Y/Z Q NS SDX SDY SDZ ...
+		// Индексы: 0=date, 1=time, 2/3/4=coordinates, 5=Q, 6=NSat, 7/8/9=SD
+
+		// Координаты (могут быть в градусах или метрах)
+		if len(fields) >= 5 {
+			fmt.Sscanf(fields[2], "%f", &sol.Lat)
+			fmt.Sscanf(fields[3], "%f", &sol.Lon)
+			fmt.Sscanf(fields[4], "%f", &sol.Height)
+		}
+
+		// Q (качество решения)
+		if len(fields) >= 6 {
+			fmt.Sscanf(fields[5], "%d", &sol.Q)
+		}
+
+		// Количество спутников
 		if len(fields) >= 7 {
-			lastNonCommentLine = line
+			fmt.Sscanf(fields[6], "%d", &sol.NSat)
+		}
 
-			// Парсим координаты и качество
-			parseFloatIfPossible := func(s string) float64 {
-				var f float64
-				fmt.Sscanf(s, "%f", &f)
-				return f
-			}
+		// Стандартные отклонения
+		if len(fields) >= 8 {
+			var sdx float64
+			fmt.Sscanf(fields[7], "%f", &sdx)
+			sol.SDX = float32(sdx)
+		}
+		if len(fields) >= 9 {
+			var sdy float64
+			fmt.Sscanf(fields[8], "%f", &sdy)
+			sol.SDY = float32(sdy)
+		}
+		if len(fields) >= 10 {
+			var sdz float64
+			fmt.Sscanf(fields[9], "%f", &sdz)
+			sol.SDZ = float32(sdz)
+		}
 
-			parseIntIfPossible := func(s string) int {
-				var i int
-				fmt.Sscanf(s, "%d", &i)
-				return i
-			}
+		solutions = append(solutions, sol)
+		lastSolution = &sol
+	}
 
-			result.Latitude = parseFloatIfPossible(fields[2])
-			result.Longitude = parseFloatIfPossible(fields[3])
-			result.Height = parseFloatIfPossible(fields[4])
-			result.Q = parseIntIfPossible(fields[5])
-			result.NSat = parseIntIfPossible(fields[6])
+	// Ищем лучшее решение: сначала Q=1 (FIX), если нет - Q=6 (FLOAT)
+	var bestSolution *Solution
+
+	// Сначала ищем Q=1 с конца (обычно последние эпохи более точные)
+	for i := len(solutions) - 1; i >= 0; i-- {
+		if solutions[i].Q == 1 {
+			bestSolution = &solutions[i]
+			s.logger.Infof("Found FIX solution (Q=1) at epoch %d", i+1)
+			break
 		}
 	}
 
-	// Для статики сохраняем последнюю строку
-	if config.Mode == model.ModeStatic && lastNonCommentLine != "" {
-		result.LastSolutionLine = lastNonCommentLine
+	// Если Q=1 не найдено, ищем Q=6 (FLOAT)
+	if bestSolution == nil {
+		for i := len(solutions) - 1; i >= 0; i-- {
+			if solutions[i].Q == 6 {
+				bestSolution = &solutions[i]
+				s.logger.Infof("Found FLOAT solution (Q=6) at epoch %d", i+1)
+				break
+			}
+		}
+	}
+
+	// Если и Q=6 нет, берем последнее решение
+	if bestSolution == nil && lastSolution != nil {
+		bestSolution = lastSolution
+		s.logger.Infof("Using last solution with Q=%d", bestSolution.Q)
+	}
+
+	// Заполняем результат из лучшего решения
+	if bestSolution != nil {
+		result.Latitude = bestSolution.Lat
+		result.Longitude = bestSolution.Lon
+		result.Height = bestSolution.Height
+		result.Q = bestSolution.Q
+		result.NSat = bestSolution.NSat
+		result.SDX = bestSolution.SDX
+		result.SDY = bestSolution.SDY
+		result.SDZ = bestSolution.SDZ
+		result.LastSolutionLine = bestSolution.Line
+
+		s.logger.Infof("Selected solution: Q=%d, Lat=%.8f, Lon=%.8f, H=%.3f, NSat=%d",
+			bestSolution.Q, bestSolution.Lat, bestSolution.Lon, bestSolution.Height, bestSolution.NSat)
+	}
+
+	// Определяем тип файла
+	if config.Mode == model.ModeStatic {
 		result.FileType = "static"
 	} else {
 		result.FileType = "kinematic"
-		result.FullResultFile = outputData
 	}
-
-	s.logger.Infof("Parsed result: lat=%.6f, lon=%.6f, h=%.2f, Q=%d, ns=%d",
-		result.Latitude, result.Longitude, result.Height, result.Q, result.NSat)
 
 	return result
 }
