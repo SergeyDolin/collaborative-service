@@ -123,7 +123,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		files.ClockFile, _ = s.downloader.DownloadPreciseClock(date, taskID)
 		files.ERPFile, _ = s.downloader.DownloadERP(date, taskID)
 		files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
-		// files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
+		files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
 
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
 		if cfgErr != nil {
