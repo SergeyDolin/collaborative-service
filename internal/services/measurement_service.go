@@ -60,7 +60,8 @@ func (s *MeasurementService) ProcessMeasurement(
 	fileData []byte,
 	filename string,
 ) error {
-	s.logger.Infof("Processing measurement: task=%s, method=%s, mode=%s", taskID, config.Method, config.Mode)
+	s.logger.Infof("Processing measurement: task=%s, method=%s, mode=%s, size=%.2f MB",
+		taskID, config.Method, config.Mode, float64(len(fileData))/(1024*1024))
 
 	// Обновляем статус на processing
 	now := time.Now()
@@ -81,14 +82,30 @@ func (s *MeasurementService) ProcessMeasurement(
 		return err
 	}
 
-	// Сохраняем файл (потоковое копирование)
+	// Сохраняем файл (потоковое копирование для больших файлов)
 	obsPath := filepath.Join(workDir, filename)
-	if err := os.WriteFile(obsPath, fileData, 0644); err != nil {
-		s.handleError(taskID, login, fmt.Sprintf("Failed to save file: %v", err))
+
+	// Для больших файлов используем буферизованную запись
+	f, err := os.Create(obsPath)
+	if err != nil {
+		s.handleError(taskID, login, fmt.Sprintf("Failed to create file: %v", err))
 		return err
 	}
+	defer f.Close()
 
-	s.logger.Infof("File saved: %s (size: %d bytes)", obsPath, len(fileData))
+	// Пишем с буфером 1 MB для оптимизации
+	buffer := make([]byte, 1024*1024) // 1 MB buffer
+	offset := 0
+	for offset < len(fileData) {
+		n := copy(buffer, fileData[offset:])
+		if _, err := f.Write(buffer[:n]); err != nil {
+			s.handleError(taskID, login, fmt.Sprintf("Failed to write file: %v", err))
+			return err
+		}
+		offset += n
+	}
+
+	s.logger.Infof("File saved: %s (size: %.2f MB)", obsPath, float64(len(fileData))/(1024*1024))
 
 	// Конвертируем файл если нужно
 	convertedPath, err := s.converter.ConvertFile(obsPath, workDir)

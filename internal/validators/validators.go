@@ -71,7 +71,7 @@ type FileValidator struct {
 }
 
 func NewFileValidator() *FileValidator {
-	return &FileValidator{maxSize: 100 * 1024 * 1024} // 100 MB
+	return &FileValidator{maxSize: 100 * 1024 * 1024 * 1024} // 1 GB
 }
 
 var validExtensions = []string{".obs", ".rnx", ".crx", ".gz", ".o"}

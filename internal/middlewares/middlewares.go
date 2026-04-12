@@ -4,6 +4,7 @@ import (
 	"collaborative/internal/auth"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -121,4 +122,25 @@ func SendJSONResponse(res http.ResponseWriter, status int, data interface{}, log
 
 func SendJSONError(res http.ResponseWriter, msg string, status int, logger *zap.SugaredLogger) {
 	SendJSONResponse(res, status, ErrorResponse{Error: msg}, logger)
+}
+
+const MaxUploadSize = 1 << 30 // 1 GB
+
+// MaxUploadSizeMiddleware ограничивает размер тела запроса
+func MaxUploadSizeMiddleware(logger *zap.SugaredLogger) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Проверяем Content-Length если он есть
+			if r.ContentLength > MaxUploadSize {
+				logger.Warnf("Request too large: %d bytes (max: %d)", r.ContentLength, MaxUploadSize)
+				SendJSONError(w, fmt.Sprintf("File too large. Maximum size: %d GB", MaxUploadSize/(1024*1024*1024)),
+					http.StatusRequestEntityTooLarge, logger)
+				return
+			}
+
+			// Ограничиваем тело запроса
+			r.Body = http.MaxBytesReader(w, r.Body, MaxUploadSize)
+			h.ServeHTTP(w, r)
+		})
+	}
 }

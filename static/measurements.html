@@ -14,6 +14,7 @@
         }
         .header {
             background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
             padding: 1rem 2rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             position: fixed;
@@ -52,13 +53,40 @@
             font-weight: 500;
             color: #4a5568;
         }
+        .logo-text span {
+            color: #a8c7e0;
+        }
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .user-name {
+            color: #718096;
+            font-weight: 500;
+        }
+        .logout-btn {
+            padding: 8px 16px;
+            background: #fed7d7;
+            color: #c53030;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+        .logout-btn:hover {
+            background: #fecaca;
+            transform: translateY(-1px);
+        }
         .main-content {
-            max-width: 800px;
-            margin: 120px auto 50px;
+            max-width: 900px;
+            margin: 100px auto 50px;
             padding: 0 20px;
         }
         .card {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: 16px;
             padding: 40px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -78,9 +106,9 @@
         }
         .method-option {
             background: #f7fafc;
-            border: 1px solid #e2e8f0;
+            border: 2px solid #e2e8f0;
             border-radius: 12px;
-            padding: 24px;
+            padding: 24px 16px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -91,7 +119,7 @@
         }
         .method-option.selected {
             border-color: #a8c7e0;
-            background: linear-gradient(135deg, rgba(168,199,224,0.1), rgba(196,212,232,0.1));
+            background: linear-gradient(135deg, rgba(168,199,224,0.15), rgba(196,212,232,0.15));
         }
         .method-icon {
             font-size: 48px;
@@ -99,7 +127,7 @@
         }
         .method-title {
             font-size: 1.2rem;
-            font-weight: 500;
+            font-weight: 600;
             margin-bottom: 8px;
             color: #4a5568;
         }
@@ -113,17 +141,23 @@
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 24px;
+            border-left: 4px solid #a8c7e0;
         }
         .method-detail h4 {
             margin-bottom: 12px;
-            color: #a8c7e0;
+            color: #4a5568;
+            font-size: 1.1rem;
+        }
+        .method-detail p {
+            color: #718096;
+            margin-bottom: 12px;
         }
         .method-detail ul {
             margin-left: 20px;
             color: #718096;
         }
         .method-detail li {
-            margin: 8px 0;
+            margin: 6px 0;
         }
         .file-zone {
             border: 2px dashed #e2e8f0;
@@ -140,7 +174,7 @@
         }
         .file-zone.drag-over {
             border-color: #a8c7e0;
-            background: rgba(168, 199, 224, 0.05);
+            background: rgba(168, 199, 224, 0.08);
         }
         .file-icon {
             font-size: 48px;
@@ -170,17 +204,30 @@
         .btn-primary:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         .status-message {
             margin-top: 20px;
-            padding: 12px;
+            padding: 12px 16px;
             border-radius: 8px;
             display: none;
         }
-        .status-success { background: #c6f6d5; color: #2f855a; }
-        .status-error { background: #fed7d7; color: #c53030; }
+        .status-success { 
+            background: #c6f6d5; 
+            color: #2f855a; 
+        }
+        .status-error { 
+            background: #fed7d7; 
+            color: #c53030; 
+        }
         @media (max-width: 768px) {
-            .method-selector { grid-template-columns: 1fr; }
+            .method-selector { 
+                grid-template-columns: 1fr; 
+            }
+            .card {
+                padding: 24px;
+            }
         }
     </style>
 </head>
@@ -189,7 +236,10 @@
         <div class="header-content">
             <div class="logo" onclick="window.location.href='/'">
                 <div class="logo-icon">📡</div>
-                <div class="logo-text"><span>Collaborative</span>PositioningService</div>
+                <div class="logo-text">Collab<span>Service</span></div>
+            </div>
+            <div class="user-menu" id="userMenu">
+                <!-- Заполняется динамически -->
             </div>
         </div>
     </header>
@@ -198,100 +248,171 @@
         <div class="card">
             <h2>📡 Обработка спутниковых измерений</h2>
 
-            <div style="margin-bottom: 32px;">
-                <label style="display: block; margin-bottom: 12px; font-weight: 500; color: #4a5568;">Режим обработки:</label>
-                <div class="method-selector" style="grid-template-columns: repeat(2, 1fr);">
-                    <div class="method-option" data-mode="kinematic" onclick="selectMode('kinematic')">
-                        <div class="method-icon">🚗</div>
-                        <div class="method-title">Кинематика</div>
-                        <div class="method-desc">Для движущихся объектов</div>
-                    </div>
-                    <div class="method-option" data-mode="static" onclick="selectMode('static')">
-                        <div class="method-icon">🏠</div>
-                        <div class="method-title">Статика</div>
-                        <div class="method-desc">Для неподвижных объектов</div>
-                    </div>
-                </div>
-            </div>
-
             <div class="method-selector">
+                <!-- Абсолютный метод -->
                 <div class="method-option" data-method="single" onclick="selectMethod('single')">
                     <div class="method-icon">📍</div>
-                    <div class="method-title">Абсолютный метод</div>
-                    <div class="method-desc">Single Point Positioning</div>
+                    <div class="method-title">Абсолютный</div>
+                    <div class="method-desc">Single Point Positioning<br>Точность 3-10 м</div>
                 </div>
-                <div class="method-option" data-method="relative" onclick="selectMethod('relative')">
-                    <div class="method-icon">📡📡</div>
-                    <div class="method-title">Относительный метод</div>
-                    <div class="method-desc">Relative positioning</div>
+                
+                <!-- PPP-AR Kinematic -->
+                <div class="method-option" data-method="ppp-kinematic" onclick="selectMethod('ppp-kinematic')">
+                    <div class="method-icon">🚗</div>
+                    <div class="method-title">PPP-AR<br>Кинематика</div>
+                    <div class="method-desc">Для движущихся объектов<br>Точность 1-2 дм</div>
                 </div>
-                <div class="method-option" data-method="ppp" onclick="selectMethod('ppp')">
-                    <div class="method-icon">🎯</div>
-                    <div class="method-title">PPP метод</div>
-                    <div class="method-desc">Precise Point Positioning</div>
+                
+                <!-- PPP-AR Static -->
+                <div class="method-option" data-method="ppp-static" onclick="selectMethod('ppp-static')">
+                    <div class="method-icon">🏠</div>
+                    <div class="method-title">PPP-AR<br>Статика</div>
+                    <div class="method-desc">Для неподвижных объектов<br>Точность от 2-5 см до 1-2 мм</div>
                 </div>
             </div>
-            <div id="methodDetail" class="method-detail"></div>
+            
+            <div id="methodDetail" class="method-detail">
+                <h4>👆 Выберите метод обработки</h4>
+                <p>Нажмите на один из методов выше, чтобы увидеть подробное описание</p>
+            </div>
+            
             <div class="file-zone" id="fileZone" onclick="document.getElementById('fileInput').click()">
                 <div class="file-icon">📁</div>
                 <div>Нажмите или перетащите файл наблюдений</div>
-                <div class="file-info" id="fileInfo">Поддерживаются форматы: RINEX, RTCM3, UBX, BIN</div>
-                <input type="file" id="fileInput" style="display: none" accept=".obs,.rnx,.rtcm3,.ubx,.bin,.crx,.gz">
+                <div class="file-info" id="fileInfo">
+                    Поддерживаются форматы: RINEX (.obs, .rnx, .crx), сжатые (.gz)
+                </div>
+                <input type="file" id="fileInput" style="display: none" accept=".obs,.rnx,.crx,.gz,.o">
             </div>
-            <button id="processBtn" class="btn-primary" onclick="startProcessing()" disabled>Выберите метод и файл</button>
+            
+            <button id="processBtn" class="btn-primary" onclick="startProcessing()" disabled>
+                Выберите метод и файл
+            </button>
+            
             <div id="status" class="status-message"></div>
         </div>
     </main>
 
     <script>
         let selectedMethod = null;
-        let selectedMode = 'kinematic'; // по умолчанию кинематика
         let selectedFile = null;
 
         const methodDetails = {
             single: {
-                title: "📌 Абсолютный метод (SPP)",
-                description: "Одиночное точечное позиционирование с использованием только псевдодальностей",
-                features: ["✅ Не требует базовой станции", "✅ Точность: 3-10 метров", "✅ Использует широковещательные эфемериды", "✅ Быстрая обработка"],
-                config: { method: "single", mode: "kinematic", frequency: "l1+l2", elevationMask: 10, ionoModel: "brdc", tropModel: "saas", arMode: "off", dynamics: false, tideCorr: false, usePreciseEphemeris: false, usePreciseClock: false, useDcb: false, useErp: false, satelliteSystem: 1 }
+                title: "📍 Абсолютный метод (SPP)",
+                description: "Одиночное точечное позиционирование с использованием псевдодальностей и широковещательных эфемерид.",
+                features: [
+                    "✅ Не требует базовой станции",
+                    "✅ Быстрая обработка (несколько секунд)",
+                    "✅ Подходит для навигации"
+                ],
+                config: { 
+                    method: "single", 
+                    mode: "kinematic",
+                    frequency: "l1+l2", 
+                    elevationMask: 15, 
+                    ionoModel: "brdc", 
+                    tropModel: "saas", 
+                    arMode: "off", 
+                    tideCorr: false, 
+                    satelliteSystem: 61 
+                }
             },
-            relative: {
-                title: "🔗 Относительный метод (Differential)",
-                description: "Дифференциальное позиционирование с использованием базовой станции",
-                features: ["✅ Требуется базовая станция (автоматический выбор)", "✅ Точность: 0.1-1 метр", "✅ Разрешение неоднозначностей", "✅ Лучшая точность в кинематике"],
-                config: { method: "relative", mode: "kinematic", frequency: "l1+l2", elevationMask: 10, ionoModel: "dual-freq", tropModel: "saas", arMode: "continuous", dynamics: true, tideCorr: false, usePreciseEphemeris: false, usePreciseClock: false, useDcb: false, useErp: false, satelliteSystem: 1, baseStation: "auto" }
+            "ppp-kinematic": {
+                title: "🎯 PPP-AR Кинематика",
+                description: "Прецизионное точечное позиционирование с разрешением неоднозначностей для движущихся объектов.",
+                features: [
+                    "✅ Не требует базовой станции",
+                    "✅ Разрешение целочисленных неоднозначностей (AR)",
+                    "✅ Для движущихся объектов",
+                    "⚠️ Требует 15-30 минут для инициализации"
+                ],
+                config: { 
+                    method: "ppp", 
+                    mode: "kinematic", 
+                    frequency: "l1+l2+l5", 
+                    elevationMask: 15, 
+                    ionoModel: "dual-freq", 
+                    tropModel: "est-ztd", 
+                    arMode: "continuous", 
+                    tideCorr: true, 
+                    usePreciseEphemeris: true, 
+                    usePreciseClock: true, 
+                    useDcb: true, 
+                    useErp: true, 
+                    useOsb: true,
+                    satelliteSystem: 61 
+                }
             },
-            ppp: {
-                title: "🎯 PPP метод",
-                description: "Прецизионное точечное позиционирование",
-                features: ["✅ Сантиметровая точность", "✅ Не требует базовой станции", "✅ Использует точные эфемериды и часы", "✅ Требует больше времени на обработку"],
-                config: { method: "ppp", mode: "kinematic", frequency: "l1+l2+l5", elevationMask: 10, ionoModel: "dual-freq", tropModel: "est-ztd", arMode: "continuous", dynamics: true, tideCorr: true, usePreciseEphemeris: true, usePreciseClock: true, useDcb: true, useErp: true, satelliteSystem: 13 }
+            "ppp-static": {
+                title: "🎯 PPP-AR Статика",
+                description: "Прецизионное точечное позиционирование с разрешением неоднозначностей для неподвижных объектов.",
+                features: [
+                    "✅ Не требует базовой станции",
+                    "✅ Разрешение целочисленных неоднозначностей (AR)",
+                    "✅ Для неподвижных объектов",
+                    "✅ Накопление решения со временем"
+                ],
+                config: { 
+                    method: "ppp", 
+                    mode: "static", 
+                    frequency: "l1+l2+l5", 
+                    elevationMask: 15, 
+                    ionoModel: "dual-freq", 
+                    tropModel: "est-ztd", 
+                    arMode: "continuous", 
+                    tideCorr: true, 
+                    usePreciseEphemeris: true, 
+                    usePreciseClock: true, 
+                    useDcb: true, 
+                    useErp: true, 
+                    useOsb: true,
+                    satelliteSystem: 61 
+                }
             }
         };
 
-        function selectMode(mode) {
-            selectedMode = mode;
-            document.querySelectorAll('[data-mode]').forEach(opt => opt.classList.remove('selected'));
-            document.querySelector(`[data-mode="${mode}"]`).classList.add('selected');
-
-            // Обновляем режим во всех конфигурациях
-            for (let key in methodDetails) {
-                methodDetails[key].config.mode = mode;
+        // Проверка авторизации и обновление меню
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            const login = localStorage.getItem('userLogin');
+            const userMenu = document.getElementById('userMenu');
+            
+            if (token && login) {
+                userMenu.innerHTML = `
+                    <span class="user-name">${login}</span>
+                    <button class="logout-btn" onclick="logout()">Выйти</button>
+                `;
+            } else {
+                window.location.href = '/login';
             }
+        }
 
-            // Обновляем описание метода, если он выбран
-            if (selectedMethod) {
-                const detail = methodDetails[selectedMethod];
-                document.getElementById('methodDetail').innerHTML = `<h4>${detail.title}</h4><p>${detail.description}</p><ul>${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>`;
-            }
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userLogin');
+            window.location.href = '/';
         }
 
         function selectMethod(method) {
             selectedMethod = method;
-            document.querySelectorAll('.method-option[data-method]').forEach(opt => opt.classList.remove('selected'));
+            
+            // Убираем выделение со всех методов
+            document.querySelectorAll('.method-option[data-method]').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            
+            // Выделяем выбранный метод
             document.querySelector(`[data-method="${method}"]`).classList.add('selected');
+            
+            // Показываем описание
             const detail = methodDetails[method];
-            document.getElementById('methodDetail').innerHTML = `<h4>${detail.title}</h4><p>${detail.description}</p><ul>${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>`;
+            document.getElementById('methodDetail').innerHTML = `
+                <h4>${detail.title}</h4>
+                <p>${detail.description}</p>
+                <ul>${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>
+            `;
+            
             updateButtonState();
         }
 
@@ -312,63 +433,132 @@
             }
         }
 
+        // Drag & Drop
         const fileZone = document.getElementById('fileZone');
-        fileZone.addEventListener('dragover', (e) => { e.preventDefault(); fileZone.classList.add('drag-over'); });
-        fileZone.addEventListener('dragleave', () => { fileZone.classList.remove('drag-over'); });
+        fileZone.addEventListener('dragover', (e) => { 
+            e.preventDefault(); 
+            fileZone.classList.add('drag-over'); 
+        });
+        
+        fileZone.addEventListener('dragleave', () => { 
+            fileZone.classList.remove('drag-over'); 
+        });
+        
         fileZone.addEventListener('drop', (e) => {
             e.preventDefault();
             fileZone.classList.remove('drag-over');
-            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
         });
-        document.getElementById('fileInput').addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+        
+        document.getElementById('fileInput').addEventListener('change', (e) => { 
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
 
         function handleFile(file) {
+            const maxSize = 1 * 1024 * 1024 * 1024; // 1 GB в байтах
+            
+            if (file.size > maxSize) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.className = 'status-message status-error';
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = `❌ Файл слишком большой. Максимальный размер: 1 GB. Ваш файл: ${(file.size / (1024*1024*1024)).toFixed(2)} GB`;
+                
+                // Очищаем выбор файла
+                document.getElementById('fileInput').value = '';
+                return;
+            }
+            
             selectedFile = file;
             const fileInfo = document.getElementById('fileInfo');
             const sizeMB = (file.size / 1024 / 1024).toFixed(2);
-            fileInfo.innerHTML = `✅ ${file.name} (${sizeMB} MB)`;
+            const sizeGB = (file.size / (1024*1024*1024)).toFixed(2);
+            const sizeStr = file.size > 1024 * 1024 * 1024 ? `${sizeGB} GB` : `${sizeMB} MB`;
+            
+            fileInfo.innerHTML = `✅ ${file.name} (${sizeStr})`;
             fileInfo.style.color = '#2e7d32';
             updateButtonState();
         }
 
         async function startProcessing() {
             if (!selectedMethod || !selectedFile) return;
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+            
             const btn = document.getElementById('processBtn');
             const statusDiv = document.getElementById('status');
+            
             btn.disabled = true;
             btn.textContent = '⏳ Обработка...';
+            
+            statusDiv.style.display = 'none';
+            
             const config = methodDetails[selectedMethod].config;
             const formData = new FormData();
             formData.append('config', JSON.stringify(config));
             formData.append('file', selectedFile);
+            
             try {
-                const token = localStorage.getItem('token');
                 const response = await fetch('/api/measurements/process', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
+                
                 const data = await response.json();
+                
                 if (response.ok) {
                     statusDiv.className = 'status-message status-success';
                     statusDiv.style.display = 'block';
-                    statusDiv.innerHTML = `✅ Обработка запущена! ID задачи: ${data.taskId}<br>Результат появится в истории личного кабинета.`;
-                    setTimeout(() => { window.location.href = '/profile'; }, 3000);
+                    statusDiv.innerHTML = `
+                        ✅ Обработка запущена!<br>
+                        ID задачи: <strong>${data.taskId}</strong><br>
+                        Результат появится в истории личного кабинета.
+                    `;
+                    
+                    // Очищаем форму
+                    selectedFile = null;
+                    selectedMethod = null;
+                    document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx), сжатые (.gz)';
+                    document.getElementById('fileInfo').style.color = '#718096';
+                    document.querySelectorAll('.method-option[data-method]').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    document.getElementById('methodDetail').innerHTML = `
+                        <h4>👆 Выберите метод обработки</h4>
+                        <p>Нажмите на один из методов выше, чтобы увидеть подробное описание</p>
+                    `;
+                    updateButtonState();
+                    
+                    setTimeout(() => { 
+                        window.location.href = '/profile'; 
+                    }, 3000);
                 } else {
                     statusDiv.className = 'status-message status-error';
                     statusDiv.style.display = 'block';
                     statusDiv.textContent = data.error || '❌ Ошибка запуска обработки';
                     btn.disabled = false;
-                    btn.textContent = '🚀 Запустить обработку';
+                    updateButtonState();
                 }
             } catch (error) {
+                console.error('Processing error:', error);
                 statusDiv.className = 'status-message status-error';
                 statusDiv.style.display = 'block';
                 statusDiv.textContent = '❌ Ошибка соединения с сервером';
                 btn.disabled = false;
-                btn.textContent = '🚀 Запустить обработку';
+                updateButtonState();
             }
         }
+
+        // Инициализация
+        checkAuth();
     </script>
 </body>
 </html>

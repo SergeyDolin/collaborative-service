@@ -53,6 +53,18 @@ func (h *MeasurementHandler) ProcessMeasurementHandler(w http.ResponseWriter, r 
 		return
 	}
 
+	// Проверяем размер запроса перед парсингом multipart формы
+	if r.ContentLength > 1<<30 { // 1 GB
+		SendJSONError(w, "File too large. Maximum size: 1 GB", http.StatusRequestEntityTooLarge, h.logger)
+		return
+	}
+
+	// Устанавливаем максимальный размер для multipart формы
+	if err := r.ParseMultipartForm(1 << 30); err != nil { // 1 GB
+		SendJSONError(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest, h.logger)
+		return
+	}
+
 	// Парсим конфигурацию
 	configJSON := r.FormValue("config")
 	if configJSON == "" {
@@ -306,7 +318,8 @@ func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *htt
 // processTaskAsync processes a task in the background using MeasurementService.
 // All heavy-lifting (file I/O, conversion, download, RTK) is delegated to the service.
 func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model.UserProcessingConfig, fileData []byte, filename string) {
-	h.logger.Infof("Starting async processing for task: %s", taskID)
+	h.logger.Infof("Starting async processing for task: %s (file: %s, size: %.2f MB)",
+		taskID, filename, float64(len(fileData))/(1024*1024))
 
 	const (
 		defaultWorkDir   = "./tmp"

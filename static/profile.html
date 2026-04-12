@@ -597,7 +597,7 @@
         <div class="modal-actions" style="margin-top: 20px;">
             <button class="btn-cancel" onclick="closeTransformModal()">Закрыть</button>
             <button class="btn-primary" onclick="performTransform()" id="btnPerformTransform">
-                🔄 Пересчитать
+                🔄 Пересчитать (Территория РФ)
             </button>
         </div>
     </div>
@@ -1046,7 +1046,7 @@
             'absolute': '📍 SPP', 
             'single': '📍 SPP', 
             'relative': '🔗 Относительный', 
-            'ppp': '🎯 PPP'
+            'ppp': '🎯 PPP-AR'
         };
         return methods[m?.toLowerCase()] || m || '—';
     }
@@ -1128,7 +1128,7 @@
 
                     const transformBtn = hasCoords
                         ? `<button class="btn-transform" onclick="openTransformModal(${r.latitude}, ${r.longitude}, ${r.height || 0}, '${task.id}')">
-                            🔄 Пересчитать
+                            🔄 Пересчитать (Территория РФ)
                            </button>`
                         : '';
 

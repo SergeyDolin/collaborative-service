@@ -22,13 +22,14 @@ import (
 // Constants для magic numbers
 const (
 	ShutdownTimeout     = 5 * time.Second
-	ReadTimeout         = 5 * time.Minute
-	WriteTimeout        = 5 * time.Minute
+	ReadTimeout         = 15 * time.Minute
+	WriteTimeout        = 15 * time.Minute
 	IdleTimeout         = 60 * time.Second
 	CleanupInterval     = 1 * time.Hour
 	ResultExpirationTTL = 24 * time.Hour
 	DefaultWorkDir      = "./tmp"
 	ConfigDir           = "./cmd/solver/app"
+	MaxUploadSize       = 1 << 30
 )
 
 // Application представляет приложение с управлением жизненным циклом
@@ -132,6 +133,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
 	router.Use(middlewares.LogMiddleware(app.logger))
+	router.Use(middlewares.MaxUploadSizeMiddleware(app.logger))
 
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
