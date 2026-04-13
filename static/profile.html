@@ -75,6 +75,52 @@
             box-shadow: 0 4px 12px rgba(168,199,224,0.3);
         }
 
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card-small {
+            background: rgba(255,255,255,0.95);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-bottom: 8px;
+        }
+
+        .stat-value-large {
+            font-size: 2rem;
+            font-weight: 300;
+            color: #4a5568;
+        }
+
+        .stat-detail {
+            font-size: 0.8rem;
+            color: #a0aec0;
+            margin-top: 4px;
+        }
+
+        .progress-bar-mini {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .progress-fill-mini {
+            height: 100%;
+            background: linear-gradient(90deg, #68d391, #48bb78);
+        }
+
         .history-section {
             background: rgba(255,255,255,0.95);
             border-radius: 12px; padding: 32px;
@@ -138,7 +184,7 @@
         }
         .select-mode .task-checkbox { display: block; }
 
-        .history-list { max-height: 660px; overflow-y: auto; }
+        .history-list { max-height: 600px; overflow-y: auto; }
 
         .history-item {
             background: #f8f9fa; border-radius: 12px;
@@ -335,6 +381,7 @@
             .welcome-card > div { flex-direction: column; align-items: flex-start; gap: 15px; }
             .btn-new-measurement { width: 100%; text-align: center; }
             .coord-type-select { flex-direction: column; gap: 5px; }
+            .stats-cards { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -364,6 +411,23 @@
                 <button class="btn-new-measurement" onclick="window.location.href='/measurements'">
                     🚀 Обработать новое измерение
                 </button>
+            </div>
+        </div>
+
+        <!-- Статистика -->
+        <div class="stats-cards" id="statsCards" style="display:none;">
+            <div class="stat-card-small">
+                <div class="stat-label">Всего завершено</div>
+                <div class="stat-value-large" id="totalCompleted">0</div>
+                <div class="stat-detail">обработок</div>
+            </div>
+            <div class="stat-card-small">
+                <div class="stat-label">Средний процент FIX</div>
+                <div class="stat-value-large" id="avgFixRate">0%</div>
+                <div class="progress-bar-mini">
+                    <div class="progress-fill-mini" id="avgFixProgress" style="width:0%"></div>
+                </div>
+                <div class="stat-detail">по всем решениям</div>
             </div>
         </div>
 
@@ -412,7 +476,6 @@
 
         <div id="sourceCoordsInfo" class="source-coords-info"></div>
 
-        <!-- Исходная система -->
         <div class="transform-section">
             <h5>Исходная система координат</h5>
             <select id="sourceCRS" class="crs-select">
@@ -440,7 +503,6 @@
             <button onclick="swapSystems()" title="Поменять направление">⇅</button>
         </div>
 
-        <!-- Целевая система -->
         <div class="transform-section">
             <h5>Целевая система координат</h5>
             <select id="targetCRS" class="crs-select">
@@ -464,7 +526,6 @@
             </div>
         </div>
 
-        <!-- Высота -->
         <div class="transform-section height-section">
             <h5>Отсчётная поверхность для высоты</h5>
             <select id="heightSurface">
@@ -494,17 +555,14 @@
 <div class="toast" id="toast"></div>
 
 <script>
-    /* ===== Статические СК — эпоха определена самим определением системы ===== */
     const STATIC_CRS = new Set(['ГСК-2011', 'СК-42', 'СК-95', 'ПЗ-90', 'ПЗ-90.02', 'ПЗ-90.11']);
 
-    /* ===== State ===== */
     let isLoading = false;
     let selectMode = false;
     let selectedIds = new Set();
     let pendingDeleteFn = null;
     let currentTransformCoords = null;
 
-    /* ===== Auth ===== */
     function checkAuth() {
         const token = localStorage.getItem('token');
         const login = localStorage.getItem('userLogin');
@@ -522,7 +580,6 @@
 
     function getToken() { return localStorage.getItem('token'); }
 
-    /* ===== Toast ===== */
     let toastTimer = null;
     function showToast(msg, type = 'success') {
         const t = document.getElementById('toast');
@@ -532,7 +589,6 @@
         toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
     }
 
-    /* ===== Модалка подтверждения ===== */
     function openModal(title, text, onConfirm) {
         pendingDeleteFn = onConfirm;
         document.getElementById('modalTitle').textContent = title;
@@ -556,7 +612,6 @@
         if (e.target === this) closeModal();
     });
 
-    /* ===== Форматирование ===== */
     function formatCoord(val) {
         if (val === null || val === undefined) return '—';
         const n = Number(val);
@@ -571,7 +626,6 @@
 
     function getSolutionStatus(q) {
         if (q === 1) return '<span class="fix-badge">🎯 FIX</span>';
-        if (q === 2) return '<span class="float-badge">📊 FLOAT (WL)</span>';
         if (q === 6) return '<span class="float-badge">📊 FLOAT</span>';
         if (q === 5) return '<span style="color:#c53030;">⚠️ DGPS</span>';
         if (q === 0) return '<span style="color:#c53030;">❌ NO SOLUTION</span>';
@@ -579,7 +633,6 @@
         return '';
     }
 
-    /* ===== Видимость полей эпох ===== */
     function updateEpochVisibility() {
         const srcCRS = document.getElementById('sourceCRS').value;
         const tgtCRS = document.getElementById('targetCRS').value;
@@ -590,7 +643,6 @@
     document.getElementById('sourceCRS').addEventListener('change', updateEpochVisibility);
     document.getElementById('targetCRS').addEventListener('change', updateEpochVisibility);
 
-    /* ===== Модалка трансформации ===== */
     async function openTransformModal(lat, lon, height, taskId) {
         currentTransformCoords = { lat, lon, height, taskId };
 
@@ -609,7 +661,6 @@
                 </span>
             </div>`;
 
-        // Сброс формы
         document.getElementById('sourceCRS').value = 'WGS84(G1150)';
         document.querySelector('input[name="sourceCoordType"][value="BLH"]').checked = true;
         document.getElementById('targetCRS').value = 'ГСК-2011';
@@ -758,7 +809,6 @@
                 const origLon = currentTransformCoords.lon;
                 const origH   = currentTransformCoords.height || 0;
 
-                // GeoJSON: [lon, lat, height]
                 const newLon = coords[0];
                 const newLat = coords[1];
                 const newH   = coords.length > 2 ? coords[2] : 0;
@@ -801,12 +851,7 @@
                             <tr><td>B</td><td>${fmt10(newLat)}°</td></tr>
                             <tr><td>L</td><td>${fmt10(newLon)}°</td></tr>
                             ${newH ? `<tr><td>H</td><td>${fmt4(newH)} м</td></tr>` : ''}
-                        </table>
-                        <div style="margin-top:10px; padding:8px 10px; background:#f7fafc; border-radius:6px; font-size:0.75rem; color:#4a5568; line-height:1.8; font-family:monospace;">
-                            ΔB = ${fmtDiff(dLat)}° / ${(dLat_m*1000).toFixed(1)} мм<br>
-                            ΔL = ${fmtDiff(dLon)}° / ${(dLon_m*1000).toFixed(1)} мм<br>
-                            ${newH ? `ΔH = ${fmtDiff(dH)} м / ${(dH*1000).toFixed(1)} мм` : ''}
-                        </div>`;
+                        </table>`;
                 } else {
                     const dX = newLon - origLon;
                     const dY = newLat - origLat;
@@ -818,12 +863,7 @@
                             <tr><td>X</td><td>${fmt4(newLon)} м</td></tr>
                             <tr><td>Y</td><td>${fmt4(newLat)} м</td></tr>
                             ${newH ? `<tr><td>Z</td><td>${fmt4(newH)} м</td></tr>` : ''}
-                        </table>
-                        <div style="margin-top:10px; padding:8px 10px; background:#f7fafc; border-radius:6px; font-size:0.75rem; color:#4a5568; line-height:1.8; font-family:monospace;">
-                            ΔX = ${fmtDiff(dX)} м<br>
-                            ΔY = ${fmtDiff(dY)} м<br>
-                            ${newH ? `ΔZ = ${fmtDiff(dZ)} м` : ''}
-                        </div>`;
+                        </table>`;
                 }
 
                 const copyText = targetType === 'BLH'
@@ -866,7 +906,6 @@
         if (e.target === this) closeTransformModal();
     });
 
-    /* ===== Режим выбора ===== */
     function toggleSelectMode() {
         selectMode = !selectMode;
         selectedIds.clear();
@@ -916,7 +955,6 @@
         updateSelectionCount();
     }
 
-    /* ===== Confirm wrappers ===== */
     function confirmDeleteAll() {
         openModal('🗑️ Удалить всю историю',
             'Это удалит все задачи и результаты обработок. Действие необратимо.', doDeleteAll);
@@ -935,7 +973,6 @@
             'Задача и результат будут удалены безвозвратно.', () => doDeleteSingle(taskId));
     }
 
-    /* ===== Исполнители удаления ===== */
     function removeItemFromDOM(taskId) {
         const el = document.querySelector(`.history-item[data-task-id="${taskId}"]`);
         if (!el) return;
@@ -946,6 +983,7 @@
                 document.getElementById('processingHistory').innerHTML =
                     '<div class="empty-history">📭 История обработок пуста</div>';
                 document.getElementById('btnDeleteAll').style.display = 'none';
+                document.getElementById('statsCards').style.display = 'none';
             }
         }, 270);
     }
@@ -993,7 +1031,6 @@
         if (selectMode) toggleSelectMode();
     }
 
-    /* ===== Загрузка истории ===== */
     function getMethodName(m) {
         return { absolute:'📍 SPP', single:'📍 SPP', relative:'🔗 Относительный', ppp:'🎯 PPP-AR' }[m?.toLowerCase()] || m || '—';
     }
@@ -1001,6 +1038,33 @@
     function getStatusText(s) {
         return { pending:'⏳ В очереди', processing:'🔄 Обработка...', completed:'✅ Завершено', failed:'❌ Ошибка' }[s] || s;
     }
+
+    function updateStats(tasks) {
+        const completed = tasks.filter(t => t.status === 'completed' && t.result);
+        const totalCompleted = completed.length;
+        
+        // Считаем средний процент FIX по всем задачам
+        let totalFixRate = 0;
+        let tasksWithFixRate = 0;
+        
+        completed.forEach(task => {
+            if (task.result.fixRate !== undefined && task.result.fixRate !== null) {
+                totalFixRate += task.result.fixRate;
+                tasksWithFixRate++;
+            }
+        });
+        
+        const avgFixRate = tasksWithFixRate > 0 
+            ? (totalFixRate / tasksWithFixRate).toFixed(1) 
+            : '0.0';
+        
+        document.getElementById('totalCompleted').textContent = totalCompleted;
+        document.getElementById('avgFixRate').textContent = avgFixRate + '%';
+        document.getElementById('avgFixProgress').style.width = avgFixRate + '%';
+        
+        document.getElementById('statsCards').style.display = totalCompleted > 0 ? 'grid' : 'none';
+    }
+    
 
     async function loadProcessingHistory() {
         if (isLoading) return;
@@ -1027,10 +1091,12 @@
             if (!tasks || tasks.length === 0) {
                 container.innerHTML = '<div class="empty-history">📭 История обработок пуста</div>';
                 btnDA.style.display = 'none';
+                document.getElementById('statsCards').style.display = 'none';
                 return;
             }
 
             btnDA.style.display = selectMode ? 'none' : 'block';
+            updateStats(tasks);
 
             container.innerHTML = tasks.map(task => {
                 const date   = new Date(task.createdAt).toLocaleString('ru');
@@ -1039,12 +1105,29 @@
                 const status = task.status || 'pending';
 
                 let resultHtml = '';
+                
                 if (status === 'completed' && task.result) {
                     const r = task.result;
                     const hasCoords = r.latitude || r.longitude;
                     const lat    = formatCoord(r.latitude);
                     const lon    = formatCoord(r.longitude);
                     const height = r.height ? formatHeight(r.height) : null;
+
+                    const qStatus = getSolutionStatus(r.q);
+                    
+                    // Процент FIX внутри этого файла
+                    const fixRate = r.fixRate ? r.fixRate.toFixed(1) : null;
+                    const fixRateHtml = fixRate ? `
+                        <span style="margin-left: 6px; font-size: 0.65rem; opacity: 0.8;">
+                            ${fixRate}%
+                        </span>
+                    ` : '';
+
+                    const statsHtml = `
+                        <div class="stats-info">
+                            <span>${qStatus}${fixRateHtml}</span>
+                            ${r.nSat ? `<span>🛰️ ${r.nSat}</span>` : ''}
+                        </div>`;
 
                     const coordsHtml = hasCoords ? `
                         <table class="coords-table">
@@ -1053,30 +1136,19 @@
                             ${height ? `<tr><td>h</td><td>${height} м</td></tr>` : ''}
                         </table>` : '';
 
-                    const statsHtml = `
-                        <div class="stats-info">
-                            <span>${getSolutionStatus(r.q)}</span>
-                            ${r.nSat ? `<span>🛰️ Спутников: ${r.nSat}</span>` : ''}
-                            ${r.sdx  ? `<span>📏 SD: ${r.sdx.toFixed(3)} м</span>` : ''}
-                        </div>`;
-
                     const dlHtml = task.fileType !== 'static'
                         ? `<button class="download-btn" onclick="downloadResult('${task.id}', event)">📥 Скачать .pos</button>`
                         : '';
 
                     const transformBtn = hasCoords
-                        ? `<button class="btn-transform" onclick="openTransformModal(${r.latitude}, ${r.longitude}, ${r.height || 0}, '${task.id}')">🔄 Пересчитать СК</button>`
+                        ? `<button class="btn-transform" onclick="openTransformModal(${r.latitude}, ${r.longitude}, ${r.height || 0}, '${task.id}')">🔄 Пересчёт</button>`
                         : '';
-
-                    const expiryHtml = task.fileType !== 'static'
-                        ? '<div class="expiry-info">⏰ Файл доступен 24 ч</div>' : '';
 
                     resultHtml = `
                         <div class="result-block">
                             ${statsHtml}
                             ${coordsHtml}
                             <div class="action-buttons">${dlHtml}${transformBtn}</div>
-                            ${expiryHtml}
                         </div>`;
                 }
 
@@ -1095,7 +1167,7 @@
                             </div>
                             <div class="history-status">
                                 <span class="status-badge status-${status}">${getStatusText(status)}</span>
-                                <button class="btn-delete-single" onclick="confirmDeleteSingle('${task.id}')">🗑️ Удалить</button>
+                                <button class="btn-delete-single" onclick="confirmDeleteSingle('${task.id}')">🗑️</button>
                             </div>
                         </div>
                         ${resultHtml}
@@ -1115,13 +1187,12 @@
         }
     }
 
-    /* ===== Скачивание ===== */
     async function downloadResult(taskId, event) {
         event.stopPropagation();
         const btn  = event.target;
         const orig = btn.textContent;
         btn.disabled = true;
-        btn.textContent = '⏳ Скачивание...';
+        btn.textContent = '⏳';
         try {
             const resp = await fetch(`/api/measurements/download?id=${taskId}`, {
                 headers: { 'Authorization': `Bearer ${getToken()}` }
@@ -1142,7 +1213,6 @@
         finally  { btn.disabled = false; btn.textContent = orig; }
     }
 
-    /* ===== Init ===== */
     if (checkAuth()) loadProcessingHistory();
 </script>
 </body>

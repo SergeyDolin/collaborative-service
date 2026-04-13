@@ -48,6 +48,7 @@ type ProcessingResult struct {
 	SDX              float32   `json:"sdx" db:"sdx"`
 	SDY              float32   `json:"sdy" db:"sdy"`
 	SDZ              float32   `json:"sdz" db:"sdz"`
+	FixRate          float32   `json:"fixRate" db:"fix_rate"`
 	LastSolutionLine string    `json:"lastSolutionLine,omitempty" db:"last_solution_line"`
 	FullResultFile   []byte    `json:"-" db:"full_result_file"`
 	FileType         string    `json:"fileType,omitempty" db:"file_type"`

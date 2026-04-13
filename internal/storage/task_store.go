@@ -78,6 +78,7 @@ func (s *TaskStorage) InitTaskSchema() error {
 			sdx REAL,
 			sdy REAL,
 			sdz REAL,
+			fix_rate REAL,
 			last_solution_line TEXT,
 			full_result_file BYTEA,
 			file_type VARCHAR(20),
@@ -124,6 +125,14 @@ func (s *TaskStorage) InitTaskSchema() error {
     ADD COLUMN IF NOT EXISTS observation_date TIMESTAMP;`)
 	if err != nil {
 		fmt.Printf("Warning: Failed to add observation_date column: %v\n", err)
+	}
+
+	_, err = s.pool.Exec(context.Background(), `
+		ALTER TABLE processing_results 
+		ADD COLUMN IF NOT EXISTS fix_rate REAL;
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to add fix_rate column: %v\n", err)
 	}
 
 	return nil
@@ -187,15 +196,16 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 	query := `
 		INSERT INTO processing_results (
 			task_id, user_login, x, y, z, latitude, longitude, height,
-			q, n_sat, sdx, sdy, sdz, last_solution_line, 
+			q, n_sat, sdx, sdy, sdz, fix_rate, last_solution_line, 
 			full_result_file, file_type, raw_output, created_at, expires_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		ON CONFLICT (task_id) DO UPDATE SET
 			x = EXCLUDED.x, y = EXCLUDED.y, z = EXCLUDED.z,
 			latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude,
 			height = EXCLUDED.height, q = EXCLUDED.q, n_sat = EXCLUDED.n_sat,
-			sdx = EXCLUDED.sdx, sdy = EXCLUDED.sdy,
-			sdz = EXCLUDED.sdz, last_solution_line = EXCLUDED.last_solution_line,
+			sdx = EXCLUDED.sdx, sdy = EXCLUDED.sdy, sdz = EXCLUDED.sdz,
+			fix_rate = EXCLUDED.fix_rate,
+			last_solution_line = EXCLUDED.last_solution_line,
 			full_result_file = EXCLUDED.full_result_file, file_type = EXCLUDED.file_type,
 			raw_output = EXCLUDED.raw_output, expires_at = EXCLUDED.expires_at
 	`
@@ -203,7 +213,7 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 	_, err := s.pool.Exec(context.Background(), query,
 		result.TaskID, result.UserLogin, result.X, result.Y, result.Z,
 		result.Latitude, result.Longitude, result.Height, result.Q,
-		result.NSat, result.SDX, result.SDY, result.SDZ,
+		result.NSat, result.SDX, result.SDY, result.SDZ, result.FixRate,
 		result.LastSolutionLine, result.FullResultFile, result.FileType,
 		result.RawOutput, result.CreatedAt, result.ExpiresAt,
 	)
@@ -329,6 +339,8 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		       COALESCE(r.x, 0), COALESCE(r.y, 0), COALESCE(r.z, 0), 
 		       COALESCE(r.latitude, 0), COALESCE(r.longitude, 0), COALESCE(r.height, 0), 
 		       COALESCE(r.q, 0), COALESCE(r.n_sat, 0),
+		       COALESCE(r.sdx, 0), COALESCE(r.sdy, 0), COALESCE(r.sdz, 0),
+		       COALESCE(r.fix_rate, 0),
 		       COALESCE(r.last_solution_line, ''), COALESCE(r.file_type, '')
 		FROM processing_tasks t
 		LEFT JOIN processing_results r ON t.id = r.task_id
@@ -349,16 +361,18 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 			id, userLogin, filename, status, errorMessage, lastSolutionLine, fileType string
 			configJSON                                                                []byte
 			createdAt                                                                 time.Time
-			completedAt                                                               *time.Time // FIX: *time.Time чтобы корректно обрабатывать NULL
+			completedAt                                                               *time.Time
 			processingSec                                                             *float64
 			x, y, z, lat, lon, height                                                 float64
 			q, nSat                                                                   int
+			sdx, sdy, sdz, fixRate                                                    float32
 		)
 
 		err := rows.Scan(
 			&id, &userLogin, &configJSON, &filename, &status,
 			&errorMessage, &createdAt, &completedAt, &processingSec,
 			&x, &y, &z, &lat, &lon, &height, &q, &nSat,
+			&sdx, &sdy, &sdz, &fixRate,
 			&lastSolutionLine, &fileType,
 		)
 		if err != nil {
@@ -380,7 +394,6 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 			"fileType":  fileType,
 		}
 
-		// completedAt добавляем только если не NULL
 		if completedAt != nil {
 			task["completedAt"] = completedAt
 		}
@@ -396,6 +409,8 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 			"x": x, "y": y, "z": z,
 			"latitude": lat, "longitude": lon, "height": height,
 			"q": q, "nSat": nSat,
+			"sdx": sdx, "sdy": sdy, "sdz": sdz,
+			"fixRate": fixRate,
 		}
 
 		if fileType == "static" && lastSolutionLine != "" {

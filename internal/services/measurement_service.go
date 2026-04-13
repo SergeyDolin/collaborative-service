@@ -228,7 +228,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	return nil
 }
 
-// parseResult парсит результаты обработки
+// parseResult парсит результаты обработки и находит лучшее решение
 // parseResult парсит результаты обработки и находит лучшее решение
 func (s *MeasurementService) parseResult(
 	outputData []byte,
@@ -246,7 +246,6 @@ func (s *MeasurementService) parseResult(
 
 	lines := strings.Split(string(outputData), "\n")
 
-	// Структура для хранения решений
 	type Solution struct {
 		Line   string
 		Lat    float64
@@ -262,8 +261,11 @@ func (s *MeasurementService) parseResult(
 	var solutions []Solution
 	var lastSolution *Solution
 
+	// Счетчики для статистики внутри файла
+	var totalEpochs int // Всего эпох с Q=1 или Q=6
+	var fixEpochs int   // Эпохи с Q=1
+
 	for _, line := range lines {
-		// Пропускаем комментарии и пустые строки
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "%") || strings.HasPrefix(line, "#") {
 			continue
@@ -274,32 +276,23 @@ func (s *MeasurementService) parseResult(
 			continue
 		}
 
-		// Парсим значения
 		var sol Solution
 		sol.Line = line
 
-		// Формат RTKLIB .pos:
-		// Date(YYYY/MM/DD) Time(HH:MM:SS.SSS) Lat/Lon/Height or X/Y/Z Q NS SDX SDY SDZ ...
-		// Индексы: 0=date, 1=time, 2/3/4=coordinates, 5=Q, 6=NSat, 7/8/9=SD
-
-		// Координаты (могут быть в градусах или метрах)
 		if len(fields) >= 5 {
 			fmt.Sscanf(fields[2], "%f", &sol.Lat)
 			fmt.Sscanf(fields[3], "%f", &sol.Lon)
 			fmt.Sscanf(fields[4], "%f", &sol.Height)
 		}
 
-		// Q (качество решения)
 		if len(fields) >= 6 {
 			fmt.Sscanf(fields[5], "%d", &sol.Q)
 		}
 
-		// Количество спутников
 		if len(fields) >= 7 {
 			fmt.Sscanf(fields[6], "%d", &sol.NSat)
 		}
 
-		// Стандартные отклонения
 		if len(fields) >= 8 {
 			var sdx float64
 			fmt.Sscanf(fields[7], "%f", &sdx)
@@ -318,26 +311,39 @@ func (s *MeasurementService) parseResult(
 
 		solutions = append(solutions, sol)
 		lastSolution = &sol
+
+		// Считаем статистику внутри файла
+		if sol.Q == 1 || sol.Q == 6 {
+			totalEpochs++
+			if sol.Q == 1 {
+				fixEpochs++
+			}
+		}
 	}
 
-	// Ищем лучшее решение: сначала Q=1 (FIX), если нет - Q=6 (FLOAT)
+	// Вычисляем процент FIX внутри файла
+	if totalEpochs > 0 {
+		result.FixRate = float32(float64(fixEpochs) / float64(totalEpochs) * 100)
+		s.logger.Infof("File %s: FIX rate = %.1f%% (%d/%d epochs)",
+			taskID, result.FixRate, fixEpochs, totalEpochs)
+	}
+
+	// Ищем лучшее решение
 	var bestSolution *Solution
 
-	// Сначала ищем Q=1 с конца (обычно последние эпохи более точные)
+	// Сначала ищем Q=1 с конца
 	for i := len(solutions) - 1; i >= 0; i-- {
 		if solutions[i].Q == 1 {
 			bestSolution = &solutions[i]
-			s.logger.Infof("Found FIX solution (Q=1) at epoch %d", i+1)
 			break
 		}
 	}
 
-	// Если Q=1 не найдено, ищем Q=6 (FLOAT)
+	// Если Q=1 не найдено, ищем Q=6
 	if bestSolution == nil {
 		for i := len(solutions) - 1; i >= 0; i-- {
 			if solutions[i].Q == 6 {
 				bestSolution = &solutions[i]
-				s.logger.Infof("Found FLOAT solution (Q=6) at epoch %d", i+1)
 				break
 			}
 		}
@@ -346,10 +352,9 @@ func (s *MeasurementService) parseResult(
 	// Если и Q=6 нет, берем последнее решение
 	if bestSolution == nil && lastSolution != nil {
 		bestSolution = lastSolution
-		s.logger.Infof("Using last solution with Q=%d", bestSolution.Q)
 	}
 
-	// Заполняем результат из лучшего решения
+	// Заполняем результат
 	if bestSolution != nil {
 		result.Latitude = bestSolution.Lat
 		result.Longitude = bestSolution.Lon
@@ -360,12 +365,8 @@ func (s *MeasurementService) parseResult(
 		result.SDY = bestSolution.SDY
 		result.SDZ = bestSolution.SDZ
 		result.LastSolutionLine = bestSolution.Line
-
-		s.logger.Infof("Selected solution: Q=%d, Lat=%.8f, Lon=%.8f, H=%.3f, NSat=%d",
-			bestSolution.Q, bestSolution.Lat, bestSolution.Lon, bestSolution.Height, bestSolution.NSat)
 	}
 
-	// Определяем тип файла
 	if config.Mode == model.ModeStatic {
 		result.FileType = "static"
 	} else {
