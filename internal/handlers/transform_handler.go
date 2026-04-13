@@ -132,15 +132,18 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	// Преобразуем в JSON строку
 	sourceDatasetJSON, _ := json.Marshal(sourceDataset)
 
-	// Отправляем запрос с source_dataset как строкой
+	// Отправляем запрос с source_dataset как строкой и эпохами
 	transformReq := map[string]interface{}{
 		"operation_code": operationCode,
 		"source_dataset": string(sourceDatasetJSON),
+		"source_epoch":   sourceEpoch,
+		"target_epoch":   targetEpoch,
 	}
 
 	reqBody, _ := json.Marshal(transformReq)
 
-	h.logger.Infof("Transform request with source_dataset as string")
+	h.logger.Infof("Transform request: operation_code=%s, source_epoch=%s, target_epoch=%s",
+		operationCode, sourceEpoch, targetEpoch)
 	h.logger.Debugf("Request body: %s", string(reqBody))
 
 	resp, err := h.client.Post(
@@ -212,7 +215,21 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 }
 
 // encodeOperation получает код операции
+// encodeOperation получает код операции
 func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface, sourceEpoch, targetEpoch string) string {
+	// Форматируем эпоху как "YYYY-MM-DD"
+	// Убеждаемся, что дата в правильном формате
+	if sourceEpoch != "" {
+		if t, err := time.Parse("2006-01-02", sourceEpoch); err == nil {
+			sourceEpoch = t.Format("2006-01-02")
+		}
+	}
+	if targetEpoch != "" {
+		if t, err := time.Parse("2006-01-02", targetEpoch); err == nil {
+			targetEpoch = t.Format("2006-01-02")
+		}
+	}
+
 	sourceMetadata := map[string]interface{}{
 		"crs": map[string]interface{}{
 			"referenceFrameID":   getReferenceFrameID(sourceCRS),
@@ -245,6 +262,8 @@ func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType
 
 	reqBody, _ := json.Marshal(encodeReq)
 
+	h.logger.Infof("Encode request: %s", string(reqBody))
+
 	resp, err := h.client.Post(
 		"https://geocentric.xyz/api/operation/encode",
 		"application/json",
@@ -257,7 +276,12 @@ func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
-	return strings.Trim(string(respBody), "\"\n ")
+	operationCode := strings.Trim(string(respBody), "\"\n ")
+
+	h.logger.Infof("Got operation code: %s for source_epoch=%s, target_epoch=%s",
+		operationCode, sourceEpoch, targetEpoch)
+
+	return operationCode
 }
 
 // getReferenceFrameID возвращает правильный код referenceFrameID

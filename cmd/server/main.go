@@ -165,6 +165,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			app.logger,
 		)
 		transformHandler := handlers.NewTransformHandler(app.logger)
+		observationHandler := handlers.NewObservationHandler(app.taskStorage, app.logger)
 		router.Get("/api/stats", measurementHandler.GetSystemStatsHandler)
 
 		// Protected routes
@@ -177,6 +178,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Get("/api/measurements/download", measurementHandler.DownloadResultHandler)
 			r.Post("/api/transform/geojson", transformHandler.TransformCoordinates)
 			r.Get("/api/transform/status", transformHandler.TransformStatus)
+			r.Get("/api/measurements/observation-date", observationHandler.GetObservationDate)
 
 			r.Delete("/api/measurements/delete", measurementHandler.DeleteTaskHandler)
 			r.Delete("/api/measurements/delete-all", measurementHandler.DeleteAllTasksHandler)

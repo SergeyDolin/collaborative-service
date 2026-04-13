@@ -16,19 +16,20 @@ const (
 
 // ProcessingTask задача на обработку
 type ProcessingTask struct {
-	ID            string               `json:"id" db:"id"`
-	UserLogin     string               `json:"userLogin" db:"user_login"`
-	Config        UserProcessingConfig `json:"config"`
-	Filename      string               `json:"filename" db:"filename"`
-	OriginalPath  string               `json:"originalPath" db:"original_path"`
-	RinexPath     string               `json:"rinexPath,omitempty" db:"rinex_path"`
-	OutputPath    string               `json:"outputPath,omitempty" db:"output_path"`
-	Status        TaskStatus           `json:"status" db:"status"`
-	ErrorMessage  string               `json:"errorMessage,omitempty" db:"error_message"`
-	CreatedAt     time.Time            `json:"createdAt" db:"created_at"`
-	StartedAt     *time.Time           `json:"startedAt,omitempty" db:"started_at"`
-	CompletedAt   *time.Time           `json:"completedAt,omitempty" db:"completed_at"`
-	ProcessingSec float64              `json:"processingSec,omitempty" db:"processing_sec"`
+	ID              string               `json:"id" db:"id"`
+	UserLogin       string               `json:"userLogin" db:"user_login"`
+	Config          UserProcessingConfig `json:"config"`
+	Filename        string               `json:"filename" db:"filename"`
+	OriginalPath    string               `json:"originalPath" db:"original_path"`
+	RinexPath       string               `json:"rinexPath,omitempty" db:"rinex_path"`
+	OutputPath      string               `json:"outputPath,omitempty" db:"output_path"`
+	Status          TaskStatus           `json:"status" db:"status"`
+	ErrorMessage    string               `json:"errorMessage,omitempty" db:"error_message"`
+	CreatedAt       time.Time            `json:"createdAt" db:"created_at"`
+	StartedAt       *time.Time           `json:"startedAt,omitempty" db:"started_at"`
+	CompletedAt     *time.Time           `json:"completedAt,omitempty" db:"completed_at"`
+	ProcessingSec   float64              `json:"processingSec,omitempty" db:"processing_sec"`
+	ObservationDate *time.Time           `json:"observationDate,omitempty" db:"observation_date"`
 }
 
 // ProcessingResult результат обработки

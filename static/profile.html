@@ -745,30 +745,101 @@
     }
 
     /* ===== Модалка трансформации ===== */
-    function openTransformModal(lat, lon, height, taskId) {
-        currentTransformCoords = { lat, lon, height, taskId };
-        
-        const infoDiv = document.getElementById('sourceCoordsInfo');
-        const heightStr = height && height !== 0 ? `<br>h = ${formatHeight(height)} м` : '';
-        infoDiv.innerHTML = `
-            <strong>Исходные координаты:</strong><br>
-            <span style="font-family: 'Consolas', monospace;">
-                B (широта) = ${formatCoord(lat)}°<br>
-                L (долгота) = ${formatCoord(lon)}°${heightStr}
+    async function openTransformModal(lat, lon, height, taskId) {
+    currentTransformCoords = { lat, lon, height, taskId };
+    
+    const infoDiv = document.getElementById('sourceCoordsInfo');
+    const heightStr = height && height !== 0 ? `<br>h = ${formatHeight(height)} м` : '';
+    infoDiv.innerHTML = `
+        <strong>Исходные координаты:</strong><br>
+        <span style="font-family: 'Consolas', monospace;">
+            B (широта) = ${formatCoord(lat)}°<br>
+            L (долгота) = ${formatCoord(lon)}°${heightStr}
+        </span>
+        <div id="rinexDateInfo" style="margin-top: 8px; font-size: 0.8rem; color: #718096;">
+            <span style="display: inline-block; vertical-align: middle;">
+                <span class="loading-spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #cbd5e0; border-top-color: #a8c7e0; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px;"></span>
+                Загрузка даты наблюдения...
             </span>
-        `;
+        </div>
+    `;
+    
+    // Добавьте стиль для спиннера если его нет
+    if (!document.getElementById('spinner-style')) {
+        const style = document.createElement('style');
+        style.id = 'spinner-style';
+        style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+    }
+    
+    // Сбрасываем значения формы
+    document.getElementById('sourceCRS').value = 'WGS84(G1150)';
+    document.querySelector('input[name="sourceCoordType"][value="BLH"]').checked = true;
+    document.getElementById('targetCRS').value = 'ГСК-2011';
+    document.querySelector('input[name="targetCoordType"][value="BLH"]').checked = true;
+    document.getElementById('heightSurface').value = 'ELLIPSOID';
+    
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('targetEpoch').value = today;
+    
+    // Загружаем дату наблюдения
+    await loadObservationDate(taskId);
+    
+    document.getElementById('transformModalOverlay').classList.add('visible');
+    document.getElementById('transformResult').classList.remove('visible');
+}
+
+async function loadObservationDate(taskId) {
+    const dateInfoEl = document.getElementById('rinexDateInfo');
+    
+    try {
+        const token = getToken();
+        const response = await fetch(`/api/measurements/observation-date?task_id=${taskId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
         
-        document.getElementById('sourceCRS').value = 'WGS84(G1150)';
-        document.querySelector('input[name="sourceCoordType"][value="BLH"]').checked = true;
-        document.getElementById('targetCRS').value = 'ГСК-2011';
-        document.querySelector('input[name="targetCoordType"][value="BLH"]').checked = true;
-        document.getElementById('heightSurface').value = 'ELLIPSOID';
+        if (response.ok) {
+            const data = await response.json();
+            const obsDate = data.date;
+            const source = data.source;
+            
+            document.getElementById('sourceEpoch').value = obsDate;
+            
+            const formattedDate = new Date(obsDate).toLocaleDateString('ru');
+            const sourceText = source === 'rinex_header' ? 'из заголовка RINEX' : 
+                              source === 'database' ? 'из кэша' : 'дата создания';
+            
+            dateInfoEl.innerHTML = `
+                <span style="color: #2f855a;">✓ Дата наблюдения: ${formattedDate}</span>
+                <span style="display: block; font-size: 0.7rem; color: #a0aec0;">
+                    (${sourceText})
+                </span>
+            `;
+        } else {
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('sourceEpoch').value = today;
+            
+            dateInfoEl.innerHTML = `
+                <span style="color: #ed6c02;">⚠️ Не удалось определить дату наблюдения</span>
+                <span style="display: block; font-size: 0.7rem; color: #a0aec0;">
+                    Используется текущая дата
+                </span>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading observation date:', error);
+        
         const today = new Date().toISOString().slice(0, 10);
         document.getElementById('sourceEpoch').value = today;
-        document.getElementById('targetEpoch').value = today;
-        document.getElementById('transformModalOverlay').classList.add('visible');
-        document.getElementById('transformResult').classList.remove('visible');
+        
+        dateInfoEl.innerHTML = `
+            <span style="color: #ed6c02;">⚠️ Ошибка загрузки даты</span>
+            <span style="display: block; font-size: 0.7rem; color: #a0aec0;">
+                Используется текущая дата
+            </span>
+        `;
     }
+}
 
     function closeTransformModal() {
         document.getElementById('transformModalOverlay').classList.remove('visible');
@@ -783,11 +854,16 @@
         
         const sourceEpoch = document.getElementById('sourceEpoch');
         const targetEpoch = document.getElementById('targetEpoch');
- 
+        
+        // Обмен значениями эпох
+        const tempEpoch = sourceEpoch.value;
+        sourceEpoch.value = targetEpoch.value;
+        targetEpoch.value = tempEpoch;
+        
         const tempCRS = sourceCRS.value;
         sourceCRS.value = targetCRS.value;
         targetCRS.value = tempCRS;
- 
+        
         document.querySelector(`input[name="sourceCoordType"][value="${targetType}"]`).checked = true;
         document.querySelector(`input[name="targetCoordType"][value="${sourceType}"]`).checked = true;
     }
@@ -806,6 +882,13 @@
             const sourceType = document.querySelector('input[name="sourceCoordType"]:checked').value;
             const targetType = document.querySelector('input[name="targetCoordType"]:checked').value;
             const heightSurface = document.getElementById('heightSurface').value;
+            const sourceEpoch = document.getElementById('sourceEpoch').value;
+            const targetEpoch = document.getElementById('targetEpoch').value;
+            
+            console.log('Transform params:', {
+                sourceCRS, targetCRS, sourceType, targetType, 
+                heightSurface, sourceEpoch, targetEpoch
+            });
             
             const coordinates = [currentTransformCoords.lon, currentTransformCoords.lat];
             if (currentTransformCoords.height && currentTransformCoords.height !== 0) {
@@ -826,8 +909,6 @@
                     }
                 }]
             };
-
-            const epoch = document.getElementById('transformEpoch').value;
             
             const params = new URLSearchParams({
                 source_crs: sourceCRS,
@@ -835,7 +916,8 @@
                 source_coord_type: sourceType,
                 target_coord_type: targetType,
                 height_surface: heightSurface,
-                epoch: epoch
+                source_epoch: sourceEpoch,
+                target_epoch: targetEpoch
             });
             
             const token = getToken();
@@ -866,64 +948,121 @@
     }
 
     function displayTransformResult(result, targetType) {
-        const resultDiv = document.getElementById('transformResult');
-        const coordDiv = document.getElementById('transformedCoordinates');
+    const resultDiv = document.getElementById('transformResult');
+    const coordDiv = document.getElementById('transformedCoordinates');
+    
+    let html = '';
+    
+    try {
+        let coords = result.target_coordinates;
         
-        let html = '';
-        
-        try {
-            let coords = result.target_coordinates;
-            
-            if (!coords || coords.length < 2) {
-                if (result.full_response && result.full_response.target_dataset) {
-                    const dataset = result.full_response.target_dataset;
-                    if (typeof dataset === 'string') {
-                        const parsed = JSON.parse(dataset);
-                        if (parsed.features && parsed.features[0]) {
-                            coords = parsed.features[0].geometry.coordinates;
-                        }
-                    } else if (dataset.features && dataset.features[0]) {
-                        coords = dataset.features[0].geometry.coordinates;
+        if (!coords || coords.length < 2) {
+            if (result.full_response && result.full_response.target_dataset) {
+                const dataset = result.full_response.target_dataset;
+                if (typeof dataset === 'string') {
+                    const parsed = JSON.parse(dataset);
+                    if (parsed.features && parsed.features[0]) {
+                        coords = parsed.features[0].geometry.coordinates;
                     }
+                } else if (dataset.features && dataset.features[0]) {
+                    coords = dataset.features[0].geometry.coordinates;
                 }
             }
-            
-            if (coords && coords.length >= 2) {
-                if (targetType === 'BLH') {
-                    html = `
-                        <div class="coordinate-value">B (широта) = ${formatCoord(coords[1])}°</div>
-                        <div class="coordinate-value">L (долгота) = ${formatCoord(coords[0])}°</div>
-                        ${coords[2] ? `<div class="coordinate-value">H (высота) = ${formatHeight(coords[2])} м</div>` : ''}
-                    `;
-                } else {
-                    html = `
-                        <div class="coordinate-value">X = ${formatCoord(coords[0])} м</div>
-                        <div class="coordinate-value">Y = ${formatCoord(coords[1])} м</div>
-                        ${coords[2] ? `<div class="coordinate-value">Z = ${formatCoord(coords[2])} м</div>` : ''}
-                    `;
-                }
-                
-                const copyText = coords.map(c => formatCoord(c)).join(', ');
-                html += `
-                    <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
-                        📋 Копировать
-                    </button>
-                `;
-                
-                showToast('Координаты успешно пересчитаны!', 'success');
-            } else {
-                html = '<div class="coordinate-value">Не удалось получить координаты</div>';
-                showToast('Не удалось получить результат', 'error');
-            }
-        } catch (e) {
-            console.error('Parse result error:', e);
-            html = '<div class="coordinate-value">Ошибка обработки результата</div>';
-            showToast('Ошибка обработки результата', 'error');
         }
         
-        coordDiv.innerHTML = html;
-        resultDiv.classList.add('visible');
+        if (coords && coords.length >= 2) {
+            // Исходные координаты для сравнения
+            const origLat = currentTransformCoords.lat;
+            const origLon = currentTransformCoords.lon;
+            const origHeight = currentTransformCoords.height || 0;
+            
+            // Новые координаты
+            const newLon = coords[0];
+            const newLat = coords[1];
+            const newHeight = coords[2] || 0;
+            
+            // Вычисляем разницу
+            const latDiff = (newLat - origLat) * 3600; // в секундах дуги
+            const lonDiff = (newLon - origLon) * 3600;
+            const heightDiff = newHeight - origHeight;
+            
+            // Приблизительное расстояние в метрах
+            // 1" широты ≈ 30.87 м
+            // 1" долготы ≈ 30.87 * cos(широта) м
+            const latDist = latDiff * 30.87;
+            const lonDist = lonDiff * 30.87 * Math.cos(origLat * Math.PI / 180);
+            const distMeters = Math.sqrt(latDist * latDist + lonDist * lonDist + heightDiff * heightDiff);
+            
+            // Определяем, была ли реальная трансформация
+            const hasSignificantChange = Math.abs(latDiff) > 0.0001 || Math.abs(lonDiff) > 0.0001 || Math.abs(heightDiff) > 0.001;
+            
+            if (targetType === 'BLH') {
+                html = `
+                    <div class="coordinate-value">B (широта) = ${formatCoord(newLat)}°</div>
+                    <div class="coordinate-value">L (долгота) = ${formatCoord(newLon)}°</div>
+                    ${newHeight ? `<div class="coordinate-value">H (высота) = ${formatHeight(newHeight)} м</div>` : ''}
+                    
+                    <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
+                        <div style="font-size: 0.8rem; color: #4a5568; margin-bottom: 5px;">
+                            <strong>Смещение относительно исходных:</strong>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #718096;">
+                            Δφ (широта) = ${latDiff.toFixed(6)}″<br>
+                            Δλ (долгота) = ${lonDiff.toFixed(6)}″<br>
+                            ${heightDiff !== 0 ? `ΔH (высота) = ${heightDiff.toFixed(3)} м<br>` : ''}
+                            <span style="display: inline-block; margin-top: 5px; padding: 3px 8px; background: ${hasSignificantChange ? '#c6f6d5' : '#fed7d7'}; border-radius: 4px; color: ${hasSignificantChange ? '#2f855a' : '#c53030'};">
+                                ${hasSignificantChange ? '✓' : '⚠'} Сдвиг ≈ ${distMeters.toFixed(3)} м
+                            </span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html = `
+                    <div class="coordinate-value">X = ${formatCoord(newLon)} м</div>
+                    <div class="coordinate-value">Y = ${formatCoord(newLat)} м</div>
+                    ${newHeight ? `<div class="coordinate-value">Z = ${formatCoord(newHeight)} м</div>` : ''}
+                    
+                    <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
+                        <div style="font-size: 0.8rem; color: #4a5568; margin-bottom: 5px;">
+                            <strong>Смещение относительно исходных:</strong>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #718096;">
+                            ΔX = ${(newLon - origLon).toFixed(4)} м<br>
+                            ΔY = ${(newLat - origLat).toFixed(4)} м<br>
+                            ${heightDiff !== 0 ? `ΔZ = ${heightDiff.toFixed(4)} м<br>` : ''}
+                            <span style="display: inline-block; margin-top: 5px; padding: 3px 8px; background: ${hasSignificantChange ? '#c6f6d5' : '#fed7d7'}; border-radius: 4px; color: ${hasSignificantChange ? '#2f855a' : '#c53030'};">
+                                ${hasSignificantChange ? '✓' : '⚠'} Сдвиг ≈ ${distMeters.toFixed(3)} м
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const copyText = coords.map(c => formatCoord(c)).join(', ');
+            html += `
+                <button class="btn-transform" onclick="copyToClipboard('${copyText}')" style="margin-top: 10px;">
+                    📋 Копировать координаты
+                </button>
+            `;
+            
+            if (hasSignificantChange) {
+                showToast('Координаты успешно пересчитаны!', 'success');
+            } else {
+                showToast('Предупреждение: смещение координат незначительно', 'error');
+            }
+        } else {
+            html = '<div class="coordinate-value">Не удалось получить координаты</div>';
+            showToast('Не удалось получить результат', 'error');
+        }
+    } catch (e) {
+        console.error('Parse result error:', e);
+        html = '<div class="coordinate-value">Ошибка обработки результата</div>';
+        showToast('Ошибка обработки результата', 'error');
     }
+    
+    coordDiv.innerHTML = html;
+    resultDiv.classList.add('visible');
+}
 
     function copyToClipboard(text) {
         navigator.clipboard?.writeText(text).then(() => {

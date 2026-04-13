@@ -20,6 +20,23 @@ func NewTaskStorage(pool *pgxpool.Pool) *TaskStorage {
 	return &TaskStorage{pool: pool}
 }
 
+func (s *TaskStorage) Pool() *pgxpool.Pool {
+	return s.pool
+}
+
+// UpdateTaskObservationDate обновляет дату наблюдения
+func (s *TaskStorage) UpdateTaskObservationDate(taskID string, date time.Time) error {
+	query := `UPDATE processing_tasks SET observation_date = $1 WHERE id = $2`
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := s.pool.Exec(ctx, query, date, taskID)
+	if err != nil {
+		return fmt.Errorf("update observation date: %w", err)
+	}
+	return nil
+}
+
 // InitTaskSchema создает таблицы для задач и результатов
 func (s *TaskStorage) InitTaskSchema() error {
 	_, err := s.pool.Exec(context.Background(), `
@@ -36,7 +53,8 @@ func (s *TaskStorage) InitTaskSchema() error {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			started_at TIMESTAMP,
 			completed_at TIMESTAMP,
-			processing_sec FLOAT
+			processing_sec FLOAT,
+			observation_date TIMESTAMP
 		);
 	`)
 	if err != nil {
@@ -100,6 +118,12 @@ func (s *TaskStorage) InitTaskSchema() error {
 	`)
 	if err != nil {
 		fmt.Printf("Trigger creation warning: %v\n", err)
+	}
+	_, err = s.pool.Exec(context.Background(), `
+    ALTER TABLE processing_tasks 
+    ADD COLUMN IF NOT EXISTS observation_date TIMESTAMP;`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to add observation_date column: %v\n", err)
 	}
 
 	return nil
@@ -237,9 +261,10 @@ func (s *TaskStorage) GetUserTasks(userLogin string, limit, offset int) ([]model
 // GetTaskByID возвращает задачу по ID
 func (s *TaskStorage) GetTaskByID(taskID string) (*model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, original_path, 
+		SELECT id, user_login, config, filename, original_path,
 		       rinex_path, output_path, status, error_message,
-		       created_at, started_at, completed_at, processing_sec
+		       created_at, started_at, completed_at, processing_sec,
+		       observation_date
 		FROM processing_tasks
 		WHERE id = $1
 	`
@@ -252,6 +277,7 @@ func (s *TaskStorage) GetTaskByID(taskID string) (*model.ProcessingTask, error) 
 		&task.OriginalPath, &task.RinexPath, &task.OutputPath,
 		&task.Status, &task.ErrorMessage, &task.CreatedAt,
 		&task.StartedAt, &task.CompletedAt, &task.ProcessingSec,
+		&task.ObservationDate,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {

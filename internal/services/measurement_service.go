@@ -117,11 +117,19 @@ func (s *MeasurementService) ProcessMeasurement(
 	rinexPath := convertedPath
 	s.logger.Infof("Converted to: %s", rinexPath)
 
-	// Определяем дату из RINEX
+	// После парсинга даты из RINEX (после строки с ParseObservationDate)
+	// После строки:
 	date, err := s.rinexParser.ParseObservationDate(rinexPath)
 	if err != nil {
 		s.logger.Warnf("Failed to parse RINEX date: %v, using current time", err)
 		date = time.Now()
+	}
+
+	// Добавьте сохранение даты в БД:
+	if err := s.taskStorage.UpdateTaskObservationDate(taskID, date); err != nil {
+		s.logger.Warnf("Failed to save observation date: %v", err)
+	} else {
+		s.logger.Infof("Saved observation date for task %s: %s", taskID, date.Format("2006-01-02"))
 	}
 
 	// Скачиваем необходимые файлы
