@@ -63,7 +63,6 @@ func (s *MeasurementService) ProcessMeasurement(
 	s.logger.Infof("Processing measurement: task=%s, method=%s, mode=%s, size=%.2f MB",
 		taskID, config.Method, config.Mode, float64(len(fileData))/(1024*1024))
 
-	// Обновляем статус на processing
 	now := time.Now()
 	task := &model.ProcessingTask{
 		ID:        taskID,
@@ -75,17 +74,14 @@ func (s *MeasurementService) ProcessMeasurement(
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
 
-	// Создаем рабочую директорию
 	workDir := filepath.Join(s.workDir, taskID)
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		s.handleError(taskID, login, fmt.Sprintf("Failed to create work directory: %v", err))
 		return err
 	}
 
-	// Сохраняем файл (потоковое копирование для больших файлов)
 	obsPath := filepath.Join(workDir, filename)
 
-	// Для больших файлов используем буферизованную запись
 	f, err := os.Create(obsPath)
 	if err != nil {
 		s.handleError(taskID, login, fmt.Sprintf("Failed to create file: %v", err))
@@ -93,8 +89,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	}
 	defer f.Close()
 
-	// Пишем с буфером 1 MB для оптимизации
-	buffer := make([]byte, 1024*1024) // 1 MB buffer
+	buffer := make([]byte, 1024*1024)
 	offset := 0
 	for offset < len(fileData) {
 		n := copy(buffer, fileData[offset:])
@@ -107,39 +102,37 @@ func (s *MeasurementService) ProcessMeasurement(
 
 	s.logger.Infof("File saved: %s (size: %.2f MB)", obsPath, float64(len(fileData))/(1024*1024))
 
-	// Конвертируем файл если нужно
+	// Конвертируем если нужно
 	convertedPath, err := s.converter.ConvertFile(obsPath, workDir)
 	if err != nil {
 		s.handleError(taskID, login, fmt.Sprintf("File conversion failed: %v", err))
 		return err
 	}
-
 	rinexPath := convertedPath
-	s.logger.Infof("Converted to: %s", rinexPath)
 
-	// После парсинга даты из RINEX (после строки с ParseObservationDate)
-	// После строки:
+	// Антенну читаем из оригинального файла (obsPath), потому что convbin
+	// при конвертации RINEX3→RINEX2 может изменить заголовок.
+	// GenerateConfig принимает obsPath как antennaSourcePath (variadic аргумент).
+	s.logger.Infof("Converted to: %s (antenna source: %s)", rinexPath, obsPath)
+
 	date, err := s.rinexParser.ParseObservationDate(rinexPath)
 	if err != nil {
 		s.logger.Warnf("Failed to parse RINEX date: %v, using current time", err)
 		date = time.Now()
 	}
 
-	// Добавьте сохранение даты в БД:
 	if err := s.taskStorage.UpdateTaskObservationDate(taskID, date); err != nil {
 		s.logger.Warnf("Failed to save observation date: %v", err)
 	} else {
 		s.logger.Infof("Saved observation date for task %s: %s", taskID, date.Format("2006-01-02"))
 	}
 
-	// Скачиваем необходимые файлы
 	files := &ProcessingFiles{}
 	files.NavigationFile, _ = s.downloader.DownloadBroadcastEphemeris(date, taskID)
 
 	var outputPath string
 	var procErr error
 
-	// Выбираем метод обработки
 	switch config.Method {
 	case model.MethodPPP:
 		s.logger.Infof("Using PPP method for task: %s", taskID)
@@ -150,7 +143,8 @@ func (s *MeasurementService) ProcessMeasurement(
 		files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
 		files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
 
-		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
+		// ← obsPath передаётся как источник для чтения антенны
+		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
@@ -164,7 +158,8 @@ func (s *MeasurementService) ProcessMeasurement(
 	case model.MethodRelative:
 		s.logger.Infof("Using Relative method for task: %s", taskID)
 
-		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
+		// ← obsPath передаётся как источник для чтения антенны
+		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
@@ -177,7 +172,8 @@ func (s *MeasurementService) ProcessMeasurement(
 	default: // MethodSingle
 		s.logger.Infof("Using Single Point Positioning for task: %s", taskID)
 
-		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath)
+		// ← obsPath передаётся как источник для чтения антенны
+		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
@@ -193,24 +189,20 @@ func (s *MeasurementService) ProcessMeasurement(
 		return procErr
 	}
 
-	// Читаем результат
 	outputData, err := os.ReadFile(outputPath)
 	if err != nil {
 		s.logger.Warnf("Failed to read output file: %v", err)
 		outputData = []byte("")
 	}
 
-	// Парсим результат
 	result := s.parseResult(outputData, taskID, login, config)
 	result.ExpiresAt = time.Now().Add(24 * time.Hour)
 
-	// Сохраняем результат в БД
 	if err := s.taskStorage.SaveResult(result); err != nil {
 		s.logger.Errorf("Failed to save result: %v", err)
 		return err
 	}
 
-	// Удаляем временную директорию задачи — файл хранится в БД
 	if err := os.RemoveAll(workDir); err != nil {
 		s.logger.Warnf("Failed to remove work directory %s: %v", workDir, err)
 	}

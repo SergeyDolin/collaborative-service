@@ -24,6 +24,14 @@ type ProcessingFiles struct {
 	BaseStationObs string
 }
 
+// AntennaInfo содержит тип антенны и смещения из заголовка RINEX
+type AntennaInfo struct {
+	Type   string  // тип + купол: "TRM57971.00     NONE"
+	DeltaH float64 // вертикаль (H в RINEX = U в RTKLIB) → ant1-antdelu
+	DeltaE float64 // восток                              → ant1-antdele
+	DeltaN float64 // север                               → ant1-antdeln
+}
+
 type ConfigGenerator struct {
 	templateDir string
 	workDir     string
@@ -38,17 +46,32 @@ func NewConfigGenerator(templateDir, workDir string, logger *zap.SugaredLogger) 
 	}
 }
 
-// GenerateConfig генерирует конфиг с информацией об антенне из RINEX файла
-func (g *ConfigGenerator) GenerateConfig(config model.UserProcessingConfig, taskID string, date time.Time, files *ProcessingFiles, rinexPath string) (string, error) {
-	var antennaType string
+// GenerateConfig генерирует конфиг с информацией об антенне из RINEX файла.
+//
+// rinexPath — сконвертированный файл для RTK-процессора.
+// antennaSourcePath (опционально) — оригинальный файл пользователя для чтения
+// антенны. Нужен потому что convbin при конвертации RINEX3→RINEX2 может изменить
+// заголовок и затереть ANT # / TYPE. Если не передан — используется rinexPath.
+func (g *ConfigGenerator) GenerateConfig(
+	config model.UserProcessingConfig,
+	taskID string,
+	date time.Time,
+	files *ProcessingFiles,
+	rinexPath string,
+	antennaSourcePath ...string,
+) (string, error) {
+	// Выбираем файл-источник для антенны
+	antFile := rinexPath
+	if len(antennaSourcePath) > 0 && antennaSourcePath[0] != "" {
+		antFile = antennaSourcePath[0]
+	}
 
-	// Извлекаем тип антенны из переданного RINEX файла
-	if rinexPath != "" {
-		antennaType = g.extractAntennaType(rinexPath)
-		g.logger.Infof("Extracted antenna type from RINEX: %s", antennaType)
+	var ant AntennaInfo
+	if antFile != "" {
+		ant = g.extractAntennaInfo(antFile)
 	} else {
-		g.logger.Warnf("No RINEX file provided for antenna extraction")
-		antennaType = "NONE"
+		g.logger.Warnf("[%s] No RINEX file provided for antenna extraction", taskID)
+		ant.Type = "NONE"
 	}
 
 	var templateName string
@@ -67,192 +90,202 @@ func (g *ConfigGenerator) GenerateConfig(config model.UserProcessingConfig, task
 		return "", fmt.Errorf("failed to read template: %w", err)
 	}
 
-	content := string(templateData)
-	content = g.replaceParameters(content, config, date, files, antennaType)
+	content := g.replaceParameters(string(templateData), config, date, files, ant)
 
 	configPath := filepath.Join(g.workDir, fmt.Sprintf("%s_config.conf", taskID))
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 		return "", fmt.Errorf("failed to write config: %w", err)
 	}
 
-	g.logger.Infof("Generated config for method %s: %s (antenna: %s)", config.Method, configPath, antennaType)
+	g.logger.Infof("[%s] Generated config: method=%s antenna=%q dH=%.4f dE=%.4f dN=%.4f",
+		taskID, config.Method, ant.Type, ant.DeltaH, ant.DeltaE, ant.DeltaN)
 	return configPath, nil
 }
 
-// extractAntennaType извлекает тип антенны + купол из строки "ANT # / TYPE"
-// заголовка RINEX 2/3 файла.
-//
-// Формат строки (RINEX 3, фиксированные столбцы по спецификации):
-//
-//	col  0–19  : серийный номер приёмника антенны (20 символов)
-//	col 20–39  : тип антенны (20 символов), например "TRM57971.00     NONE"
-//	col 40–59  : (padding / не используется)
-//	col 60–79  : метка "ANT # / TYPE"
-//
-// Однако на практике некоторые конвертеры (convbin, teqc) записывают поля
-// с отступом отличным от стандарта, поэтому сначала пробуем фиксированные
-// позиции, а если результат пустой — парсим по словам.
-func (g *ConfigGenerator) extractAntennaType(filePath string) string {
+// extractAntennaInfo читает заголовок RINEX-файла и возвращает тип антенны и смещения.
+func (g *ConfigGenerator) extractAntennaInfo(filePath string) AntennaInfo {
+	ant := AntennaInfo{Type: "NONE"}
+
 	f, err := os.Open(filePath)
 	if err != nil {
-		g.logger.Warnf("Failed to open file for antenna extraction: %v", err)
-		return "NONE"
+		g.logger.Warnf("extractAntennaInfo: cannot open %q: %v", filePath, err)
+		return ant
 	}
 	defer f.Close()
 
+	g.logger.Debugf("extractAntennaInfo: scanning %q", filePath)
+
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		// Убираем \r на случай Windows-переносов строк
-		line := strings.TrimRight(scanner.Text(), "\r")
+		line := strings.TrimRight(scanner.Text(), "\r\n")
 
 		if strings.Contains(line, "END OF HEADER") {
 			break
 		}
 
-		if !strings.Contains(line, "ANT # / TYPE") {
-			continue
-		}
-
-		// --- Метод 1: фиксированные позиции RINEX-спецификации ---
-		// Метка начинается с col 60; поле антенны — col 20..59 (40 символов).
-		if len(line) >= 40 {
-			end := 60
-			if len(line) < end {
-				end = len(line)
-			}
-			// Убираем метку из правой части если строка короче 60 символов
-			fieldArea := line[20:end]
-			// Отрезаем правые пробелы, но сохраняем внутренние
-			// (rtklib читает тип и купол как два слова разделённых пробелами)
-			candidate := strings.TrimRight(fieldArea, " ")
-			if candidate != "" {
-				g.logger.Infof("Antenna type (fixed-col): %q from file %s", candidate, filePath)
-				return candidate
+		if strings.Contains(line, "ANT # / TYPE") {
+			t := parseAntennaTypeLine(line)
+			g.logger.Infof("extractAntennaInfo: ANT line=%q parsed=%q", line, t)
+			if t != "" {
+				ant.Type = t
 			}
 		}
 
-		// --- Метод 2: парсинг по словам ---
-		// Отрезаем метку "ANT # / TYPE" и берём остаток слева.
-		// Пример: "1441112501          TRM57971.00     NONE                    ANT # / TYPE"
-		// После отрезания метки: "1441112501          TRM57971.00     NONE                    "
-		labelIdx := strings.Index(line, "ANT # / TYPE")
-		if labelIdx > 0 {
-			beforeLabel := strings.TrimRight(line[:labelIdx], " ")
-			// Теперь разбиваем на слова: [серийник, тип, купол]
-			// Серийник — первое слово (или пустое если нет), тип и купол — следующие
-			words := strings.Fields(beforeLabel)
-			// words[0] = серийник ("1441112501")
-			// words[1] = тип антенны ("TRM57971.00")
-			// words[2] = купол ("NONE") — опционально
-			if len(words) >= 2 {
-				antType := words[1]
-				if len(words) >= 3 {
-					antType = words[1] + "     " + words[2] // сохраняем разделитель для rtklib
-				}
-				g.logger.Infof("Antenna type (word-parse): %q from file %s", antType, filePath)
-				return antType
-			}
+		if strings.Contains(line, "ANTENNA: DELTA H/E/N") {
+			h, e, n := parseAntennaDeltaLine(line)
+			g.logger.Infof("extractAntennaInfo: DELTA line=%q H=%.4f E=%.4f N=%.4f", line, h, e, n)
+			ant.DeltaH = h
+			ant.DeltaE = e
+			ant.DeltaN = n
 		}
-
-		g.logger.Warnf("ANT # / TYPE line found but could not parse antenna: %q", line)
-		return "NONE"
 	}
 
 	if err := scanner.Err(); err != nil {
-		g.logger.Warnf("Error reading file %s: %v", filePath, err)
+		g.logger.Warnf("extractAntennaInfo: scan error %q: %v", filePath, err)
 	}
 
-	g.logger.Infof("ANT # / TYPE not found in header of %s, using NONE", filePath)
-	return "NONE"
+	g.logger.Infof("extractAntennaInfo: result type=%q dH=%.4f dE=%.4f dN=%.4f",
+		ant.Type, ant.DeltaH, ant.DeltaE, ant.DeltaN)
+	return ant
+}
+
+// parseAntennaTypeLine извлекает "тип+купол" из строки заголовка "ANT # / TYPE".
+//
+// Формат RINEX (фиксированные колонки):
+//
+//	col  0–19  серийный номер антенны
+//	col 20–59  тип антенны + купол  ← нужное поле
+//	col 60–79  метка "ANT # / TYPE"
+//
+// Пример:
+//
+//	"1441116772          TRM57971.00     NONE                    ANT # / TYPE"
+//	 ^col 0              ^col 20                                 ^col 60
+func parseAntennaTypeLine(line string) string {
+	labelIdx := strings.Index(line, "ANT # / TYPE")
+	if labelIdx < 0 {
+		return ""
+	}
+
+	// Поле данных заканчивается перед меткой
+	if labelIdx > 20 {
+		field := strings.TrimSpace(line[20:labelIdx])
+		if field != "" {
+			return field
+		}
+	}
+
+	// Резервный вариант: парсинг по словам
+	// words[0]=серийник, words[1]=тип, words[2]=купол
+	words := strings.Fields(line[:labelIdx])
+	switch len(words) {
+	case 0:
+		return ""
+	case 1:
+		return words[0]
+	case 2:
+		return words[1]
+	default:
+		return words[1] + "     " + words[2]
+	}
+}
+
+// parseAntennaDeltaLine извлекает смещения H, E, N из строки "ANTENNA: DELTA H/E/N".
+//
+// Формат RINEX (каждое поле — 14 символов, 4 знака):
+//
+//	col  0–13  delta H (вертикаль вверх)
+//	col 14–27  delta E (восток)
+//	col 28–41  delta N (север)
+//
+// Пример:
+//
+//	"        6.1661        0.0000        0.0000                  ANTENNA: DELTA H/E/N"
+func parseAntennaDeltaLine(line string) (dH, dE, dN float64) {
+	parseF := func(s string) float64 {
+		v, _ := strconv.ParseFloat(strings.TrimSpace(s), 64)
+		return v
+	}
+
+	// Правая граница данных — начало метки "ANTENNA:"
+	end := len(line)
+	if idx := strings.Index(line, "ANTENNA:"); idx > 0 {
+		end = idx
+	}
+	data := line[:end]
+
+	// Дополняем до минимум 42 символов пробелами, если данные короче
+	for len(data) < 42 {
+		data += " "
+	}
+
+	// Фиксированные позиции
+	dH = parseF(data[0:14])
+	dE = parseF(data[14:28])
+	dN = parseF(data[28:42])
+	return
+}
+
+// extractAntennaType оставлен для обратной совместимости
+func (g *ConfigGenerator) extractAntennaType(filePath string) string {
+	return g.extractAntennaInfo(filePath).Type
 }
 
 // findRINEXFile ищет RINEX файл в папке задачи
 func (g *ConfigGenerator) findRINEXFile(taskID string) string {
 	workDir := filepath.Join(g.workDir, taskID)
-
 	entries, err := os.ReadDir(workDir)
 	if err != nil {
 		g.logger.Warnf("Failed to read work directory: %v", err)
 		return ""
 	}
-
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-
 		name := entry.Name()
-		lowerName := strings.ToLower(name)
-
-		// Ищем файлы с расширениями .obs, .rnx, .o
-		if strings.HasSuffix(lowerName, ".obs") ||
-			strings.HasSuffix(lowerName, ".rnx") ||
-			strings.HasSuffix(lowerName, ".o") ||
-			strings.HasSuffix(lowerName, "converted.obs") {
+		lower := strings.ToLower(name)
+		if strings.HasSuffix(lower, ".obs") ||
+			strings.HasSuffix(lower, ".rnx") ||
+			strings.HasSuffix(lower, ".o") ||
+			strings.HasSuffix(lower, "converted.obs") {
 			return filepath.Join(workDir, name)
 		}
 	}
-
 	return ""
 }
 
-// isUnknownOrSmartphone проверяет, является ли антенна неизвестной или встроенной в смартфон
+// isUnknownOrSmartphone проверяет, является ли антенна неизвестной или встроенной
 func (g *ConfigGenerator) isUnknownOrSmartphone(antennaData string) bool {
-	lowerData := strings.ToLower(antennaData)
-
-	// Маркеры для определения отсутствия антенны или смартфона
+	lower := strings.ToLower(antennaData)
 	markers := []string{
-		"phone",
-		"mobile",
-		"smartphone",
-		"iphone",
-		"android",
-		"samsung",
-		"huawei",
-		"xiaomi",
-		"oppo",
-		"vivo",
-		"realme",
-		"internal",
-		"built-in",
-		"builtin",
-		"onboard",
-		"on-board",
-		"gnss receiver",
-		"chipset",
-		"soc",
-		"qualcomm",
-		"broadcom",
-		"mtk",
-		"mediatek",
-		"helix",
-		"sige",
-		"u-blox",
-		"ublox",
-		"unknown",
-		"n/a",
-		"na",
-		"not specified",
-		"notspecified",
-		"no antenna",
-		"noantenna",
-		"test",
-		"sim",
+		"phone", "mobile", "smartphone", "iphone", "android",
+		"samsung", "huawei", "xiaomi", "oppo", "vivo", "realme",
+		"internal", "built-in", "builtin", "onboard", "on-board",
+		"gnss receiver", "chipset", "soc", "qualcomm", "broadcom",
+		"mtk", "mediatek", "helix", "sige", "u-blox", "ublox",
+		"unknown", "n/a", "na", "not specified", "notspecified",
+		"no antenna", "noantenna", "test", "sim",
 	}
-
-	for _, marker := range markers {
-		if strings.Contains(lowerData, marker) {
+	for _, m := range markers {
+		if strings.Contains(lower, m) {
 			return true
 		}
 	}
-
 	return false
 }
 
 // replaceParameters заменяет плейсхолдеры в шаблоне конфига
-func (g *ConfigGenerator) replaceParameters(content string, config model.UserProcessingConfig, date time.Time, files *ProcessingFiles, antennaType string) string {
-	year := strconv.Itoa(date.Year())
-	doy := strconv.Itoa(date.YearDay())
+func (g *ConfigGenerator) replaceParameters(
+	content string,
+	config model.UserProcessingConfig,
+	date time.Time,
+	files *ProcessingFiles,
+	ant AntennaInfo,
+) string {
+	fmtDelta := func(v float64) string {
+		return strconv.FormatFloat(v, 'f', 4, 64)
+	}
 
 	replacements := map[string]string{
 		"{{POS_MODE}}":         g.getPosMode(config),
@@ -263,9 +296,13 @@ func (g *ConfigGenerator) replaceParameters(content string, config model.UserPro
 		"{{AR_MODE}}":          string(config.ARMode),
 		"{{TIDE_CORR}}":        g.boolToStr(config.TideCorr),
 		"{{SATELLITE_SYSTEM}}": strconv.Itoa(config.SatelliteSystem),
-		"{{YEAR}}":             year,
-		"{{DOY}}":              doy,
-		"{{ANT_TYPE}}":         antennaType,
+		"{{YEAR}}":             strconv.Itoa(date.Year()),
+		"{{DOY}}":              strconv.Itoa(date.YearDay()),
+		// Антенна: H из RINEX = U (вертикаль вверх) в RTKLIB
+		"{{ANT_TYPE}}":    ant.Type,
+		"{{ANT_DELTA_U}}": fmtDelta(ant.DeltaH),
+		"{{ANT_DELTA_E}}": fmtDelta(ant.DeltaE),
+		"{{ANT_DELTA_N}}": fmtDelta(ant.DeltaN),
 	}
 
 	if files.NavigationFile != "" {
@@ -294,7 +331,6 @@ func (g *ConfigGenerator) replaceParameters(content string, config model.UserPro
 	return content
 }
 
-// getPosMode определяет режим позиционирования
 func (g *ConfigGenerator) getPosMode(config model.UserProcessingConfig) string {
 	switch config.Method {
 	case model.MethodSingle:
@@ -314,7 +350,6 @@ func (g *ConfigGenerator) getPosMode(config model.UserProcessingConfig) string {
 	}
 }
 
-// boolToStr конвертирует boolean в "on"/"off"
 func (g *ConfigGenerator) boolToStr(b bool) string {
 	if b {
 		return "on"
