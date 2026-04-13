@@ -56,6 +56,8 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	sourceCoordType := r.URL.Query().Get("source_coord_type")
 	targetCoordType := r.URL.Query().Get("target_coord_type")
 	heightSurface := r.URL.Query().Get("height_surface")
+	sourceEpoch := r.URL.Query().Get("source_epoch")
+	targetEpoch := r.URL.Query().Get("target_epoch")
 
 	// Устанавливаем значения по умолчанию
 	if sourceCRS == "" {
@@ -69,6 +71,13 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	}
 	if targetCoordType == "" {
 		targetCoordType = "BLH"
+	}
+	today := time.Now().Format("2006-01-02")
+	if sourceEpoch == "" {
+		sourceEpoch = today
+	}
+	if targetEpoch == "" {
+		targetEpoch = today
 	}
 
 	// Извлекаем координаты из GeoJSON
@@ -95,7 +104,7 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	h.logger.Infof("Coordinates to transform: %v", coordinates)
 
 	// Сначала получаем код операции
-	operationCode := h.encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface)
+	operationCode := h.encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface, sourceEpoch, targetEpoch)
 	if operationCode == "" {
 		SendJSONError(w, "Failed to encode operation", http.StatusBadGateway, h.logger)
 		return
@@ -203,7 +212,7 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 }
 
 // encodeOperation получает код операции
-func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface string) string {
+func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface, sourceEpoch, targetEpoch string) string {
 	sourceMetadata := map[string]interface{}{
 		"crs": map[string]interface{}{
 			"referenceFrameID":   getReferenceFrameID(sourceCRS),
@@ -211,7 +220,7 @@ func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType
 			"representationType": sourceCoordType,
 		},
 		"epoch": map[string]interface{}{
-			"date": fmt.Sprintf("%d-07-02", time.Now().Year()),
+			"date": sourceEpoch,
 		},
 		"coord_type": sourceCoordType,
 	}
@@ -223,7 +232,7 @@ func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType
 			"representationType": targetCoordType,
 		},
 		"epoch": map[string]interface{}{
-			"date": fmt.Sprintf("%d-07-02", time.Now().Year()),
+			"date": targetEpoch,
 		},
 		"coord_type": targetCoordType,
 	}
@@ -231,6 +240,7 @@ func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType
 	encodeReq := map[string]interface{}{
 		"source_metadata": sourceMetadata,
 		"target_metadata": targetMetadata,
+		"height_surface":  heightSurface,
 	}
 
 	reqBody, _ := json.Marshal(encodeReq)

@@ -14,6 +14,28 @@
             color: #4a5568;
         }
 
+
+        .epoch-row {
+            margin-top: 10px;
+        }
+ 
+        .epoch-label {
+            display: block;
+            font-size: 0.8rem;
+            color: #718096;
+            margin-bottom: 4px;
+        }
+ 
+        .epoch-input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            font-size: 0.85rem;
+            box-sizing: border-box;
+        }
+
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
         .header {
@@ -264,7 +286,10 @@
         .modal-overlay {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,0.35);
-            z-index: 2000; align-items: center; justify-content: center;
+            z-index: 2000;
+            align-items: flex-start; justify-content: center;
+            overflow-y: auto;
+            padding: 20px 0;
         }
         .modal-overlay.visible { display: flex; }
 
@@ -273,12 +298,11 @@
             padding: 32px 28px; max-width: 420px; width: 90%;
             box-shadow: 0 8px 30px rgba(0,0,0,0.15);
             animation: modalIn 0.2s ease;
+            margin: auto;
         }
 
-        .transform-modal .modal {
+        .modal.transform-modal {
             max-width: 650px;
-            max-height: 90vh;
-            overflow-y: auto;
         }
 
         @keyframes modalIn {
@@ -351,6 +375,16 @@
             border-radius: 6px;
             background: white;
             font-size: 0.85rem;
+        }
+
+        .epoch-input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            font-size: 0.85rem;
+            box-sizing: border-box;
         }
 
         .swap-btn {
@@ -536,6 +570,7 @@
                 <option value="СК-95">СК-95</option>
             </select>
             
+            
             <div class="coord-type-select">
                 <label>
                     <input type="radio" name="sourceCoordType" value="BLH" checked> B,L,H (геодезические)
@@ -544,13 +579,18 @@
                     <input type="radio" name="sourceCoordType" value="XYZ"> X,Y,Z (геоцентрические)
                 </label>
             </div>
+ 
+                        <div class="epoch-row">
+                <label class="epoch-label">Эпоха исходных координат</label>
+                <input type="date" id="sourceEpoch" class="epoch-input">
+            </div>
         </div>
-        
+ 
         <!-- Кнопка обмена -->
         <div class="swap-btn">
             <button onclick="swapSystems()" title="Поменять направление">⇅</button>
         </div>
-        
+ 
         <!-- Целевая система -->
         <div class="transform-section">
             <h5>Целевая система координат</h5>
@@ -565,7 +605,7 @@
                 <option value="СК-42">СК-42</option>
                 <option value="СК-95">СК-95</option>
             </select>
-            
+ 
             <div class="coord-type-select">
                 <label>
                     <input type="radio" name="targetCoordType" value="BLH" checked> B,L,H (геодезические)
@@ -574,8 +614,13 @@
                     <input type="radio" name="targetCoordType" value="XYZ"> X,Y,Z (геоцентрические)
                 </label>
             </div>
+ 
+            <div class="epoch-row">
+                <label class="epoch-label">Эпоха целевых координат</label>
+                <input type="date" id="targetEpoch" class="epoch-input">
+            </div>
         </div>
-        
+ 
         <!-- Настройки высоты -->
         <div class="transform-section height-section">
             <h5>Отсчетная поверхность для высоты</h5>
@@ -585,7 +630,7 @@
                 <option value="EGM2008">Геоид EGM2008</option>
             </select>
         </div>
-        
+
         <div id="transformResult" class="transform-result">
             <h5 style="margin-bottom: 10px;">Результат пересчета:</h5>
             <div id="transformedCoordinates"></div>
@@ -718,7 +763,9 @@
         document.getElementById('targetCRS').value = 'ГСК-2011';
         document.querySelector('input[name="targetCoordType"][value="BLH"]').checked = true;
         document.getElementById('heightSurface').value = 'ELLIPSOID';
-        
+        const today = new Date().toISOString().slice(0, 10);
+        document.getElementById('sourceEpoch').value = today;
+        document.getElementById('targetEpoch').value = today;
         document.getElementById('transformModalOverlay').classList.add('visible');
         document.getElementById('transformResult').classList.remove('visible');
     }
@@ -734,10 +781,13 @@
         const sourceType = document.querySelector('input[name="sourceCoordType"]:checked').value;
         const targetType = document.querySelector('input[name="targetCoordType"]:checked').value;
         
+        const sourceEpoch = document.getElementById('sourceEpoch');
+        const targetEpoch = document.getElementById('targetEpoch');
+ 
         const tempCRS = sourceCRS.value;
         sourceCRS.value = targetCRS.value;
         targetCRS.value = tempCRS;
-        
+ 
         document.querySelector(`input[name="sourceCoordType"][value="${targetType}"]`).checked = true;
         document.querySelector(`input[name="targetCoordType"][value="${sourceType}"]`).checked = true;
     }
@@ -776,13 +826,16 @@
                     }
                 }]
             };
+
+            const epoch = document.getElementById('transformEpoch').value;
             
             const params = new URLSearchParams({
                 source_crs: sourceCRS,
                 target_crs: targetCRS,
                 source_coord_type: sourceType,
                 target_coord_type: targetType,
-                height_surface: heightSurface
+                height_surface: heightSurface,
+                epoch: epoch
             });
             
             const token = getToken();
