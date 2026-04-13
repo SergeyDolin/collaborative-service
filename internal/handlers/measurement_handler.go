@@ -13,7 +13,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -329,12 +328,11 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 
 	// Отложенная очистка: удаляем всю папку с временными файлами в конце
 	defer func() {
-		taskWorkDir := filepath.Join(defaultWorkDir, taskID)
-		h.logger.Debugf("Cleaning up task directory: %s", taskWorkDir)
-		if err := os.RemoveAll(taskWorkDir); err != nil {
-			h.logger.Warnf("Failed to remove task directory %s: %v", taskWorkDir, err)
+		h.logger.Debugf("Cleaning up temporary directory: %s", defaultWorkDir)
+		if err := os.RemoveAll(defaultWorkDir); err != nil {
+			h.logger.Warnf("Failed to remove work directory %s: %v", defaultWorkDir, err)
 		} else {
-			h.logger.Infof("Successfully cleaned up task directory: %s", taskWorkDir)
+			h.logger.Infof("Successfully cleaned up work directory: %s", defaultWorkDir)
 		}
 	}()
 

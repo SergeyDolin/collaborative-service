@@ -80,6 +80,9 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 		targetEpoch = today
 	}
 
+	h.logger.Infof("Transform request: source_crs=%s target_crs=%s source_epoch=%s target_epoch=%s",
+		sourceCRS, targetCRS, sourceEpoch, targetEpoch)
+
 	// Извлекаем координаты из GeoJSON
 	var coordinates []float64
 	if features, ok := geojson["features"].([]interface{}); ok && len(features) > 0 {
@@ -103,16 +106,23 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 
 	h.logger.Infof("Coordinates to transform: %v", coordinates)
 
-	// Сначала получаем код операции
-	operationCode := h.encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface, sourceEpoch, targetEpoch)
+	// Получаем код операции.
+	// Эпохи передаются в encodeOperation: они влияют на выбор параметров трансформации
+	// (модели скоростей плит, реализации ITRF и т.д.).
+	operationCode := h.encodeOperation(
+		sourceCRS, targetCRS,
+		sourceCoordType, targetCoordType,
+		heightSurface,
+		sourceEpoch, targetEpoch,
+	)
 	if operationCode == "" {
 		SendJSONError(w, "Failed to encode operation", http.StatusBadGateway, h.logger)
 		return
 	}
 
-	h.logger.Infof("Got operation code: %s", operationCode)
+	h.logger.Infof("Operation code: %s", operationCode)
 
-	// Создаем source_dataset как строку (GeoJSON)
+	// Формируем source_dataset
 	sourceDataset := map[string]interface{}{
 		"type": "FeatureCollection",
 		"features": []interface{}{
@@ -129,10 +139,11 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 		},
 	}
 
-	// Преобразуем в JSON строку
 	sourceDatasetJSON, _ := json.Marshal(sourceDataset)
 
-	// Отправляем запрос с source_dataset как строкой и эпохами
+	// Передаём operation_code, source_dataset и ОБЯЗАТЕЛЬНО обе эпохи.
+	// Эпохи нужны не только для encode (выбор трансформации),
+	// но и для вычисления (интерполяция скоростей движения плит во времени).
 	transformReq := map[string]interface{}{
 		"operation_code": operationCode,
 		"source_dataset": string(sourceDatasetJSON),
@@ -142,9 +153,7 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 
 	reqBody, _ := json.Marshal(transformReq)
 
-	h.logger.Infof("Transform request: operation_code=%s, source_epoch=%s, target_epoch=%s",
-		operationCode, sourceEpoch, targetEpoch)
-	h.logger.Debugf("Request body: %s", string(reqBody))
+	h.logger.Debugf("Transform request body: %s", string(reqBody))
 
 	resp, err := h.client.Post(
 		"https://geocentric.xyz/api/operation/from_code/geojson",
@@ -152,15 +161,15 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 		bytes.NewReader(reqBody),
 	)
 	if err != nil {
-		h.logger.Errorf("Transform failed: %v", err)
+		h.logger.Errorf("Transform POST failed: %v", err)
 		SendJSONError(w, "Transform failed", http.StatusBadGateway, h.logger)
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
-	h.logger.Infof("Response status: %d", resp.StatusCode)
-	h.logger.Debugf("Response body: %s", string(respBody))
+	h.logger.Infof("Transform response: status=%d", resp.StatusCode)
+	h.logger.Debugf("Transform response body: %s", string(respBody))
 
 	if resp.StatusCode != http.StatusOK {
 		SendJSONError(w, fmt.Sprintf("Transform failed: %s", string(respBody)), resp.StatusCode, h.logger)
@@ -170,18 +179,16 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	var result map[string]interface{}
 	json.Unmarshal(respBody, &result)
 
-	// Извлекаем трансформированные координаты
+	// Извлекаем трансформированные координаты из target_dataset
 	var targetCoords []float64
-
-	// Сначала пробуем из target_dataset (может быть строкой или объектом)
 	if targetDataset, ok := result["target_dataset"]; ok && targetDataset != nil {
 		var dataset map[string]interface{}
 
-		// Если это строка, парсим её
-		if str, ok := targetDataset.(string); ok {
-			json.Unmarshal([]byte(str), &dataset)
-		} else if obj, ok := targetDataset.(map[string]interface{}); ok {
-			dataset = obj
+		switch v := targetDataset.(type) {
+		case string:
+			json.Unmarshal([]byte(v), &dataset)
+		case map[string]interface{}:
+			dataset = v
 		}
 
 		if dataset != nil {
@@ -201,11 +208,15 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	h.logger.Infof("Transform result: source=%v target=%v", coordinates, targetCoords)
+
 	response := map[string]interface{}{
 		"success":            true,
 		"source_coordinates": coordinates,
 		"target_coordinates": targetCoords,
 		"operation_code":     operationCode,
+		"source_epoch":       sourceEpoch,
+		"target_epoch":       targetEpoch,
 		"full_response":      result,
 	}
 
@@ -214,20 +225,21 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	h.logger.Info("Transform completed!")
 }
 
-// encodeOperation получает код операции
-// encodeOperation получает код операции
-func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface, sourceEpoch, targetEpoch string) string {
-	// Форматируем эпоху как "YYYY-MM-DD"
-	// Убеждаемся, что дата в правильном формате
-	if sourceEpoch != "" {
-		if t, err := time.Parse("2006-01-02", sourceEpoch); err == nil {
-			sourceEpoch = t.Format("2006-01-02")
-		}
+// encodeOperation запрашивает код операции у geocentric.xyz.
+// Эпохи влияют на выбор параметров трансформации (скорости тектонических плит,
+// реализации ITRF, поправки за движение полюса и т.д.).
+func (h *TransformHandler) encodeOperation(
+	sourceCRS, targetCRS string,
+	sourceCoordType, targetCoordType string,
+	heightSurface string,
+	sourceEpoch, targetEpoch string,
+) string {
+	// Нормализуем формат дат до YYYY-MM-DD
+	if t, err := time.Parse("2006-01-02", sourceEpoch); err == nil {
+		sourceEpoch = t.Format("2006-01-02")
 	}
-	if targetEpoch != "" {
-		if t, err := time.Parse("2006-01-02", targetEpoch); err == nil {
-			targetEpoch = t.Format("2006-01-02")
-		}
+	if t, err := time.Parse("2006-01-02", targetEpoch); err == nil {
+		targetEpoch = t.Format("2006-01-02")
 	}
 
 	sourceMetadata := map[string]interface{}{
@@ -262,7 +274,8 @@ func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType
 
 	reqBody, _ := json.Marshal(encodeReq)
 
-	h.logger.Infof("Encode request: %s", string(reqBody))
+	h.logger.Infof("encodeOperation: %s@%s -> %s@%s", sourceCRS, sourceEpoch, targetCRS, targetEpoch)
+	h.logger.Debugf("encodeOperation body: %s", string(reqBody))
 
 	resp, err := h.client.Post(
 		"https://geocentric.xyz/api/operation/encode",
@@ -270,21 +283,21 @@ func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType
 		bytes.NewReader(reqBody),
 	)
 	if err != nil {
-		h.logger.Errorf("Failed to encode: %v", err)
+		h.logger.Errorf("encodeOperation failed: %v", err)
 		return ""
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
-	operationCode := strings.Trim(string(respBody), "\"\n ")
+	h.logger.Debugf("encodeOperation response: status=%d body=%s", resp.StatusCode, string(respBody))
 
-	h.logger.Infof("Got operation code: %s for source_epoch=%s, target_epoch=%s",
-		operationCode, sourceEpoch, targetEpoch)
+	operationCode := strings.Trim(string(respBody), "\"\n ")
+	h.logger.Infof("encodeOperation result: %q", operationCode)
 
 	return operationCode
 }
 
-// getReferenceFrameID возвращает правильный код referenceFrameID
+// getReferenceFrameID возвращает внутренний ID системы координат для geocentric.xyz
 func getReferenceFrameID(crsName string) string {
 	mapping := map[string]string{
 		"WGS84(G1150)": "WGS84G1150GOST",
@@ -309,7 +322,7 @@ func getReferenceFrameID(crsName string) string {
 	return "WGS84G1150GOST"
 }
 
-// TransformStatus проверяет статус сервиса
+// TransformStatus проверяет доступность сервиса трансформации
 func (h *TransformHandler) TransformStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"ok","message":"Transform service ready"}`))
