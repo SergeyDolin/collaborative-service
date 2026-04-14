@@ -2,6 +2,7 @@ package validators
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"collaborative/internal/model"
@@ -74,21 +75,32 @@ func NewFileValidator() *FileValidator {
 	return &FileValidator{maxSize: 100 * 1024 * 1024 * 1024} // 1 GB
 }
 
-var validExtensions = []string{".obs", ".rnx", ".crx", ".gz", ".o"}
+// reHatanakaExt соответствует расширению .YYd / .YYD — Hatanaka compact RINEX 2.
+// Формат: точка, две цифры двузначного года, буква d или D.
+// Примеры: .24d  .23d  .99D
+var reHatanakaExt = regexp.MustCompile(`\.\d{2}[dD]$`)
+
+// isValidExtension возвращает true если расширение файла допустимо.
+func isValidExtension(lower string) bool {
+	fixed := []string{".obs", ".rnx", ".crx", ".gz", ".o"}
+	for _, ext := range fixed {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+	return reHatanakaExt.MatchString(lower)
+}
 
 func (v *FileValidator) ValidateFilename(filename string) error {
 	if filename == "" {
 		return fmt.Errorf("filename is required")
 	}
-
-	lower := strings.ToLower(filename)
-	for _, ext := range validExtensions {
-		if strings.HasSuffix(lower, ext) {
-			return nil
-		}
+	if !isValidExtension(strings.ToLower(filename)) {
+		return fmt.Errorf(
+			"unsupported file format; supported: .obs, .rnx, .crx, .gz, .o, .YYd (Hatanaka, e.g. .24d)",
+		)
 	}
-
-	return fmt.Errorf("unsupported file format, supported: %s", strings.Join(validExtensions, ", "))
+	return nil
 }
 
 func (v *FileValidator) ValidateFileSize(size int64) error {

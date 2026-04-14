@@ -280,9 +280,9 @@
                 <div class="file-icon">📁</div>
                 <div>Нажмите или перетащите файл наблюдений</div>
                 <div class="file-info" id="fileInfo">
-                    Поддерживаются форматы: RINEX (.obs, .rnx, .crx), сжатые (.gz)
+                    Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYd), сжатые (.gz)
                 </div>
-                <input type="file" id="fileInput" style="display: none" accept=".obs,.rnx,.crx,.gz,.o">
+                <input type="file" id="fileInput" style="display: none" accept=".obs,.rnx,.crx,.26d,.23d,.99D,.24d,.25d,.20d,.21d,.22d,.gz,.o">
             </div>
             
             <button id="processBtn" class="btn-primary" onclick="startProcessing()" disabled>
@@ -526,7 +526,7 @@
                     // Очищаем форму
                     selectedFile = null;
                     selectedMethod = null;
-                    document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx), сжатые (.gz)';
+                    document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYd), сжатые (.gz)';
                     document.getElementById('fileInfo').style.color = '#718096';
                     document.querySelectorAll('.method-option[data-method]').forEach(opt => {
                         opt.classList.remove('selected');
