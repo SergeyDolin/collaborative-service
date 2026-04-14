@@ -15,9 +15,10 @@ import (
 // staticCRS — системы координат с фиксированной эпохой (не зависят от даты наблюдения).
 // Для них эпоха всегда определена самим определением системы.
 var staticCRS = map[string]string{
-	"ГСК-2011": "2011-01-01",
-	"СК-42":    "1942-01-01",
-	"СК-95":    "1995-01-01",
+	"ГСК-2011":     "2011-01-01",
+	"СК-42":        "1942-01-01",
+	"СК-95":        "1995-01-01",
+	"WGS84(G1150)": "2010-01-01",
 }
 
 // isStaticCRS возвращает true если СК статическая (фиксированная эпоха).
@@ -80,7 +81,7 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	targetEpochRaw := r.URL.Query().Get("target_epoch")
 
 	if sourceCRS == "" {
-		sourceCRS = "WGS84(G1150)"
+		sourceCRS = "ITRF2020"
 	}
 	if targetCRS == "" {
 		targetCRS = "ГСК-2011"
@@ -293,7 +294,7 @@ func getReferenceFrameID(crsName string) string {
 	if code, ok := mapping[crsName]; ok {
 		return code
 	}
-	return "WGS84G1150GOST"
+	return "ITRF2020"
 }
 
 func (h *TransformHandler) TransformStatus(w http.ResponseWriter, r *http.Request) {

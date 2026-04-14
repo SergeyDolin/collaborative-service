@@ -221,7 +221,6 @@ func (s *MeasurementService) ProcessMeasurement(
 }
 
 // parseResult парсит результаты обработки и находит лучшее решение
-// parseResult парсит результаты обработки и находит лучшее решение
 func (s *MeasurementService) parseResult(
 	outputData []byte,
 	taskID string,
@@ -251,11 +250,11 @@ func (s *MeasurementService) parseResult(
 	}
 
 	var solutions []Solution
-	var lastSolution *Solution
+	var absoluteLastSolution *Solution // Самая последняя валидная строка
 
 	// Счетчики для статистики внутри файла
-	var totalEpochs int // Всего эпох с Q=1 или Q=6
-	var fixEpochs int   // Эпохи с Q=1
+	var totalEpochs int
+	var fixEpochs int
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -302,7 +301,7 @@ func (s *MeasurementService) parseResult(
 		}
 
 		solutions = append(solutions, sol)
-		lastSolution = &sol
+		absoluteLastSolution = &sol // ВСЕГДА обновляем на последнюю валидную строку
 
 		// Считаем статистику внутри файла
 		if sol.Q == 1 || sol.Q == 6 {
@@ -320,33 +319,34 @@ func (s *MeasurementService) parseResult(
 			taskID, result.FixRate, fixEpochs, totalEpochs)
 	}
 
-	// Ищем лучшее решение
+	// Ищем лучшее FIX решение (Q=1) с конца
 	var bestSolution *Solution
-
-	// Сначала ищем Q=1 с конца
 	for i := len(solutions) - 1; i >= 0; i-- {
 		if solutions[i].Q == 1 {
 			bestSolution = &solutions[i]
+			s.logger.Infof("Found best FIX solution (Q=1) at epoch %d", i+1)
 			break
 		}
 	}
 
-	// Если Q=1 не найдено, ищем Q=6
+	// Если Q=1 не найдено, ищем Q=6 (FLOAT)
 	if bestSolution == nil {
 		for i := len(solutions) - 1; i >= 0; i-- {
 			if solutions[i].Q == 6 {
 				bestSolution = &solutions[i]
+				s.logger.Infof("Found best FLOAT solution (Q=6) at epoch %d", i+1)
 				break
 			}
 		}
 	}
 
-	// Если и Q=6 нет, берем последнее решение
-	if bestSolution == nil && lastSolution != nil {
-		bestSolution = lastSolution
+	// Если ничего не найдено, берем последнее решение
+	if bestSolution == nil && absoluteLastSolution != nil {
+		bestSolution = absoluteLastSolution
+		s.logger.Infof("Using absolute last solution with Q=%d", bestSolution.Q)
 	}
 
-	// Заполняем результат
+	// Заполняем результат из лучшего решения
 	if bestSolution != nil {
 		result.Latitude = bestSolution.Lat
 		result.Longitude = bestSolution.Lon
@@ -356,9 +356,16 @@ func (s *MeasurementService) parseResult(
 		result.SDX = bestSolution.SDX
 		result.SDY = bestSolution.SDY
 		result.SDZ = bestSolution.SDZ
-		result.LastSolutionLine = bestSolution.Line
 	}
 
+	// ВСЕГДА сохраняем последнюю строку решения (последнюю эпоху)
+	if absoluteLastSolution != nil {
+		result.LastSolutionLine = absoluteLastSolution.Line
+		s.logger.Infof("Saved last solution line: Q=%d, Lat=%.8f, Lon=%.8f",
+			absoluteLastSolution.Q, absoluteLastSolution.Lat, absoluteLastSolution.Lon)
+	}
+
+	// Определяем тип файла
 	if config.Mode == model.ModeStatic {
 		result.FileType = "static"
 	} else {

@@ -7,6 +7,65 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        
+                .dual-solution {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        
+        .solution-box {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            border-left: 3px solid;
+        }
+        
+        .solution-box.fix {
+            border-left-color: #68d391;
+            background: #f0fff4;
+        }
+        
+        .solution-box.float {
+            border-left-color: #ed8936;
+            background: #fffaf0;
+        }
+        
+        .solution-box.last {
+            border-left-color: #a0aec0;
+            background: #f7fafc;
+        }
+        
+        .solution-header {
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .solution-coords {
+            font-family: 'Consolas', monospace;
+            font-size: 0.7rem;
+            color: #4a5568;
+            line-height: 1.5;
+        }
+        
+        .warning-message {
+            background: #fff5f5;
+            border: 1px solid #feb2b2;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: #c53030;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         body {
             font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
@@ -479,11 +538,11 @@
         <div class="transform-section">
             <h5>Исходная система координат</h5>
             <select id="sourceCRS" class="crs-select">
-                <option value="WGS84(G1150)" selected>WGS84 (G1150)</option>
-                <option value="ITRF2020">ITRF2020</option>
+                <option value="ITRF2020" selected>ITRF2020</option>
                 <option value="ITRF2014">ITRF2014</option>
                 <option value="ITRF2008">ITRF2008</option>
                 <option value="ITRF2005">ITRF2005</option>
+                <option value="WGS84(G1150)">WGS84 (G1150)</option>
                 <option value="ГСК-2011">ГСК-2011</option>
                 <option value="ПЗ-90.11">ПЗ-90.11</option>
                 <option value="СК-42">СК-42</option>
@@ -555,7 +614,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-    const STATIC_CRS = new Set(['ГСК-2011', 'СК-42', 'СК-95', 'ПЗ-90', 'ПЗ-90.02', 'ПЗ-90.11']);
+    const STATIC_CRS = new Set(['ГСК-2011', 'СК-42', 'СК-95', 'ПЗ-90', 'ПЗ-90.02', 'ПЗ-90.11', 'WGS84(G1150)']);
 
     let isLoading = false;
     let selectMode = false;
@@ -661,7 +720,7 @@
                 </span>
             </div>`;
 
-        document.getElementById('sourceCRS').value = 'WGS84(G1150)';
+        document.getElementById('sourceCRS').value = 'ITRF2020';
         document.querySelector('input[name="sourceCoordType"][value="BLH"]').checked = true;
         document.getElementById('targetCRS').value = 'ГСК-2011';
         document.querySelector('input[name="targetCoordType"][value="BLH"]').checked = true;
@@ -1104,37 +1163,81 @@
                 const mode   = (task.fileType === 'static' || task.config?.mode === 'static') ? 'Статика' : 'Кинематика';
                 const status = task.status || 'pending';
 
-                let resultHtml = '';
+                                let resultHtml = '';
                 
                 if (status === 'completed' && task.result) {
                     const r = task.result;
                     const hasCoords = r.latitude || r.longitude;
-                    const lat    = formatCoord(r.latitude);
-                    const lon    = formatCoord(r.longitude);
+                    const lat = formatCoord(r.latitude);
+                    const lon = formatCoord(r.longitude);
                     const height = r.height ? formatHeight(r.height) : null;
-
-                    const qStatus = getSolutionStatus(r.q);
                     
-                    // Процент FIX внутри этого файла
+                    const qStatus = getSolutionStatus(r.q);
                     const fixRate = r.fixRate ? r.fixRate.toFixed(1) : null;
-                    const fixRateHtml = fixRate ? `
-                        <span style="margin-left: 6px; font-size: 0.65rem; opacity: 0.8;">
-                            ${fixRate}%
-                        </span>
-                    ` : '';
-
+                    
                     const statsHtml = `
                         <div class="stats-info">
-                            <span>${qStatus}${fixRateHtml}</span>
+                            <span>${qStatus}${fixRate ? ` (${fixRate}%)` : ''}</span>
                             ${r.nSat ? `<span>🛰️ ${r.nSat}</span>` : ''}
                         </div>`;
 
-                    const coordsHtml = hasCoords ? `
-                        <table class="coords-table">
-                            <tr><td>φ</td><td>${lat}°</td></tr>
-                            <tr><td>λ</td><td>${lon}°</td></tr>
-                            ${height ? `<tr><td>h</td><td>${height} м</td></tr>` : ''}
-                        </table>` : '';
+                    // Всегда парсим последнюю строку если она есть
+                    let lastSolutionHtml = '';
+                    let bestFixHtml = '';
+                    
+                    if (r.lastSolutionLine) {
+                        const lastFields = r.lastSolutionLine.trim().split(/\s+/);
+                        let lastLat, lastLon, lastHeight, lastQ;
+                        
+                        if (lastFields.length >= 5) {
+                            lastLat = parseFloat(lastFields[2]);
+                            lastLon = parseFloat(lastFields[3]);
+                            lastHeight = parseFloat(lastFields[4]);
+                        }
+                        if (lastFields.length >= 6) {
+                            lastQ = parseInt(lastFields[5]);
+                        }
+                        
+                        const lastQStatus = lastQ === 1 ? '🎯 FIX' : lastQ === 6 ? '📊 FLOAT' : `Q=${lastQ}`;
+                        const lastBoxClass = lastQ === 1 ? 'fix' : 'float';
+                        
+                        lastSolutionHtml = `
+                                <div class="solution-coords">
+                                    ${!isNaN(lastLat) ? `B: ${lastLat.toFixed(8)}°<br>` : ''}
+                                    ${!isNaN(lastLon) ? `L: ${lastLon.toFixed(8)}°<br>` : ''}
+                                    ${!isNaN(lastHeight) ? `H: ${lastHeight.toFixed(4)} м` : ''}
+                                </div>
+                            
+                        `;
+                    } else {
+                        // Если нет lastSolutionLine, показываем обычные координаты
+                        lastSolutionHtml = hasCoords ? `
+                            <div class="solution-box last fix">
+                                <div class="solution-header">
+                                    <span>📋 Решение</span>
+                                    <span style="font-size:0.65rem; opacity:0.7;">${qStatus}</span>
+                                </div>
+                                <div class="solution-coords">
+                                    B: ${lat}°<br>
+                                    L: ${lon}°<br>
+                                    ${height ? `H: ${height} м` : ''}
+                                </div>
+                            </div>
+                        ` : '';
+                    }
+                    
+                    // Формируем отображение
+                    let coordsDisplay = '';
+                    if (bestFixHtml) {
+                        coordsDisplay = `
+                            <div class="dual-solution">
+                                ${lastSolutionHtml}
+                                ${bestFixHtml}
+                            </div>
+                        `;
+                    } else {
+                        coordsDisplay = lastSolutionHtml;
+                    }
 
                     const dlHtml = task.fileType !== 'static'
                         ? `<button class="download-btn" onclick="downloadResult('${task.id}', event)">📥 Скачать .pos</button>`
@@ -1147,7 +1250,7 @@
                     resultHtml = `
                         <div class="result-block">
                             ${statsHtml}
-                            ${coordsHtml}
+                            ${coordsDisplay}
                             <div class="action-buttons">${dlHtml}${transformBtn}</div>
                         </div>`;
                 }
