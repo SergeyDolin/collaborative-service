@@ -324,6 +324,7 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 	const (
 		defaultWorkDir   = "./tmp"
 		defaultConfigDir = "./cmd/solver/configs"
+		defaultSolverDir = "./cmd/solver/app"
 	)
 
 	// Отложенная очистка: удаляем всю папку с временными файлами в конце
@@ -338,8 +339,8 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 
 	configGen := services.NewConfigGenerator(defaultConfigDir, defaultWorkDir, h.logger)
 	downloader := services.NewFileDownloader(defaultWorkDir, h.logger)
-	converter := services.NewConverterService(defaultConfigDir, h.logger)
-	rtk := services.NewRTKService(defaultConfigDir, defaultWorkDir, h.logger)
+	converter := services.NewConverterService(defaultSolverDir, h.logger)
+	rtk := services.NewRTKService(defaultSolverDir, defaultWorkDir, h.logger)
 	fileSvc := services.NewFileService(defaultWorkDir, h.logger)
 
 	measurementSvc := services.NewMeasurementService(
