@@ -323,7 +323,7 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 
 	const (
 		defaultWorkDir   = "./tmp"
-		defaultConfigDir = "./cmd/solver/app"
+		defaultConfigDir = "./cmd/solver/configs"
 	)
 
 	// Отложенная очистка: удаляем всю папку с временными файлами в конце

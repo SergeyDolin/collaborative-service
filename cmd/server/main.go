@@ -73,19 +73,16 @@ func NewApplication(cfg *config.Config, logger *zap.SugaredLogger) (*Application
 		cancel: cancel,
 	}
 
-	// Инициализация хранилища
 	if err := app.initStorage(cfg); err != nil {
 		return nil, err
 	}
 
-	// Инициализация сервиса вспомогательных функций
 	app.workerMgr = workers.NewManager(
 		app.logger,
 		app.taskStorage,
 		DefaultWorkDir,
 	)
 
-	// Инициализация HTTP маршрутов
 	router := app.setupRoutes(cfg)
 
 	app.server = &http.Server{
@@ -120,6 +117,13 @@ func (app *Application) initStorage(cfg *config.Config) error {
 	}
 	app.logger.Info("Task schema initialized")
 
+	// Инициализируем схему профилей и устройств
+	if err := app.dbStorage.InitProfileSchema(); err != nil {
+		app.logger.Warnf("Profile schema init warning: %v", err)
+	} else {
+		app.logger.Info("Profile schema initialized")
+	}
+
 	return nil
 }
 
@@ -127,7 +131,6 @@ func (app *Application) initStorage(cfg *config.Config) error {
 func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	router := chi.NewRouter()
 
-	// Middleware
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Recoverer)
@@ -142,22 +145,24 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 		http.Error(w, "Invalid path format", http.StatusNotFound)
 	})
 
-	// Инициализация JWT сервиса
 	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.TokenExpiry)
 	app.logger.Infof("JWT service initialized with expiry: %d hours", cfg.TokenExpiry)
 
-	// Public routes
+	staticHandler := handlers.StaticFileServer(app.logger)
+	router.Handle("/css/*", staticHandler)
+	router.Handle("/js/*", staticHandler)
+
+	// Static pages
 	router.Get("/", handlers.IndexHandler(app.logger))
 	router.Get("/login", handlers.LoginPageHandler(app.logger))
 	router.Get("/register", handlers.RegisterPageHandler(app.logger))
 	router.Get("/profile", handlers.ProfilePageHandler(app.logger))
 	router.Get("/measurements", handlers.MeasurementsPageHandler(app.logger))
 
-	// Public API routes
+	// Public API
 	router.Post("/api/register", handlers.RegisterHandler(app.dbStorage, app.logger))
 	router.Post("/api/login", handlers.LoginHandler(app.dbStorage, jwtService, app.logger))
 
-	// Measurement handler инициализация
 	if app.taskStorage != nil {
 		measurementHandler := handlers.NewMeasurementHandler(
 			app.dbStorage,
@@ -171,7 +176,17 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 		// Protected routes
 		router.Group(func(r chi.Router) {
 			r.Use(middlewares.AuthMiddleware(jwtService, app.logger))
+
+			// Profile
 			r.Get("/api/profile", handlers.ProfileHandler(app.logger))
+			r.Get("/api/profile/data", handlers.ProfileDataHandler(app.dbStorage, app.logger))
+			r.Post("/api/profile/update", handlers.UpdateProfileHandler(app.dbStorage, app.logger))
+
+			// Devices
+			r.Post("/api/devices", handlers.AddDeviceHandler(app.dbStorage, app.logger))
+			r.Delete("/api/devices", handlers.DeleteDeviceHandler(app.dbStorage, app.logger))
+
+			// Measurements
 			r.Post("/api/measurements/process", measurementHandler.ProcessMeasurementHandler)
 			r.Get("/api/measurements/history", measurementHandler.GetHistoryHandler)
 			r.Get("/api/measurements/status", measurementHandler.GetTaskStatusHandler)
@@ -179,7 +194,6 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Post("/api/transform/geojson", transformHandler.TransformCoordinates)
 			r.Get("/api/transform/status", transformHandler.TransformStatus)
 			r.Get("/api/measurements/observation-date", observationHandler.GetObservationDate)
-
 			r.Delete("/api/measurements/delete", measurementHandler.DeleteTaskHandler)
 			r.Delete("/api/measurements/delete-all", measurementHandler.DeleteAllTasksHandler)
 		})
@@ -188,13 +202,11 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	return router
 }
 
-// Run запускает приложение и управляет его жизненным циклом
+// Run запускает приложение
 func (app *Application) Run() error {
-	// Запуск фоновых рабочих процессов
 	app.workerMgr.Start(app.ctx)
 	app.logger.Info("Background workers started")
 
-	// Запуск сервера
 	go func() {
 		app.logger.Infof("Running server on %s", app.server.Addr)
 		if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -202,24 +214,20 @@ func (app *Application) Run() error {
 		}
 	}()
 
-	// Ожидание сигнала завершения
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	<-sigChan
 	app.logger.Info("Shutdown signal received")
 
-	// Graceful shutdown
 	return app.Shutdown()
 }
 
 // Shutdown корректно завершает приложение
 func (app *Application) Shutdown() error {
-	// Отмена контекста для рабочих процессов
 	app.cancel()
 	app.logger.Info("Background workers stopped")
 
-	// Завершение HTTP сервера
 	ctx, cancel := context.WithTimeout(context.Background(), ShutdownTimeout)
 	defer cancel()
 
@@ -229,7 +237,6 @@ func (app *Application) Shutdown() error {
 	}
 	app.logger.Info("Server shutdown complete")
 
-	// Закрытие хранилища
 	if app.dbStorage != nil {
 		if err := app.dbStorage.Close(); err != nil {
 			app.logger.Errorf("Failed to close DB connection: %v", err)
