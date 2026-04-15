@@ -1,0 +1,36 @@
+# pyfes configuration for Ocean Tide Loading (OTL) — vertical (radial) component.
+#
+# Used by generate_blq.py to produce BLQ files for RTKLIB.
+#
+# SETUP:
+#   1. Download FES2014 / FES2022 ocean loading (radial) NetCDF constituent
+#      files from:
+#      https://www.aviso.altimetry.fr/en/data/products/auxiliary-products/global-tide-fes.html
+#
+#   2. Set the DATASET_DIR environment variable to the directory that contains
+#      the *_radial.nc files, e.g.:
+#        export DATASET_DIR=/data/fes2014/ocean_loading
+#
+#   3. Run generate_blq.py with this file as the <pyfes_config> argument:
+#        python3 generate_blq.py ROVER 13.405 52.520 \
+#            ./cmd/solver/src/fes_ocean_loading.yml output.blq
+#
+# Alternatively, set the PYFES_CONFIG environment variable to the absolute
+# path of this file so the collaborative-service can locate it at runtime.
+
+engine: darwin
+radial:
+  cartesian:
+    paths:
+      2N2: ${DATASET_DIR}/2N2_radial.nc
+      K1:  ${DATASET_DIR}/K1_radial.nc
+      K2:  ${DATASET_DIR}/K2_radial.nc
+      M2:  ${DATASET_DIR}/M2_radial.nc
+      N2:  ${DATASET_DIR}/N2_radial.nc
+      O1:  ${DATASET_DIR}/O1_radial.nc
+      P1:  ${DATASET_DIR}/P1_radial.nc
+      Q1:  ${DATASET_DIR}/Q1_radial.nc
+      S2:  ${DATASET_DIR}/S2_radial.nc
+      Mf:  ${DATASET_DIR}/Mf_radial.nc
+      Mm:  ${DATASET_DIR}/Mm_radial.nc
+      Ssa: ${DATASET_DIR}/Ssa_radial.nc
