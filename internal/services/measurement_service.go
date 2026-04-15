@@ -22,6 +22,7 @@ type MeasurementService struct {
 	converter   *ConverterService
 	rtk         *RTKService
 	fileService *FileService
+	blq         *BLQService
 	rinexParser *parsers.RINEXParser
 	workDir     string
 	logger      *zap.SugaredLogger
@@ -35,6 +36,7 @@ func NewMeasurementService(
 	converter *ConverterService,
 	rtk *RTKService,
 	fileService *FileService,
+	blq *BLQService,
 	workDir string,
 	logger *zap.SugaredLogger,
 ) *MeasurementService {
@@ -45,6 +47,7 @@ func NewMeasurementService(
 		converter:   converter,
 		rtk:         rtk,
 		fileService: fileService,
+		blq:         blq,
 		rinexParser: parsers.NewRINEXParser(),
 		workDir:     workDir,
 		logger:      logger,
@@ -129,6 +132,8 @@ func (s *MeasurementService) ProcessMeasurement(
 
 	files := &ProcessingFiles{}
 	files.NavigationFile, _ = s.downloader.DownloadBroadcastEphemeris(date, taskID)
+
+	s.generateBLQIfAvailable(obsPath, taskID, files)
 
 	var outputPath string
 	var procErr error
@@ -218,6 +223,30 @@ func (s *MeasurementService) ProcessMeasurement(
 
 	s.logger.Infof("Task completed: %s in %.2fs", taskID, task.ProcessingSec)
 	return nil
+}
+
+// generateBLQIfAvailable извлекает позицию из RINEX-заголовка и вызывает
+// BLQService. При любой ошибке логирует предупреждение и оставляет
+// files.BLQFile пустым — обработка продолжается без OTL-коррекции.
+func (s *MeasurementService) generateBLQIfAvailable(obsPath, taskID string, files *ProcessingFiles) {
+	if s.blq == nil {
+		return
+	}
+	lat, lon, found := s.rinexParser.ParseApproxPosition(obsPath)
+	if !found {
+		s.logger.Warnf("[%s] APPROX POSITION XYZ отсутствует или нулевая — BLQ пропущен", taskID)
+		return
+	}
+	marker := s.rinexParser.ParseMarkerName(obsPath)
+	if marker == "" {
+		marker = "ROVER"
+	}
+	blqFile, err := s.blq.GenerateBLQ(marker, lat, lon, taskID)
+	if err != nil {
+		s.logger.Warnf("[%s] BLQ не сгенерирован: %v", taskID, err)
+		return
+	}
+	files.BLQFile = blqFile
 }
 
 // parseResult парсит результаты обработки и находит лучшее решение

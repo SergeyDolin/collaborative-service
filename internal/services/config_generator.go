@@ -21,6 +21,7 @@ type ProcessingFiles struct {
 	DCBFile        string
 	ERPFile        string
 	BIAFile        string
+	BLQFile        string
 	BaseStationObs string
 }
 
@@ -322,6 +323,9 @@ func (g *ConfigGenerator) replaceParameters(
 	}
 	if files.BIAFile != "" {
 		replacements["{{BIA_FILE}}"] = files.BIAFile
+	}
+	if files.BLQFile != "" {
+		replacements["{{BLQ_FILE}}"] = files.BLQFile
 	}
 
 	for placeholder, value := range replacements {

@@ -76,10 +76,12 @@ func NewContainer(cfg *config.Config, logger *zap.SugaredLogger) (*Container, er
 	downloader := services.NewFileDownloader("./tmp", logger)
 	converter := services.NewConverterService("./cmd/solver/app", logger)
 	rtk := services.NewRTKService("./cmd/solver/app", "./tmp", logger)
+	blqSvc := services.NewBLQService("./cmd/solver/src", "./cmd/solver/src", "./tmp", logger)
 
 	measurementSvc := services.NewMeasurementService(
 		taskStorage, configGen, downloader, converter, rtk,
 		services.NewFileService("./tmp", logger),
+		blqSvc,
 		"./tmp", logger,
 	)
 

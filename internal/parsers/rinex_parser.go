@@ -3,6 +3,7 @@ package parsers
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -195,6 +196,99 @@ func parseTimeOfFirstObs(line string) (time.Time, error) {
 	}
 
 	return time.Date(year, time.Month(month), day, hour, minute, second, 0, time.UTC), nil
+}
+
+// ParseApproxPosition извлекает APPROX POSITION XYZ из заголовка RINEX,
+// конвертирует ECEF → геодезические координаты WGS84.
+// Возвращает (lat, lon) в градусах и found=true при успехе.
+func (p *RINEXParser) ParseApproxPosition(filePath string) (lat, lon float64, found bool) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return 0, 0, false
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "END OF HEADER") {
+			break
+		}
+		if strings.Contains(line, "APPROX POSITION XYZ") {
+			// RINEX фиксированные колонки: X[0:14], Y[14:28], Z[28:42]
+			if len(line) < 42 {
+				continue
+			}
+			x, err1 := strconv.ParseFloat(strings.TrimSpace(line[0:14]), 64)
+			y, err2 := strconv.ParseFloat(strings.TrimSpace(line[14:28]), 64)
+			z, err3 := strconv.ParseFloat(strings.TrimSpace(line[28:42]), 64)
+			if err1 != nil || err2 != nil || err3 != nil {
+				continue
+			}
+			if x == 0 && y == 0 && z == 0 {
+				continue // неинициализированная позиция
+			}
+			lat, lon = ecefToGeodetic(x, y, z)
+			return lat, lon, true
+		}
+	}
+	return 0, 0, false
+}
+
+// ParseMarkerName возвращает MARKER NAME из заголовка RINEX.
+func (p *RINEXParser) ParseMarkerName(filePath string) string {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "END OF HEADER") {
+			break
+		}
+		if strings.Contains(line, "MARKER NAME") {
+			end := len(line)
+			if idx := strings.Index(line, "MARKER NAME"); idx > 0 {
+				end = idx
+			}
+			if name := strings.TrimSpace(line[:end]); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+// ecefToGeodetic конвертирует ECEF-координаты в геодезические (WGS84).
+// Использует итерационный алгоритм Боуринга.
+func ecefToGeodetic(x, y, z float64) (lat, lon float64) {
+	const (
+		a  = 6378137.0           // большая полуось WGS84 (м)
+		f  = 1.0 / 298.257223563 // сжатие WGS84
+		e2 = 2*f - f*f           // квадрат первого эксцентриситета
+	)
+
+	lon = math.Atan2(y, x) * (180.0 / math.Pi)
+
+	p := math.Sqrt(x*x + y*y)
+	latRad := math.Atan2(z, p*(1-e2))
+
+	for i := 0; i < 10; i++ {
+		sinLat := math.Sin(latRad)
+		N := a / math.Sqrt(1-e2*sinLat*sinLat)
+		next := math.Atan2(z+e2*N*sinLat, p)
+		if math.Abs(next-latRad) < 1e-12 {
+			latRad = next
+			break
+		}
+		latRad = next
+	}
+
+	lat = latRad * (180.0 / math.Pi)
+	return
 }
 
 // isNumeric проверяет, состоит ли строка только из цифр

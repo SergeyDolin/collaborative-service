@@ -325,6 +325,8 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 		defaultWorkDir   = "./tmp"
 		defaultConfigDir = "./cmd/solver/configs"
 		defaultSolverDir = "./cmd/solver/app"
+		defaultBLQScript = "./cmd/solver/src/generate_blq.py"
+		defaultBLQConfig = "./cmd/solver/src/fes_ocean_loading.yml"
 	)
 
 	// Отложенная очистка: удаляем всю папку с временными файлами в конце
@@ -342,6 +344,7 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 	converter := services.NewConverterService(defaultSolverDir, h.logger)
 	rtk := services.NewRTKService(defaultSolverDir, defaultWorkDir, h.logger)
 	fileSvc := services.NewFileService(defaultWorkDir, h.logger)
+	blqSvc := services.NewBLQService(defaultBLQScript, defaultBLQConfig, defaultWorkDir, h.logger)
 
 	measurementSvc := services.NewMeasurementService(
 		h.taskStorage,
@@ -350,6 +353,7 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 		converter,
 		rtk,
 		fileSvc,
+		blqSvc,
 		defaultWorkDir,
 		h.logger,
 	)
