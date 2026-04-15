@@ -63,6 +63,9 @@ func (s *BLQService) GenerateBLQ(stationName string, lat, lon float64, taskID st
 		return "", fmt.Errorf("BLQ generation failed: %w", err)
 	}
 
+	if msg := stderr.String(); msg != "" {
+		s.logger.Infof("[%s] generate_blq.py stderr:\n%s", taskID, msg)
+	}
 	s.logger.Infof("[%s] BLQ generated: %s (station=%q lat=%.4f lon=%.4f)",
 		taskID, outputPath, stationName, lat, lon)
 	return outputPath, nil
