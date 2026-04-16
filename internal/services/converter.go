@@ -176,43 +176,33 @@ func (c *ConverterService) IsRINEX3(filePath string) bool {
 }
 
 // ConvertFile определяет тип файла и конвертирует при необходимости.
-// Возвращает путь к готовому RINEX 2 файлу наблюдений.
+// Возвращает путь к готовому RINEX 3 файлу наблюдений.
 //
 // Поддерживаемые форматы на входе:
 //
-//	.obs / .o     — RINEX 2 наблюдений (без конвертации, если не RINEX 3 внутри)
-//	.rnx          — RINEX 3 → convbin → RINEX 2
-//	.crx          — Hatanaka CRX → crx2rnx → RINEX (затем проверка версии)
-//	.YYd / .YYD   — Hatanaka compact RINEX 2 (напр. .24d) → crx2rnx → RINEX 2
-//	.gz           — gzip → распаковка → рекурсивная обработка
+//	.obs / .o / .rnx — RINEX 3 наблюдений (без конвертации)
+//	.crx             — Hatanaka CRX → crx2rnx → RINEX 3
+//	.YYd / .YYD      — Hatanaka compact RINEX 2 → crx2rnx → RINEX 2 → convbin → RINEX 3
+//	.gz              — gzip → распаковка → рекурсивная обработка
 func (c *ConverterService) ConvertFile(filePath, workDir string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	c.logger.Infof("ConvertFile: %s (ext=%s)", filePath, ext)
 
-	// ── RINEX 2 (.obs / .o) ──────────────────────────────────────────────────
-	if ext == ".obs" || ext == ".o" {
-		if c.IsRINEX3(filePath) {
-			c.logger.Infof("File has %s ext but is RINEX 3 inside, converting...", ext)
-			out := filepath.Join(workDir, "converted.obs")
-			if err := c.ConvertRINEX3to2(filePath, out); err != nil {
-				c.logger.Warnf("RINEX 3→2 failed: %v, using original", err)
+	// ── RINEX 3 (.obs / .o / .rnx) ──────────────────────────────────────────
+	if ext == ".obs" || ext == ".o" || ext == ".rnx" {
+		// Проверяем, не RINEX 2 ли внутри
+		if !c.IsRINEX3(filePath) {
+			c.logger.Infof("File has %s ext but is RINEX 2 inside, converting to RINEX 3...", ext)
+			out := filepath.Join(workDir, "converted.rnx")
+			if err := c.ConvertRINEX2to3(filePath, out); err != nil {
+				c.logger.Warnf("RINEX 2→3 failed: %v, using original", err)
 				return filePath, nil
 			}
 			return out, nil
 		}
-		c.logger.Infof("File is RINEX 2, no conversion needed")
+		c.logger.Infof("File is RINEX 3, no conversion needed")
 		return filePath, nil
-	}
-
-	// ── RINEX 3 (.rnx) ───────────────────────────────────────────────────────
-	if ext == ".rnx" {
-		out := filepath.Join(workDir, "converted.obs")
-		if err := c.ConvertRINEX3to2(filePath, out); err != nil {
-			c.logger.Warnf("RINEX 3→2 failed: %v, using original", err)
-			return filePath, nil
-		}
-		return out, nil
 	}
 
 	// ── Hatanaka .crx ─────────────────────────────────────────────────────────
@@ -233,17 +223,13 @@ func (c *ConverterService) ConvertFile(filePath, workDir string) (string, error)
 		if err := c.ConvertCRX2RNX(filePath, out); err != nil {
 			return "", fmt.Errorf("Hatanaka (.YYd) decompression failed: %w", err)
 		}
-		// .YYd после распаковки — всегда RINEX 2, но на всякий случай проверяем
-		if c.IsRINEX3(out) {
-			c.logger.Infof("Decompressed .YYd appears to be RINEX 3, converting...")
-			out2 := filepath.Join(workDir, "converted.obs")
-			if err := c.ConvertRINEX3to2(out, out2); err != nil {
-				c.logger.Warnf("RINEX 3→2 after .YYd failed: %v, using decompressed", err)
-				return out, nil
-			}
-			return out2, nil
+		// .YYd после распаковки — RINEX 2, конвертируем в RINEX 3
+		out3 := filepath.Join(workDir, "converted.rnx")
+		if err := c.ConvertRINEX2to3(out, out3); err != nil {
+			c.logger.Warnf("RINEX 2→3 after .YYd failed: %v, using decompressed", err)
+			return out, nil
 		}
-		return out, nil
+		return out3, nil
 	}
 
 	// ── GZ архив ─────────────────────────────────────────────────────────────
@@ -256,6 +242,18 @@ func (c *ConverterService) ConvertFile(filePath, workDir string) (string, error)
 	}
 
 	return "", fmt.Errorf("unknown file format: %s", filePath)
+}
+
+// ConvertRINEX2to3 конвертирует RINEX 2 в RINEX 3
+// Примечание: это заглушка, так как RTKLIB не имеет прямой конвертации 2→3
+// В реальном проекте здесь может быть реализация через внешнюю утилиту или библиотеку
+func (c *ConverterService) ConvertRINEX2to3(inputPath, outputPath string) error {
+	c.logger.Infof("ConvertRINEX2to3: %s -> %s", inputPath, outputPath)
+
+	// TODO: Реализовать конвертацию RINEX 2 → 3
+	// Это может потребовать использования внешних инструментов или ручного парсинга
+
+	return fmt.Errorf("RINEX 2→3 conversion not yet implemented")
 }
 
 // unpackGzip распаковывает gzip файл через gunzip
