@@ -75,6 +75,22 @@ func (g *ConfigGenerator) GenerateConfig(
 		ant.Type = "NONE"
 	}
 
+	// Мобильное устройство: переопределяем антенну из пользовательского ввода
+	if config.DeviceType == "mobile" {
+		antType := strings.TrimSpace(config.AntennaType)
+		if antType == "" {
+			antType = "UNKNOWN"
+		}
+		ant = AntennaInfo{
+			Type:   antType,
+			DeltaH: config.AntennaDeltaU, // U пользователя → DeltaH → {{ANT_DELTA_U}}
+			DeltaE: config.AntennaDeltaE,
+			DeltaN: config.AntennaDeltaN,
+		}
+		g.logger.Infof("[%s] Mobile device override: ant=%q dU=%.4f dE=%.4f dN=%.4f",
+			taskID, ant.Type, ant.DeltaH, ant.DeltaE, ant.DeltaN)
+	}
+
 	var templateName string
 	switch config.Method {
 	case model.MethodRelative:

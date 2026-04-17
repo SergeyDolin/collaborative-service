@@ -79,6 +79,14 @@ type UserProcessingConfig struct {
 	UseDCB              bool `json:"useDcb"`
 	UseERP              bool `json:"useErp"`
 	UseOSB              bool `json:"useOsb"`
+
+	// Тип устройства и переопределение антенны (для мобильных устройств)
+	// DeviceType: "gnss" — читать антенну из RINEX, "mobile" — использовать значения ниже
+	DeviceType    string  `json:"deviceType,omitempty"`
+	AntennaType   string  `json:"antennaType,omitempty"`  // RINEX-формат; пусто → "UNKNOWN"
+	AntennaDeltaU float64 `json:"antennaDeltaU"`           // смещение вверх (U), метры
+	AntennaDeltaE float64 `json:"antennaDeltaE"`           // смещение восток (E), метры
+	AntennaDeltaN float64 `json:"antennaDeltaN"`           // смещение север (N), метры
 }
 
 // DefaultConfig return config

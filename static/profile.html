@@ -455,6 +455,17 @@ body::before {
 }
 .mc:hover, .mc.chosen { border-color:var(--sky); background:var(--sky-glow); }
 .mc .mi { font-size:18px; } .mc .ml { font-size:0.72rem; font-weight:600; color:var(--ink); line-height:1.3; }
+.pc-card {
+    border:2px solid var(--border); border-radius:var(--r-sm); padding:10px 8px;
+    cursor:pointer; display:flex; flex-direction:column; align-items:center;
+    gap:3px; background:var(--surface); transition:all .2s; text-align:center;
+}
+.pc-card:hover, .pc-card.chosen { border-color:var(--sky); background:var(--sky-glow); }
+.dev-antenna { font-family:'JetBrains Mono',monospace; font-size:0.70rem; color:var(--sky-dk); margin-top:5px; word-break:break-all; }
+.dev-antenna-enu { font-size:0.70rem; color:var(--muted); margin-top:3px; font-family:'JetBrains Mono',monospace; }
+.dev-pc { font-size:0.72rem; margin-top:5px; padding:2px 7px; border-radius:20px; display:inline-block; }
+.dev-pc-ok      { background:var(--ok-bg); color:var(--ok); }
+.dev-pc-expired { background:var(--warn-bg); color:var(--warn); }
 @media(max-width:680px){
     .profile-hero{flex-direction:column;gap:16px;align-items:flex-start;}
     .hero-actions{width:100%;}
@@ -614,6 +625,65 @@ body::before {
                 <div class="mc" data-mount="man"               onclick="pickMount(this)"><span class="mi">🙋‍♂️</span><span class="ml">Человек</span></div>
             </div>
         </div>
+        <!-- Поля для ГНСС-приёмника -->
+        <div class="form-field" id="devAntennaField" style="display:none">
+            <label>Название антенны (формат RINEX) <span style="color:var(--err);">*</span></label>
+            <input type="text" id="devAntennaName" placeholder="TRM57971.00     NONE" style="font-family:'JetBrains Mono',monospace;letter-spacing:0.02em">
+            <div style="font-size:0.73rem;color:var(--muted);margin-top:4px;">Тип антенны (20 символов) + тип радиома согласно IGS ANTEX</div>
+        </div>
+        <div class="form-field" id="devAntennaOffsetField" style="display:none">
+            <label>Смещения антенны ENU <span style="color:var(--muted);font-weight:400;">(метры, 0 если не известны)</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                <div>
+                    <label style="font-size:0.73rem;color:var(--muted);">E (Восток)</label>
+                    <input type="number" id="devAntennaE" value="0" step="0.001" placeholder="0.000">
+                </div>
+                <div>
+                    <label style="font-size:0.73rem;color:var(--muted);">N (Север)</label>
+                    <input type="number" id="devAntennaN" value="0" step="0.001" placeholder="0.000">
+                </div>
+                <div>
+                    <label style="font-size:0.73rem;color:var(--muted);">U (Высота)</label>
+                    <input type="number" id="devAntennaU" value="0" step="0.001" placeholder="0.000">
+                </div>
+            </div>
+        </div>
+        <!-- Фазовый центр для мобильных устройств -->
+        <div class="form-field" id="devPhaseCenterField" style="display:none">
+            <label>Фазовый центр антенны <span style="color:var(--err);">*</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                <div class="pc-card" data-method="none" onclick="pickPcMethod(this)">
+                    <div style="font-size:20px;margin-bottom:3px;">🚫</div>
+                    <div style="font-size:0.72rem;font-weight:600;color:var(--ink);">Без фазового центра</div>
+                    <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">Смещения = 0</div>
+                </div>
+                <div class="pc-card" data-method="manual" onclick="pickPcMethod(this)">
+                    <div style="font-size:20px;margin-bottom:3px;">✏️</div>
+                    <div style="font-size:0.72rem;font-weight:600;color:var(--ink);">Ввести вручную</div>
+                    <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">Указать смещения ENU</div>
+                </div>
+            </div>
+            <div id="devAutoWarning" style="display:none;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn);border-radius:var(--r-sm);padding:10px 12px;font-size:0.78rem;line-height:1.5;">
+                ⚠️ Без поправки на фазовый центр антенны точность определения координат на уровне сантиметров <strong>недоступна</strong>.
+            </div>
+            <div id="devManualOffsets" style="display:none;margin-top:10px;">
+                <label style="margin-bottom:6px;display:block;font-size:0.82rem;">Смещения ENU <span style="color:var(--err);">*</span> <span style="color:var(--muted);font-weight:400;">(метры)</span></label>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                    <div>
+                        <label style="font-size:0.73rem;color:var(--muted);">E (Восток)</label>
+                        <input type="number" id="devPcE" value="0" step="0.001" placeholder="0.000">
+                    </div>
+                    <div>
+                        <label style="font-size:0.73rem;color:var(--muted);">N (Север)</label>
+                        <input type="number" id="devPcN" value="0" step="0.001" placeholder="0.000">
+                    </div>
+                    <div>
+                        <label style="font-size:0.73rem;color:var(--muted);">U (Высота)</label>
+                        <input type="number" id="devPcU" value="0" step="0.001" placeholder="0.000">
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="form-field">
             <label>Описание <span style="color:var(--muted);font-weight:400;">(необязательно)</span></label>
             <input type="text" id="newDevDesc" placeholder="Дополнительная информация">
@@ -693,6 +763,6 @@ body::before {
     </div>
 </div>
 <div class="toast" id="toast"></div>
-<script src="/js/profile.js"></script>
+<script src="/js/profile.js?v=2"></script>
 </body>
 </html>

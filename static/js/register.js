@@ -1,6 +1,7 @@
 /* ── state ── */
 let selectedDeviceType = null;
 let selectedMountType  = null;
+let selectedPcMethod   = null;
 
 /* ── helpers ── */
 function showAlert(msg) {
@@ -59,13 +60,33 @@ function selectType(el) {
     el.classList.add('chosen');
     selectedDeviceType = el.dataset.type;
     document.getElementById('mountField').style.display = 'block';
-    document.getElementById('descField').style.display = 'block';
+    document.getElementById('descField').style.display  = 'block';
+
+    const isGNSS = selectedDeviceType === 'gnss_receiver';
+    document.getElementById('antennaField').style.display      = isGNSS ? 'block' : 'none';
+    document.getElementById('antennaOffsetField').style.display = isGNSS ? 'block' : 'none';
+    document.getElementById('phaseCenterField').style.display  = isGNSS ? 'none'  : 'block';
+
+    // Сбрасываем выбор фазового центра при смене типа
+    selectedPcMethod = null;
+    document.querySelectorAll('.pc-card').forEach(c => c.classList.remove('chosen'));
+    document.getElementById('autoWarning').style.display   = 'none';
+    document.getElementById('manualOffsets').style.display = 'none';
+    setErr('antennaName', '');
 }
 
 function selectMount(el) {
     document.querySelectorAll('.mount-card').forEach(c => c.classList.remove('chosen'));
     el.classList.add('chosen');
     selectedMountType = el.dataset.mount;
+}
+
+function selectPcMethod(el) {
+    document.querySelectorAll('.pc-card').forEach(c => c.classList.remove('chosen'));
+    el.classList.add('chosen');
+    selectedPcMethod = el.dataset.method;
+    document.getElementById('autoWarning').style.display   = selectedPcMethod === 'none'   ? 'block' : 'none';
+    document.getElementById('manualOffsets').style.display = selectedPcMethod === 'manual' ? 'block' : 'none';
 }
 
 /* ── navigation ── */
@@ -123,12 +144,48 @@ async function submitRegistration(skipDevice = false) {
                     btn.disabled = false; btn.textContent = 'Зарегистрироваться';
                     return;
                 }
+
                 const device = {
                     name:        deviceName,
                     deviceType:  selectedDeviceType,
                     mountType:   selectedMountType,
                     description: document.getElementById('deviceDesc').value.trim(),
                 };
+
+                if (selectedDeviceType === 'gnss_receiver') {
+                    const antennaName = document.getElementById('antennaName').value.trim();
+                    if (!antennaName) {
+                        setErr('antennaName', 'Обязательное поле для ГНСС-приёмника');
+                        showAlert('Введите название антенны в формате RINEX');
+                        btn.disabled = false; btn.textContent = 'Зарегистрироваться';
+                        return;
+                    }
+                    device.antennaName = antennaName;
+                    device.antennaE = parseFloat(document.getElementById('antennaE').value) || 0;
+                    device.antennaN = parseFloat(document.getElementById('antennaN').value) || 0;
+                    device.antennaU = parseFloat(document.getElementById('antennaU').value) || 0;
+                } else {
+                    if (!selectedPcMethod) {
+                        showAlert('Укажите метод определения фазового центра антенны');
+                        btn.disabled = false; btn.textContent = 'Зарегистрироваться';
+                        return;
+                    }
+                    device.phaseCenterMethod = selectedPcMethod;
+                    if (selectedPcMethod === 'manual') {
+                        const e = parseFloat(document.getElementById('pcE').value);
+                        const n = parseFloat(document.getElementById('pcN').value);
+                        const u = parseFloat(document.getElementById('pcU').value);
+                        if (!e && !n && !u) {
+                            showAlert('Введите хотя бы одно ненулевое смещение ENU');
+                            btn.disabled = false; btn.textContent = 'Зарегистрироваться';
+                            return;
+                        }
+                        device.antennaE = e || 0;
+                        device.antennaN = n || 0;
+                        device.antennaU = u || 0;
+                    }
+                }
+
                 formData.append('device', JSON.stringify(device));
             }
         }

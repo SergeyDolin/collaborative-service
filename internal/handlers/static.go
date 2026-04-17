@@ -12,8 +12,8 @@ func StaticFileServer(logger *zap.SugaredLogger) http.Handler {
 	fs := http.FileServer(http.Dir("./static"))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Добавляем заголовки кэширования для статических файлов
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		// no-cache: браузер всегда проверяет свежесть файла у сервера
+		w.Header().Set("Cache-Control", "no-cache")
 
 		// Логируем только важные ошибки
 		if strings.HasSuffix(r.URL.Path, ".css") || strings.HasSuffix(r.URL.Path, ".js") {

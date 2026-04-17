@@ -16,6 +16,25 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// applyDeviceDefaults валидирует устройство перед сохранением.
+// Для ГНСС-приёмника требует имя антенны.
+// Для мобильных устройств принимает методы "none" (смещения = 0) и "manual" (смещения обязательны).
+func applyDeviceDefaults(d *model.UserDevice) error {
+	if d.DeviceType == model.DeviceTypeGNSS {
+		if d.AntennaName == "" {
+			return fmt.Errorf("для ГНСС-приёмника необходимо указать название антенны в формате RINEX")
+		}
+	} else if d.DeviceType != "" {
+		if d.PhaseCenterMethod != "none" && d.PhaseCenterMethod != "manual" {
+			return fmt.Errorf("метод фазового центра должен быть 'none' или 'manual'")
+		}
+		if d.PhaseCenterMethod == "manual" && d.AntennaE == 0 && d.AntennaN == 0 && d.AntennaU == 0 {
+			return fmt.Errorf("при ручном вводе необходимо указать хотя бы одно ненулевое смещение ENU")
+		}
+	}
+	return nil
+}
+
 const maxAvatarSize = 5 * 1024 * 1024 // 5 MB
 
 // RegisterHandler обрабатывает регистрацию пользователя.
@@ -112,7 +131,9 @@ func RegisterHandler(
 		// Сохраняем устройство
 		if devicePtr != nil && devicePtr.Name != "" {
 			devicePtr.UserLogin = login
-			if err := dbStor.CreateDevice(devicePtr); err != nil {
+			if err := applyDeviceDefaults(devicePtr); err != nil {
+				logger.Warnf("Device validation failed for %s: %v", login, err)
+			} else if err := dbStor.CreateDevice(devicePtr); err != nil {
 				logger.Warnf("Failed to save device for %s: %v", login, err)
 			}
 		}
@@ -278,6 +299,10 @@ func AddDeviceHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http
 		}
 
 		d.UserLogin = login
+		if err := applyDeviceDefaults(&d); err != nil {
+			SendJSONError(w, err.Error(), http.StatusBadRequest, logger)
+			return
+		}
 		if err := dbStor.CreateDevice(&d); err != nil {
 			logger.Errorf("CreateDevice %s: %v", login, err)
 			SendJSONError(w, "Failed to add device", http.StatusInternalServerError, logger)

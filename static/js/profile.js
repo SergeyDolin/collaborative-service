@@ -7,8 +7,9 @@ let currentTransformCoords = null;
 let pendingConfirmFn = null;
 let selectMode = false;
 let selectedIds = new Set();
-let newDevType  = null;
+let newDevType   = null;
 let newMountType = null;
+let newPcMethod  = null;
 let isHistLoading = false;
 
 /* ════════════════════════════════════════════
@@ -86,6 +87,29 @@ const DEVICE_ICONS  = { gnss_receiver:'📡', smartphone:'📱', tablet:'📟', 
 const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'Смартфон', tablet:'Планшет', other:'Иное' };
 const MOUNT_LABELS  = { car:'Автомобиль', permanent_station:'Пост. станция', uav:'БПЛА', rod:'Веха',  man: "Человек" };
 
+function renderDeviceExtra(d) {
+    if (d.deviceType === 'gnss_receiver') {
+        if (!d.antennaName) return '';
+        const enu = (d.antennaE || d.antennaN || d.antennaU)
+            ? `<div class="dev-antenna-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`
+            : '';
+        return `<div class="dev-antenna">${escHtml(d.antennaName)}</div>${enu}`;
+    }
+    if (d.phaseCenterMethod === 'auto' && d.phaseCenterValidUntil) {
+        const until = new Date(d.phaseCenterValidUntil);
+        const now   = new Date();
+        const expired = until < now;
+        const fmt = until.toLocaleString('ru', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+        return `<div class="dev-pc ${expired ? 'dev-pc-expired' : 'dev-pc-ok'}">
+            ${expired ? '⚠️ Калибровка истекла' : '🤖 Авто до ' + fmt}
+        </div>`;
+    }
+    if (d.phaseCenterMethod === 'manual' && (d.antennaE || d.antennaN || d.antennaU)) {
+        return `<div class="dev-antenna-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`;
+    }
+    return '';
+}
+
 function renderDevices(devices) {
     const el = document.getElementById('devicesContent');
     if (!devices || devices.length === 0) {
@@ -101,6 +125,7 @@ function renderDevices(devices) {
                 <span class="badge badge-type">${DEVICE_LABELS[d.deviceType] || d.deviceType}</span>
                 <span class="badge badge-mount">${MOUNT_LABELS[d.mountType] || d.mountType}</span>
             </div>
+            ${renderDeviceExtra(d)}
             ${d.description ? `<div class="dev-desc">${escHtml(d.description)}</div>` : ''}
         </div>`).join('')}
         <button class="add-device-card" onclick="openAddDevice()">
@@ -110,33 +135,97 @@ function renderDevices(devices) {
 }
 
 function openAddDevice() {
-    newDevType = null; newMountType = null;
+    newDevType = null; newMountType = null; newPcMethod = null;
     document.querySelectorAll('.tc').forEach(c => c.classList.remove('chosen'));
     document.querySelectorAll('.mc').forEach(c => c.classList.remove('chosen'));
-    document.getElementById('newDevName').value  = '';
-    document.getElementById('newDevDesc').value  = '';
+    document.querySelectorAll('.pc-card').forEach(c => c.classList.remove('chosen'));
+    document.getElementById('newDevName').value   = '';
+    document.getElementById('newDevDesc').value   = '';
+    document.getElementById('devAntennaName').value = '';
+    document.getElementById('devAntennaE').value  = '0';
+    document.getElementById('devAntennaN').value  = '0';
+    document.getElementById('devAntennaU').value  = '0';
+    document.getElementById('devPcE').value = '0';
+    document.getElementById('devPcN').value = '0';
+    document.getElementById('devPcU').value = '0';
+    document.getElementById('devAntennaField').style.display       = 'none';
+    document.getElementById('devAntennaOffsetField').style.display = 'none';
+    document.getElementById('devPhaseCenterField').style.display   = 'none';
+    document.getElementById('devAutoWarning').style.display   = 'none';
+    document.getElementById('devManualOffsets').style.display = 'none';
     openModal('addDeviceModal');
 }
 function pickType(el) {
     document.querySelectorAll('.tc').forEach(c => c.classList.remove('chosen'));
-    el.classList.add('chosen'); newDevType = el.dataset.type;
+    el.classList.add('chosen');
+    newDevType = el.dataset.type;
+
+    const isGNSS = newDevType === 'gnss_receiver';
+    document.getElementById('devAntennaField').style.display       = isGNSS ? 'block' : 'none';
+    document.getElementById('devAntennaOffsetField').style.display = isGNSS ? 'block' : 'none';
+    document.getElementById('devPhaseCenterField').style.display   = isGNSS ? 'none'  : 'block';
+
+    newPcMethod = null;
+    document.querySelectorAll('.pc-card').forEach(c => c.classList.remove('chosen'));
+    document.getElementById('devAutoWarning').style.display   = 'none';
+    document.getElementById('devManualOffsets').style.display = 'none';
 }
 function pickMount(el) {
     document.querySelectorAll('.mc').forEach(c => c.classList.remove('chosen'));
     el.classList.add('chosen'); newMountType = el.dataset.mount;
 }
+function pickPcMethod(el) {
+    document.querySelectorAll('.pc-card').forEach(c => c.classList.remove('chosen'));
+    el.classList.add('chosen');
+    newPcMethod = el.dataset.method;
+    document.getElementById('devAutoWarning').style.display   = newPcMethod === 'none'   ? 'block' : 'none';
+    document.getElementById('devManualOffsets').style.display = newPcMethod === 'manual' ? 'block' : 'none';
+}
 async function saveDevice() {
     const name = document.getElementById('newDevName').value.trim();
-    if (!name) { showToast('Введите название устройства', 'err'); return; }
+    if (!name)        { showToast('Введите название устройства', 'err'); return; }
     if (!newDevType)  { showToast('Выберите тип устройства', 'err'); return; }
     if (!newMountType){ showToast('Выберите тип установки', 'err'); return; }
+
+    const payload = {
+        name,
+        deviceType:  newDevType,
+        mountType:   newMountType,
+        description: document.getElementById('newDevDesc').value.trim(),
+    };
+
+    if (newDevType === 'gnss_receiver') {
+        const antennaName = document.getElementById('devAntennaName').value.trim();
+        if (!antennaName) { showToast('Введите название антенны в формате RINEX', 'err'); return; }
+        payload.antennaName = antennaName;
+        payload.antennaE = parseFloat(document.getElementById('devAntennaE').value) || 0;
+        payload.antennaN = parseFloat(document.getElementById('devAntennaN').value) || 0;
+        payload.antennaU = parseFloat(document.getElementById('devAntennaU').value) || 0;
+    } else {
+        if (!newPcMethod) { showToast('Укажите метод определения фазового центра', 'err'); return; }
+        payload.phaseCenterMethod = newPcMethod;
+        if (newPcMethod === 'manual') {
+            const e = parseFloat(document.getElementById('devPcE').value);
+            const n = parseFloat(document.getElementById('devPcN').value);
+            const u = parseFloat(document.getElementById('devPcU').value);
+            if (!e && !n && !u) { showToast('Введите хотя бы одно ненулевое смещение ENU', 'err'); return; }
+            payload.antennaE = e || 0;
+            payload.antennaN = n || 0;
+            payload.antennaU = u || 0;
+        }
+    }
+
     try {
         const r = await fetch('/api/devices', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, deviceType: newDevType, mountType: newMountType, description: document.getElementById('newDevDesc').value.trim() }),
+            body: JSON.stringify(payload),
         });
-        if (!r.ok) throw new Error();
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            showToast(err.error || 'Ошибка добавления', 'err');
+            return;
+        }
         closeModal('addDeviceModal');
         showToast('Устройство добавлено');
         loadProfile();

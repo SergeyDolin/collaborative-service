@@ -120,7 +120,8 @@ document.querySelectorAll('.menu-item:not(.disabled)').forEach(item => {
             setTimeout(() => { window.location.href = '/login'; }, 1500);
             return;
         }
-        window.location.href = page === 'measurements' ? '/measurements' : '/profile';
+        const routes = { measurements: '/measurements', collaborative: '/collaborative' };
+        window.location.href = routes[page] || '/profile';
     });
 });
 

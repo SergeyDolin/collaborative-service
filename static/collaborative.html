@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Коллаборативное позиционирование — Collaborative Positioning</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+    --sky: #6aabcf; --sky-lt: #93c4e0; --sky-dk: #4a8fb5;
+    --sky-glow: rgba(106,171,207,0.18);
+    --bg: #f0f4f8; --bg-alt: #e6ecf3;
+    --surface: rgba(255,255,255,0.92); --surface-2: rgba(255,255,255,0.70);
+    --border: rgba(0,0,0,0.08); --border-hv: rgba(106,171,207,0.55);
+    --ink: #1e2a38; --ink-2: #4a5568; --muted: #718096; --ghost: #e2e8f0;
+    --ok: #2f855a; --ok-bg: #c6f6d5;
+    --err: #c53030; --err-bg: #fed7d7;
+    --warn: #b7791f; --warn-bg: #fefcbf;
+    --info-bg: #ebf8ff; --info: #2b6cb0;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 14px rgba(80,110,140,0.10);
+    --shadow-lg: 0 8px 32px rgba(80,110,140,0.14);
+    --r-sm: 8px; --r-md: 12px; --r-lg: 18px; --r-xl: 24px;
+    --t: .2s ease; --header-h: 64px;
+}
+[data-theme="dark"] {
+    --sky: #7bbfe0; --sky-lt: #a8d4ee; --sky-dk: #5aaacf;
+    --sky-glow: rgba(123,191,224,0.14);
+    --bg: #0f1923; --bg-alt: #152030;
+    --surface: rgba(20,32,48,0.97); --surface-2: rgba(20,32,48,0.70);
+    --border: rgba(255,255,255,0.08); --border-hv: rgba(123,191,224,0.45);
+    --ink: #e8f0f8; --ink-2: #a0b8cc; --muted: #627d8e; --ghost: #1e3040;
+    --ok: #68d391; --ok-bg: rgba(56,161,105,0.18);
+    --err: #fc8181; --err-bg: rgba(197,48,48,0.18);
+    --warn: #f6ad55; --warn-bg: rgba(183,121,31,0.18);
+    --info-bg: rgba(43,108,176,0.18); --info: #90cdf4;
+    --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+    --shadow-lg: 0 8px 36px rgba(0,0,0,0.45);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Onest', 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--ink);
+    min-height: 100vh; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background .3s, color .3s;
+}
+h1,h2,h3,h4,h5 { font-family: 'Onest', sans-serif; font-weight: 600; color: var(--ink); }
+
+.header {
+    background: var(--surface); backdrop-filter: blur(16px);
+    padding: 0 2rem; box-shadow: var(--shadow-sm);
+    border-bottom: 1px solid var(--border);
+    position: fixed; width: 100%; top: 0; z-index: 1000;
+    height: var(--header-h); display: flex; align-items: center;
+    transition: background .3s, border-color .3s;
+}
+.header-content {
+    max-width: 1000px; margin: 0 auto; width: 100%;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+}
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; cursor: pointer; flex-shrink: 0; }
+.logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--sky), var(--sky-dk));
+    border-radius: 10px; display: flex; align-items: center;
+    justify-content: center; font-size: 18px;
+    box-shadow: 0 2px 8px var(--sky-glow); transition: transform .2s;
+}
+.logo:hover .logo-icon { transform: scale(1.06); }
+.logo-text { font-size: 1.1rem; font-weight: 600; color: var(--ink); letter-spacing: -0.3px; }
+.logo-text span { color: var(--sky-dk); }
+.user-menu { display: flex; align-items: center; gap: 12px; }
+.user-name { color: var(--muted); font-weight: 500; font-size: 0.9rem; white-space: nowrap; }
+.theme-toggle {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 1.5px solid var(--border); background: var(--surface);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all .2s; color: var(--ink-2); flex-shrink: 0; line-height: 1;
+}
+.theme-toggle:hover { background: var(--sky-glow); border-color: var(--sky); transform: rotate(20deg); }
+.btn-logout {
+    background: none; border: none; color: var(--err); cursor: pointer;
+    padding: 6px 10px; font-size: 0.82rem; font-family: 'Onest', inherit;
+    border-radius: var(--r-sm); transition: background .2s; white-space: nowrap;
+}
+.btn-logout:hover { background: var(--err-bg); }
+
+.main {
+    max-width: 1000px; margin: 0 auto;
+    padding: calc(var(--header-h) + 32px) 20px 60px;
+}
+
+.page-header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.page-back {
+    background: var(--ghost); border: 1px solid var(--border); color: var(--ink);
+    padding: 8px 16px; border-radius: var(--r-sm); font-family: 'Onest', sans-serif;
+    font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all .2s; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.page-back:hover { background: var(--bg-alt); }
+.page-title { font-size: 1.4rem; font-weight: 600; color: var(--ink); }
+.page-subtitle { font-size: 0.88rem; color: var(--muted); margin-top: 2px; }
+
+.card {
+    background: var(--surface); backdrop-filter: blur(12px);
+    border-radius: var(--r-lg); padding: 28px;
+    box-shadow: var(--shadow-md); border: 1px solid var(--border);
+    transition: background .3s, border-color .3s; margin-bottom: 20px;
+}
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+.card-title { font-size: 1rem; font-weight: 600; color: var(--ink); }
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 18px; border-radius: var(--r-sm); border: none;
+    font-family: 'Onest', sans-serif; font-size: 0.85rem; font-weight: 500;
+    cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: linear-gradient(135deg, var(--sky), var(--sky-dk)); color: #fff; box-shadow: 0 2px 10px var(--sky-glow); }
+.btn-primary:hover { box-shadow: 0 4px 18px var(--sky-glow); }
+
+/* Device cards */
+.devices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+}
+.device-card {
+    background: var(--bg-alt); border: 1px solid var(--border);
+    border-radius: var(--r-md); padding: 18px 16px;
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: 8px; position: relative; transition: border-color .2s, box-shadow .2s;
+}
+.device-card:hover { border-color: var(--border-hv); box-shadow: var(--shadow-sm); }
+.dev-icon { font-size: 28px; }
+.dev-name { font-size: 0.95rem; font-weight: 600; color: var(--ink); word-break: break-word; }
+.dev-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.badge { padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; }
+.badge-type  { background: var(--sky-glow); color: var(--sky-dk); }
+.badge-mount { background: var(--ok-bg); color: var(--ok); }
+.dev-desc { font-size: 0.78rem; color: var(--muted); }
+.dev-antenna { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--sky-dk); word-break: break-all; }
+.dev-antenna-label { font-size: 0.70rem; color: var(--muted); margin-bottom: 1px; }
+.dev-enu { font-size: 0.70rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.dev-pc { font-size: 0.72rem; padding: 2px 8px; border-radius: 20px; display: inline-block; }
+.dev-pc-ok      { background: var(--ok-bg); color: var(--ok); }
+.dev-pc-expired { background: var(--warn-bg); color: var(--warn); }
+
+.no-devices {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+    font-size: 0.9rem; line-height: 1.7;
+}
+.no-devices .nd-icon { font-size: 40px; display: block; margin-bottom: 10px; }
+
+.loading { text-align: center; padding: 32px; color: var(--muted); font-size: 0.9rem; }
+
+.toast {
+    position: fixed; bottom: 24px; right: 24px;
+    padding: 11px 18px; border-radius: var(--r-md);
+    font-size: 0.88rem; font-weight: 500; font-family: 'Onest', sans-serif;
+    box-shadow: var(--shadow-lg); z-index: 3000;
+    opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none;
+    border: 1px solid transparent;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.ok  { background: var(--ok-bg);  color: var(--ok); }
+.toast.err { background: var(--err-bg); color: var(--err); }
+
+@keyframes popIn { from { transform: scale(.88); opacity:0; } to { transform: scale(1); opacity:1; } }
+@media (max-width: 680px) {
+    .header { padding: 0 1rem; }
+    .main { padding-top: calc(var(--header-h) + 20px); padding-left: 14px; padding-right: 14px; }
+    .card { padding: 18px 14px; }
+}
+</style>
+<script>
+(function(){
+    var k='cps_theme';
+    var t=localStorage.getItem(k)||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    document.documentElement.setAttribute('data-theme',t);
+    window._applyTheme=function(theme){
+        document.documentElement.setAttribute('data-theme',theme);
+        localStorage.setItem(k,theme);
+        document.querySelectorAll('.theme-toggle').forEach(function(b){
+            b.textContent=theme==='dark'?'☀️':'🌙';
+            b.title=theme==='dark'?'Светлая тема':'Тёмная тема';
+        });
+    };
+    window._toggleTheme=function(){
+        var cur=document.documentElement.getAttribute('data-theme')||'light';
+        _applyTheme(cur==='dark'?'light':'dark');
+    };
+    document.addEventListener('DOMContentLoaded',function(){
+        var isDark=document.documentElement.getAttribute('data-theme')==='dark';
+        document.querySelectorAll('.theme-toggle').forEach(function(b){
+            b.textContent=isDark?'☀️':'🌙';
+            b.title=isDark?'Светлая тема':'Тёмная тема';
+        });
+    });
+})();
+</script>
+</head>
+<body>
+<header class="header">
+    <div class="header-content">
+        <a class="logo" href="/">
+            <div class="logo-icon">📡</div>
+            <div class="logo-text"><span>Collaborative</span>PositioningService</div>
+        </a>
+        <div class="user-menu">
+            <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема">🌙</button>
+            <span class="user-name" id="headerLogin">—</span>
+            <button class="btn-logout" onclick="logout()">Выйти</button>
+        </div>
+    </div>
+</header>
+<main class="main">
+    <div class="page-header">
+        <a class="page-back" href="/">← Главная</a>
+        <div>
+            <div class="page-title">🤝 Коллаборативное позиционирование</div>
+            <div class="page-subtitle">Ваши устройства, участвующие в позиционировании</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">📡 Мои устройства</div>
+            <button class="btn btn-primary" onclick="window.location.href='/profile'">＋ Управление устройствами</button>
+        </div>
+        <div id="devicesContent"><div class="loading">Загрузка…</div></div>
+    </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DEVICE_ICONS  = { gnss_receiver:'📡', smartphone:'📱', tablet:'📟', other:'🔧' };
+const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'Смартфон', tablet:'Планшет', other:'Иное' };
+const MOUNT_LABELS  = { car:'Автомобиль', permanent_station:'Пост. станция', uav:'БПЛА', rod:'Веха', man:'Человек' };
+
+function getToken()  { return localStorage.getItem('token'); }
+function getLogin()  { return localStorage.getItem('userLogin') || ''; }
+function logout()    { localStorage.removeItem('token'); localStorage.removeItem('userLogin'); window.location.href = '/'; }
+function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let _toastTimer;
+function showToast(msg, type = 'ok') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `toast ${type} show`;
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+function checkAuth() {
+    if (!getToken() || !getLogin()) { window.location.href = '/login'; return false; }
+    document.getElementById('headerLogin').textContent = getLogin();
+    return true;
+}
+
+function renderDeviceExtra(d) {
+    if (d.deviceType === 'gnss_receiver') {
+        if (!d.antennaName) return '';
+        const enu = (d.antennaE || d.antennaN || d.antennaU)
+            ? `<div class="dev-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`
+            : '';
+        return `<div class="dev-antenna-label">Антенна</div><div class="dev-antenna">${escHtml(d.antennaName)}</div>${enu}`;
+    }
+    if (d.phaseCenterMethod === 'auto' && d.phaseCenterValidUntil) {
+        const until   = new Date(d.phaseCenterValidUntil);
+        const expired = until < new Date();
+        const fmt     = until.toLocaleString('ru', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+        return `<div class="dev-pc ${expired ? 'dev-pc-expired' : 'dev-pc-ok'}">${expired ? '⚠️ Калибровка истекла' : '🤖 Авто до ' + fmt}</div>`;
+    }
+    if (d.phaseCenterMethod === 'manual') {
+        return `<div class="dev-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`;
+    }
+    return '';
+}
+
+function renderDevices(devices) {
+    const el = document.getElementById('devicesContent');
+    if (!devices || devices.length === 0) {
+        el.innerHTML = `<div class="no-devices">
+            <span class="nd-icon">📡</span>
+            Нет зарегистрированных устройств.<br>
+            Добавьте устройство в <a href="/profile">личном кабинете</a>.
+        </div>`;
+        return;
+    }
+    el.innerHTML = `<div class="devices-grid">${devices.map(d => `
+        <div class="device-card">
+            <span class="dev-icon">${DEVICE_ICONS[d.deviceType] || '🔧'}</span>
+            <div class="dev-name">${escHtml(d.name)}</div>
+            <div class="dev-badges">
+                <span class="badge badge-type">${DEVICE_LABELS[d.deviceType] || d.deviceType}</span>
+                <span class="badge badge-mount">${MOUNT_LABELS[d.mountType] || d.mountType}</span>
+            </div>
+            ${renderDeviceExtra(d)}
+            ${d.description ? `<div class="dev-desc">${escHtml(d.description)}</div>` : ''}
+        </div>`).join('')}
+    </div>`;
+}
+
+async function loadDevices() {
+    try {
+        const r = await fetch('/api/profile/data', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (!r.ok) { showToast('Ошибка загрузки данных', 'err'); return; }
+        const data = await r.json();
+        renderDevices(data.devices || []);
+    } catch { showToast('Ошибка соединения', 'err'); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!checkAuth()) return;
+    loadDevices();
+});
+</script>
+</body>
+</html>

@@ -365,6 +365,12 @@ body::before {
 .footer-link a { color:var(--sky-dk); text-decoration:none; font-weight:600; }
 .footer-link a:hover { text-decoration:underline; }
 textarea { resize:vertical; min-height:64px; }
+.pc-card {
+    border:2px solid var(--border); border-radius:var(--r-md); padding:12px 10px;
+    cursor:pointer; display:flex; flex-direction:column; align-items:center;
+    gap:4px; background:var(--surface); transition:all .2s; text-align:center;
+}
+.pc-card:hover, .pc-card.chosen { border-color:var(--sky); background:var(--sky-glow); }
 @media(max-width:480px){ .steps-body{padding:22px 20px 24px;} }
 </style>
 <script>
@@ -468,6 +474,66 @@ textarea { resize:vertical; min-height:64px; }
                         <div class="mount-card" data-mount="rod"               onclick="selectMount(this)"><span class="mi">📏</span><span class="ml">Веха</span></div>
                     </div>
                 </div>
+                <!-- Поля для ГНСС-приёмника -->
+                <div class="field" id="antennaField" style="display:none">
+                    <label for="antennaName">Название антенны (формат RINEX) <span style="color:var(--err);">*</span></label>
+                    <input type="text" id="antennaName" placeholder="TRM57971.00     NONE" style="font-family:'JetBrains Mono',monospace;letter-spacing:0.02em">
+                    <div class="field-error" id="err-antennaName"></div>
+                    <div style="font-size:0.73rem;color:var(--muted);margin-top:4px;">Название в формате IGS ANTEX: тип антенны (20 символов) + тип радиома</div>
+                </div>
+                <div class="field" id="antennaOffsetField" style="display:none">
+                    <label>Смещения антенны ENU <span style="color:var(--muted);font-weight:400;">(метры, 0 если не известны)</span></label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                        <div>
+                            <label for="antennaE" style="font-size:0.73rem;color:var(--muted);">E (Восток)</label>
+                            <input type="number" id="antennaE" value="0" step="0.001" placeholder="0.000">
+                        </div>
+                        <div>
+                            <label for="antennaN" style="font-size:0.73rem;color:var(--muted);">N (Север)</label>
+                            <input type="number" id="antennaN" value="0" step="0.001" placeholder="0.000">
+                        </div>
+                        <div>
+                            <label for="antennaU" style="font-size:0.73rem;color:var(--muted);">U (Высота)</label>
+                            <input type="number" id="antennaU" value="0" step="0.001" placeholder="0.000">
+                        </div>
+                    </div>
+                </div>
+                <!-- Фазовый центр для мобильных устройств -->
+                <div class="field" id="phaseCenterField" style="display:none">
+                    <label>Фазовый центр антенны <span style="color:var(--err);">*</span></label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                        <div class="pc-card" data-method="none" onclick="selectPcMethod(this)">
+                            <div style="font-size:22px;margin-bottom:4px;">🚫</div>
+                            <div style="font-size:0.78rem;font-weight:600;color:var(--ink);">Без фазового центра</div>
+                            <div style="font-size:0.70rem;color:var(--muted);margin-top:2px;">Смещения = 0</div>
+                        </div>
+                        <div class="pc-card" data-method="manual" onclick="selectPcMethod(this)">
+                            <div style="font-size:22px;margin-bottom:4px;">✏️</div>
+                            <div style="font-size:0.78rem;font-weight:600;color:var(--ink);">Ввести вручную</div>
+                            <div style="font-size:0.70rem;color:var(--muted);margin-top:2px;">Указать смещения ENU</div>
+                        </div>
+                    </div>
+                    <div id="autoWarning" style="display:none;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn);border-radius:var(--r-sm);padding:10px 12px;font-size:0.78rem;line-height:1.5;">
+                        ⚠️ Без поправки на фазовый центр антенны точность определения координат на уровне сантиметров <strong>недоступна</strong>.
+                    </div>
+                    <div id="manualOffsets" style="display:none;margin-top:10px;">
+                        <label style="margin-bottom:6px;display:block;">Смещения ENU <span style="color:var(--err);">*</span> <span style="color:var(--muted);font-weight:400;">(метры)</span></label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                            <div>
+                                <label for="pcE" style="font-size:0.73rem;color:var(--muted);">E (Восток)</label>
+                                <input type="number" id="pcE" value="0" step="0.001" placeholder="0.000">
+                            </div>
+                            <div>
+                                <label for="pcN" style="font-size:0.73rem;color:var(--muted);">N (Север)</label>
+                                <input type="number" id="pcN" value="0" step="0.001" placeholder="0.000">
+                            </div>
+                            <div>
+                                <label for="pcU" style="font-size:0.73rem;color:var(--muted);">U (Высота)</label>
+                                <input type="number" id="pcU" value="0" step="0.001" placeholder="0.000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="field" id="descField" style="display:none">
                     <label for="deviceDesc">Описание <span style="color:var(--muted);font-weight:400;">(необязательно)</span></label>
                     <textarea id="deviceDesc" placeholder="Дополнительная информация об устройстве"></textarea>
@@ -487,6 +553,6 @@ textarea { resize:vertical; min-height:64px; }
     </div>
     <div class="footer-link"><a href="/">← Вернуться на главную</a></div>
 </div>
-<script src="/js/register.js"></script>
+<script src="/js/register.js?v=2"></script>
 </body>
 </html>

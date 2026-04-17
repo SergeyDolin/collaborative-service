@@ -26,11 +26,22 @@ const (
 type UserDevice struct {
 	ID          int64      `json:"id" db:"id"`
 	UserLogin   string     `json:"userLogin" db:"user_login"`
-	Name        string     `json:"name" db:"name"` // Название/модель
+	Name        string     `json:"name" db:"name"`
 	DeviceType  DeviceType `json:"deviceType" db:"device_type"`
 	MountType   MountType  `json:"mountType" db:"mount_type"`
 	Description string     `json:"description,omitempty" db:"description"`
-	CreatedAt   time.Time  `json:"createdAt" db:"created_at"`
+
+	// Поля антенны ГНСС-приёмника
+	AntennaName string  `json:"antennaName,omitempty" db:"antenna_name"`
+	AntennaE    float64 `json:"antennaE" db:"antenna_e"`
+	AntennaN    float64 `json:"antennaN" db:"antenna_n"`
+	AntennaU    float64 `json:"antennaU" db:"antenna_u"`
+
+	// Фазовый центр для мобильных устройств
+	PhaseCenterMethod     string     `json:"phaseCenterMethod,omitempty" db:"phase_center_method"`
+	PhaseCenterValidUntil *time.Time `json:"phaseCenterValidUntil,omitempty" db:"phase_center_valid_until"`
+
+	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 }
 
 // DeviceTypeLabel человекочитаемое название типа

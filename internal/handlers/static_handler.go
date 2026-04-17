@@ -44,3 +44,8 @@ func ProfilePageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 func MeasurementsPageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 	return ServeStaticFile("measurements.html", logger)
 }
+
+// CollaborativePageHandler обслуживает страницу коллаборативного позиционирования
+func CollaborativePageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
+	return ServeStaticFile("collaborative.html", logger)
+}
