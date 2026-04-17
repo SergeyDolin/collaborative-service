@@ -1,6 +1,7 @@
 
 let selectedMethod = null;
 let selectedFile = null;
+let selectedDeviceType = null;
 
 const methodDetails = {
     single: {
@@ -114,20 +115,41 @@ function selectMethod(method) {
         <ul>${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>
     `;
     
+    document.getElementById('deviceSection').style.display = 'block';
     updateButtonState();
+}
+
+function selectDeviceType(type) {
+    selectedDeviceType = type;
+    document.querySelectorAll('.device-option').forEach(el => el.classList.remove('selected'));
+    document.querySelector(`.device-option[data-device="${type}"]`).classList.add('selected');
+    document.getElementById('mobileAntennaSection').style.display = type === 'mobile' ? 'block' : 'none';
+    if (type === 'mobile') checkMobileWarning();
+    updateButtonState();
+}
+
+function checkMobileWarning() {
+    const e = parseFloat(document.getElementById('mobileE').value) || 0;
+    const n = parseFloat(document.getElementById('mobileN').value) || 0;
+    const u = parseFloat(document.getElementById('mobileU').value) || 0;
+    document.getElementById('mobileAccuracyWarning').style.display = (e === 0 && n === 0 && u === 0) ? 'block' : 'none';
 }
 
 function updateButtonState() {
     const btn = document.getElementById('processBtn');
-    if (selectedMethod && selectedFile) {
+    const ready = selectedMethod && selectedFile && selectedDeviceType;
+    if (ready) {
         btn.disabled = false;
         btn.textContent = '🚀 Запустить обработку';
-    } else if (selectedMethod && !selectedFile) {
+    } else if (!selectedMethod) {
+        btn.disabled = true;
+        btn.textContent = 'Выберите метод и файл';
+    } else if (!selectedDeviceType) {
+        btn.disabled = true;
+        btn.textContent = '📡 Выберите тип устройства';
+    } else if (!selectedFile) {
         btn.disabled = true;
         btn.textContent = '📁 Выберите файл наблюдений';
-    } else if (!selectedMethod && selectedFile) {
-        btn.disabled = true;
-        btn.textContent = '📍 Выберите метод обработки';
     } else {
         btn.disabled = true;
         btn.textContent = 'Выберите метод и файл';
@@ -184,7 +206,7 @@ function handleFile(file) {
 }
 
 async function startProcessing() {
-    if (!selectedMethod || !selectedFile) return;
+    if (!selectedMethod || !selectedFile || !selectedDeviceType) return;
     
     const token = localStorage.getItem('token');
     if (!token) {
@@ -200,7 +222,13 @@ async function startProcessing() {
     
     statusDiv.style.display = 'none';
     
-    const config = methodDetails[selectedMethod].config;
+    const config = { ...methodDetails[selectedMethod].config, deviceType: selectedDeviceType };
+    if (selectedDeviceType === 'mobile') {
+        config.antennaType = document.getElementById('mobileAntennaType').value.trim();
+        config.antennaDeltaE = parseFloat(document.getElementById('mobileE').value) || 0;
+        config.antennaDeltaN = parseFloat(document.getElementById('mobileN').value) || 0;
+        config.antennaDeltaU = parseFloat(document.getElementById('mobileU').value) || 0;
+    }
     const formData = new FormData();
     formData.append('config', JSON.stringify(config));
     formData.append('file', selectedFile);
@@ -225,15 +253,17 @@ async function startProcessing() {
             
             selectedFile = null;
             selectedMethod = null;
+            selectedDeviceType = null;
             document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYd), сжатые (.gz)';
             document.getElementById('fileInfo').style.color = '#718096';
-            document.querySelectorAll('.method-option[data-method]').forEach(opt => {
-                opt.classList.remove('selected');
-            });
+            document.querySelectorAll('.method-option[data-method]').forEach(opt => opt.classList.remove('selected'));
+            document.querySelectorAll('.device-option').forEach(el => el.classList.remove('selected'));
             document.getElementById('methodDetail').innerHTML = `
                 <h4>👆 Выберите метод обработки</h4>
                 <p>Нажмите на один из методов выше, чтобы увидеть подробное описание</p>
             `;
+            document.getElementById('deviceSection').style.display = 'none';
+            document.getElementById('mobileAntennaSection').style.display = 'none';
             updateButtonState();
             
             setTimeout(() => { 

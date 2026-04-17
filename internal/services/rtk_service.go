@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -27,7 +28,9 @@ func NewRTKService(rtklibPath, workDir string, logger *zap.SugaredLogger) *RTKSe
 
 // ProcessPPP запускает PPP обработку с использованием точных файлов
 func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath, taskID string) (string, error) {
-	outputFile := filepath.Join(r.workDir, fmt.Sprintf("%s_output.pos", taskID))
+	taskDir := filepath.Join(r.workDir, taskID)
+	os.MkdirAll(taskDir, 0755)
+	outputFile := filepath.Join(taskDir, "output.pos")
 
 	// Формируем команду для rnx2rtkp с PPP опциями
 	args := []string{
@@ -65,7 +68,9 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath,
 
 // ProcessRelative запускает относительную обработку (DGPS/RTK)
 func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, taskID string) (string, error) {
-	outputFile := filepath.Join(r.workDir, fmt.Sprintf("%s_output.pos", taskID))
+	taskDir := filepath.Join(r.workDir, taskID)
+	os.MkdirAll(taskDir, 0755)
+	outputFile := filepath.Join(taskDir, "output.pos")
 
 	args := []string{
 		"-k", configPath,
@@ -102,7 +107,9 @@ func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, tas
 
 // ProcessAbsolute запускает абсолютное позиционирование (SPP)
 func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID string) (string, error) {
-	outputFile := filepath.Join(r.workDir, fmt.Sprintf("%s_output.pos", taskID))
+	taskDir := filepath.Join(r.workDir, taskID)
+	os.MkdirAll(taskDir, 0755)
+	outputFile := filepath.Join(taskDir, "output.pos")
 
 	args := []string{
 		"-k", configPath,
@@ -138,7 +145,9 @@ func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID strin
 
 // ProcessWithConfig общий метод для запуска с любым конфигом
 func (r *RTKService) ProcessWithConfig(configPath, rinexPath, taskID string) (string, error) {
-	outputFile := filepath.Join(r.workDir, fmt.Sprintf("%s_output.pos", taskID))
+	taskDir := filepath.Join(r.workDir, taskID)
+	os.MkdirAll(taskDir, 0755)
+	outputFile := filepath.Join(taskDir, "output.pos")
 
 	args := []string{
 		"-k", configPath,

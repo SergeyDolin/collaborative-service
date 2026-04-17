@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"collaborative/internal/model"
+	"collaborative/internal/parsers"
 
 	"go.uber.org/zap"
 )
@@ -37,6 +38,7 @@ type ConfigGenerator struct {
 	templateDir string
 	workDir     string
 	logger      *zap.SugaredLogger
+	rinexParser *parsers.RINEXParser
 }
 
 func NewConfigGenerator(templateDir, workDir string, logger *zap.SugaredLogger) *ConfigGenerator {
@@ -44,6 +46,44 @@ func NewConfigGenerator(templateDir, workDir string, logger *zap.SugaredLogger) 
 		templateDir: templateDir,
 		workDir:     workDir,
 		logger:      logger,
+		rinexParser: parsers.NewRINEXParser(),
+	}
+}
+
+type SNRConfig struct {
+	Enabled bool
+	MaskL1  string
+	MaskL2  string
+	MaskL5  string
+}
+
+func (g *ConfigGenerator) getSNRConfig(rinexPath string) SNRConfig {
+	snrInfo := g.rinexParser.ParseSNRMapping(rinexPath)
+
+	if !snrInfo.Present {
+		g.logger.Info("SNR mapping not found in RINEX header, SNR mask disabled")
+		return SNRConfig{Enabled: false}
+	}
+
+	thresholds := g.rinexParser.GetSNRMaskValues(snrInfo)
+	if len(thresholds) != 9 {
+		g.logger.Warn("Failed to parse SNR thresholds, SNR mask disabled")
+		return SNRConfig{Enabled: false}
+	}
+
+	// Формируем строки масок
+	maskStr := fmt.Sprintf("%d,%d,%d,%d,%d,%d,%d,%d,%d",
+		thresholds[0], thresholds[1], thresholds[2],
+		thresholds[3], thresholds[4], thresholds[5],
+		thresholds[6], thresholds[7], thresholds[8])
+
+	g.logger.Infof("SNR mapping found, mask values: %s", maskStr)
+
+	return SNRConfig{
+		Enabled: true,
+		MaskL1:  maskStr,
+		MaskL2:  maskStr,
+		MaskL5:  maskStr,
 	}
 }
 
@@ -107,9 +147,9 @@ func (g *ConfigGenerator) GenerateConfig(
 		return "", fmt.Errorf("failed to read template: %w", err)
 	}
 
-	content := g.replaceParameters(string(templateData), config, date, files, ant)
+	content := g.replaceParameters(string(templateData), config, date, files, ant, rinexPath)
 
-	configPath := filepath.Join(g.workDir, fmt.Sprintf("%s_config.conf", taskID))
+	configPath := filepath.Join(g.workDir, taskID, fmt.Sprintf("%s_config.conf", taskID))
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 		return "", fmt.Errorf("failed to write config: %w", err)
 	}
@@ -299,6 +339,7 @@ func (g *ConfigGenerator) replaceParameters(
 	date time.Time,
 	files *ProcessingFiles,
 	ant AntennaInfo,
+	rinexPath string,
 ) string {
 	fmtDelta := func(v float64) string {
 		return strconv.FormatFloat(v, 'f', 4, 64)
@@ -320,6 +361,27 @@ func (g *ConfigGenerator) replaceParameters(
 		"{{ANT_DELTA_U}}": fmtDelta(ant.DeltaH),
 		"{{ANT_DELTA_E}}": fmtDelta(ant.DeltaE),
 		"{{ANT_DELTA_N}}": fmtDelta(ant.DeltaN),
+	}
+
+	snrConfig := g.getSNRConfig(rinexPath)
+
+	snrMaskR := "off"
+	snrMaskB := "off"
+	if snrConfig.Enabled {
+		snrMaskR = "on"
+		snrMaskB = "on"
+	}
+
+	snrReplacements := map[string]string{
+		"{{SNR_MASK_R}}":  snrMaskR,
+		"{{SNR_MASK_B}}":  snrMaskB,
+		"{{SNR_MASK_L1}}": snrConfig.MaskL1,
+		"{{SNR_MASK_L2}}": snrConfig.MaskL2,
+		"{{SNR_MASK_L5}}": snrConfig.MaskL5,
+	}
+
+	for placeholder, value := range snrReplacements {
+		replacements[placeholder] = value
 	}
 
 	if files.NavigationFile != "" {

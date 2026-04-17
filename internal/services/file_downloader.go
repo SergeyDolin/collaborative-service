@@ -94,7 +94,7 @@ func getGPSWeekAndDOW(date time.Time) (week int, dow int) {
 func (d *FileDownloader) DownloadBroadcastEphemeris(date time.Time, taskID string) (string, error) {
 	year, doy := getYearDay(date)
 
-	localFile := filepath.Join(d.workDir, fmt.Sprintf("%s_brdc.rnx.gz", taskID))
+	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_brdc.rnx.gz", taskID))
 	url := fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/BRDC/%d/%03d/BRDC00WRD_R_%d%03d0000_01D_MN.rnx.gz",
 		year, doy, year, doy)
 
@@ -124,7 +124,7 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
-	localFile := filepath.Join(d.workDir, fmt.Sprintf("%s_sp3.sp3.gz", taskID))
+	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_sp3.sp3.gz", taskID))
 
 	type candidate struct {
 		label  string
@@ -189,7 +189,7 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
-	localFile := filepath.Join(d.workDir, fmt.Sprintf("%s_clk.clk.gz", taskID))
+	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_clk.clk.gz", taskID))
 
 	type candidate struct {
 		label  string
@@ -254,7 +254,7 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 	week, _ := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
-	localFile := filepath.Join(d.workDir, fmt.Sprintf("%s_erp.erp.gz", taskID))
+	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_erp.erp.gz", taskID))
 
 	candidates := []struct {
 		label string
@@ -304,8 +304,8 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, error) {
 	year, doy := getYearDay(date)
 
-	gzFile := filepath.Join(d.workDir, fmt.Sprintf("%s_dcb.bsx.gz", taskID))
-	outFile := filepath.Join(d.workDir, fmt.Sprintf("%s_dcb.bsx", taskID))
+	gzFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx.gz", taskID))
+	outFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx", taskID))
 
 	ftpDir := fmt.Sprintf("/gnss/products/bias/%d", year)
 
@@ -363,8 +363,8 @@ func (d *FileDownloader) DownloadBIA(date time.Time, taskID string) (string, err
 	week, _ := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
-	gzFile := filepath.Join(d.workDir, fmt.Sprintf("%s_bia.bia.gz", taskID))
-	outFile := filepath.Join(d.workDir, fmt.Sprintf("%s_bia.bia", taskID))
+	gzFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_bia.bia.gz", taskID))
+	outFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_bia.bia", taskID))
 
 	ftpDir := fmt.Sprintf("/gnss/products/%d", week)
 
@@ -488,7 +488,7 @@ func (d *FileDownloader) DownloadBaseStation(stationID string, date time.Time, t
 	urlCrx := fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/%03d/%s%03d0.%02dcrx.gz",
 		year, doy, strings.ToLower(stationID), doy, year%100)
 
-	filename := filepath.Join(d.workDir, fmt.Sprintf("%s_base", taskID))
+	filename := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_base", taskID))
 	gzFile := filename + ".gz"
 
 	// Сначала пробуем скачать .crx.gz

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,134 @@ type RINEXParser struct{}
 
 func NewRINEXParser() *RINEXParser {
 	return &RINEXParser{}
+}
+
+// SNRRange представляет диапазон SNR значений
+type SNRRange struct {
+	Min float64
+	Max float64
+	Val int
+}
+
+// SNRInfo содержит информацию о SNR маппинге из RINEX заголовка
+type SNRInfo struct {
+	Present bool
+	Ranges  []SNRRange
+}
+
+// ParseSNRMapping извлекает SNR маппинг из заголовка RINEX
+func (p *RINEXParser) ParseSNRMapping(filePath string) *SNRInfo {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return &SNRInfo{Present: false}
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	var snrLines []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "END OF HEADER") {
+			break
+		}
+		// Ищем строки с SNR mapping
+		if strings.Contains(line, "SNR is mapped to RINEX snr flag value") ||
+			strings.Contains(line, "dBHz ->") {
+			snrLines = append(snrLines, line)
+		}
+	}
+
+	if len(snrLines) == 0 {
+		return &SNRInfo{Present: false}
+	}
+
+	// Парсим все строки вместе
+	fullText := strings.Join(snrLines, " ")
+	info := &SNRInfo{Present: true}
+
+	// Известные стандартные диапазоны
+	knownRanges := []SNRRange{
+		{Min: 0, Max: 12, Val: 1},
+		{Min: 12, Max: 17, Val: 2},
+		{Min: 18, Max: 23, Val: 3},
+		{Min: 24, Max: 29, Val: 4},
+		{Min: 30, Max: 35, Val: 5},
+		{Min: 36, Max: 41, Val: 6},
+		{Min: 42, Max: 47, Val: 7},
+		{Min: 48, Max: 53, Val: 8},
+		{Min: 54, Max: 999, Val: 9},
+	}
+
+	// Проверяем, соответствует ли текст стандартному формату
+	if strings.Contains(fullText, "< 12dBHz -> 1") {
+		info.Ranges = knownRanges
+		return info
+	}
+
+	// Если формат нестандартный, пытаемся распарсить с помощью regexp
+	re := regexp.MustCompile(`([<>]=?\s*\d+|\d+\s*-\s*\d+)\s*dBHz\s*->\s*(\d)`)
+	matches := re.FindAllStringSubmatch(fullText, -1)
+
+	for _, match := range matches {
+		if len(match) >= 3 {
+			rangeStr := match[1]
+			val, _ := strconv.Atoi(match[2])
+
+			var min, max float64
+			if strings.HasPrefix(rangeStr, "<") {
+				maxStr := strings.TrimPrefix(rangeStr, "<")
+				max, _ = strconv.ParseFloat(strings.TrimSpace(maxStr), 64)
+				min = 0
+			} else if strings.HasPrefix(rangeStr, ">=") {
+				minStr := strings.TrimPrefix(rangeStr, ">=")
+				min, _ = strconv.ParseFloat(strings.TrimSpace(minStr), 64)
+				max = 999
+			} else if strings.Contains(rangeStr, "-") {
+				parts := strings.Split(rangeStr, "-")
+				min, _ = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+				max, _ = strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+			}
+
+			info.Ranges = append(info.Ranges, SNRRange{
+				Min: min,
+				Max: max,
+				Val: val,
+			})
+		}
+	}
+
+	return info
+}
+
+// GetSNRMaskValues возвращает массив значений SNR маски для RTKLIB конфига
+// на основе распарсенного SNR маппинга. Используется верхняя граница диапазона.
+func (p *RINEXParser) GetSNRMaskValues(info *SNRInfo) []int {
+	if !info.Present || len(info.Ranges) == 0 {
+		return nil
+	}
+
+	// Для каждого значения 1-9 находим порог (верхнюю границу диапазона)
+	thresholds := make([]int, 9)
+	for i := range thresholds {
+		thresholds[i] = 0
+	}
+
+	for _, r := range info.Ranges {
+		if r.Val >= 1 && r.Val <= 9 {
+			// Используем верхнюю границу диапазона как порог
+			threshold := int(r.Max)
+			// Для последнего диапазона (>=54) Max=999, но порог должен быть 54
+			if r.Max > 100 {
+				threshold = int(r.Min)
+			}
+			if threshold > thresholds[r.Val-1] {
+				thresholds[r.Val-1] = threshold
+			}
+		}
+	}
+
+	return thresholds
 }
 
 // ParseObservationDate extracts the start date from a RINEX observation file header.

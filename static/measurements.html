@@ -314,46 +314,40 @@ body::before {
 .status-success { background:var(--ok-bg);  color:var(--ok); }
 .status-error   { background:var(--err-bg); color:var(--err); }
 .user-menu { display:flex; align-items:center; gap:12px; }
+@media(max-width:768px){ .method-selector{grid-template-columns:1fr;} }
+
 /* Device type selector */
 .device-section { margin-bottom:22px; }
-.device-section-label { font-size:0.82rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px; }
+.device-section-label { font-size:0.78rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px; }
 .device-selector { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .device-option {
-    border:2px solid var(--border); border-radius:var(--r-md); padding:14px 16px;
-    cursor:pointer; display:flex; align-items:center; gap:14px;
-    background:var(--surface); transition:all .2s;
+    border:2px solid var(--border); border-radius:var(--r-md); padding:18px 16px;
+    cursor:pointer; transition:all .2s; background:var(--surface);
+    display:flex; gap:12px; align-items:flex-start;
 }
-.device-option:hover { border-color:var(--border-hv); background:var(--sky-glow); transform:translateY(-1px); }
+.device-option:hover { border-color:var(--border-hv); box-shadow:var(--shadow-md); transform:translateY(-1px); }
 .device-option.selected { border-color:var(--sky); background:var(--sky-glow); box-shadow:0 0 0 3px var(--sky-glow); }
 .device-option-icon { font-size:26px; flex-shrink:0; }
-.device-option-title { font-size:0.9rem; font-weight:600; color:var(--ink); }
-.device-option-desc  { font-size:0.74rem; color:var(--muted); margin-top:2px; line-height:1.4; }
+.device-option-title { font-size:0.9rem; font-weight:600; color:var(--ink); margin-bottom:4px; }
+.device-option-desc  { font-size:0.75rem; color:var(--muted); line-height:1.4; }
+
 /* Mobile antenna section */
 .antenna-section {
-    background:var(--bg-alt); border:1px solid var(--border);
-    border-radius:var(--r-md); padding:18px 16px; margin-bottom:20px;
+    background:var(--bg-alt); border-radius:var(--r-md);
+    padding:18px 20px; margin-bottom:22px;
+    border:1px solid var(--border); border-left:4px solid var(--sky);
 }
-.antenna-section label { display:block; font-size:0.82rem; font-weight:500; color:var(--ink); margin-bottom:6px; }
-.antenna-section input[type="text"],
-.antenna-section input[type="number"] {
-    width:100%; padding:9px 12px; border:1.5px solid var(--border);
-    border-radius:var(--r-sm); font-family:'Onest',sans-serif; font-size:0.88rem;
-    color:var(--ink); background:var(--surface); outline:none;
-    transition:border-color .2s, box-shadow .2s;
-}
-.antenna-section input:focus { border-color:var(--sky); box-shadow:0 0 0 3px var(--sky-glow); }
-.enu-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:6px; }
-.enu-grid label { font-size:0.73rem; color:var(--muted); margin-bottom:4px; }
+.antenna-section label { font-size:0.82rem; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
+.enu-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; }
+.enu-grid label { font-size:0.78rem; font-weight:500; color:var(--muted); margin-bottom:4px; }
 .accuracy-warning {
-    margin-top:14px; padding:10px 14px; border-radius:var(--r-sm);
-    background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn);
-    font-size:0.8rem; line-height:1.5;
+    background:var(--warn-bg); color:var(--warn);
+    border-radius:var(--r-sm); padding:10px 14px;
+    font-size:0.82rem; margin-top:12px;
+    border-left:3px solid var(--warn);
+    display:none;
 }
-@media(max-width:768px){
-    .method-selector { grid-template-columns:1fr; }
-    .device-selector { grid-template-columns:1fr; }
-    .enu-grid { grid-template-columns:1fr; }
-}
+@media(max-width:600px){ .device-selector{grid-template-columns:1fr;} .enu-grid{grid-template-columns:1fr;} }
 </style>
 <script>
 // Theme manager — inline script, runs before page renders
@@ -421,7 +415,6 @@ body::before {
             <h4>👆 Выберите метод обработки</h4>
             <p>Нажмите на один из методов выше, чтобы увидеть подробное описание</p>
         </div>
-
         <!-- Тип устройства — появляется после выбора метода -->
         <div class="device-section" id="deviceSection" style="display:none">
             <div class="device-section-label">Тип устройства</div>
@@ -430,14 +423,14 @@ body::before {
                     <div class="device-option-icon">📡</div>
                     <div>
                         <div class="device-option-title">ГНСС-приёмник</div>
-                        <div class="device-option-desc">Антенна считывается из заголовка RINEX-файла</div>
+                        <div class="device-option-desc">Антенна считывается из заголовка RINEX-файла автоматически</div>
                     </div>
                 </div>
                 <div class="device-option" data-device="mobile" onclick="selectDeviceType('mobile')">
                     <div class="device-option-icon">📱</div>
                     <div>
                         <div class="device-option-title">Мобильное устройство</div>
-                        <div class="device-option-desc">Смартфон или планшет — задать смещения антенны вручную</div>
+                        <div class="device-option-desc">Задать смещения фазового центра антенны вручную</div>
                     </div>
                 </div>
             </div>
@@ -445,31 +438,29 @@ body::before {
 
         <!-- Параметры антенны мобильного устройства -->
         <div class="antenna-section" id="mobileAntennaSection" style="display:none">
-            <div style="font-size:0.88rem;font-weight:600;color:var(--ink);margin-bottom:14px;">📐 Параметры антенны</div>
-            <div style="margin-bottom:14px;">
-                <label>Тип антенны (формат RINEX) <span style="color:var(--muted);font-weight:400;">(необязательно)</span></label>
-                <input type="text" id="mobileAntennaType" placeholder="Оставьте пустым — будет подставлено UNKNOWN"
-                    style="font-family:'JetBrains Mono',monospace;letter-spacing:.02em" oninput="checkMobileWarning()">
+            <div class="form-group">
+                <label>Тип антенны (формат RINEX, необязательно)</label>
+                <input type="text" id="mobileAntennaType" placeholder="Если внешней антенны нет напишите: UNKNOWN" oninput="checkMobileWarning()">
             </div>
             <div>
-                <label>Смещения фазового центра ENU <span style="color:var(--muted);font-weight:400;">(метры)</span></label>
+                <label>Смещения фазового центра (метры)</label>
                 <div class="enu-grid">
                     <div>
-                        <label>E (Восток)</label>
-                        <input type="number" id="mobileE" value="0" step="0.001" placeholder="0.000" oninput="checkMobileWarning()">
+                        <label>↕ Вверх (U)</label>
+                        <input type="number" id="mobileU" placeholder="0.0000" step="0.0001" oninput="checkMobileWarning()">
                     </div>
                     <div>
-                        <label>N (Север)</label>
-                        <input type="number" id="mobileN" value="0" step="0.001" placeholder="0.000" oninput="checkMobileWarning()">
+                        <label>→ Восток (E)</label>
+                        <input type="number" id="mobileE" placeholder="0.0000" step="0.0001" oninput="checkMobileWarning()">
                     </div>
                     <div>
-                        <label>U (Высота)</label>
-                        <input type="number" id="mobileU" value="0" step="0.001" placeholder="0.000" oninput="checkMobileWarning()">
+                        <label>↑ Север (N)</label>
+                        <input type="number" id="mobileN" placeholder="0.0000" step="0.0001" oninput="checkMobileWarning()">
                     </div>
                 </div>
             </div>
             <div class="accuracy-warning" id="mobileAccuracyWarning">
-                ⚠️ Без поправки на фазовый центр антенны точность определения координат на уровне сантиметров <strong>недоступна</strong>. Введите смещения ENU для получения высокоточного результата.
+                ⚠️ Без поправки на фазовый центр точность определения координат на уровне сантиметров недостижима.
             </div>
         </div>
 
@@ -483,6 +474,6 @@ body::before {
         <div id="status" class="status-message"></div>
     </div>
 </main>
-<script src="/js/measurements.js"></script>
+<script src="/js/measurements.js?v=2"></script>
 </body>
 </html>
