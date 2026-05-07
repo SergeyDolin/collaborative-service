@@ -357,19 +357,8 @@ async function loadHistory() {
                 } else if (hasCoords) {
                     coordsHtml = `<div class="coords-mono">B: ${formatCoord(r.latitude)}°<br>L: ${formatCoord(r.longitude)}°<br>H: ${formatH(r.height)} м</div>`;
                 }
-                // Кнопка скачивания: показываем если файл есть в базе
-                let dlBtn = '';
-                if (task.hasResultFile) {
-                    const isStatic = task.fileType === 'static';
-                    const label = isStatic ? '📥 Скачать решение .pos' : '📥 Скачать .pos';
-                    let expiryNote = '';
-                    if (task.resultExpiresAt) {
-                        const exp = new Date(task.resultExpiresAt);
-                        const days = Math.ceil((exp - Date.now()) / 86400000);
-                        expiryNote = ` <span class="dl-expiry" title="Файл будет удалён ${exp.toLocaleDateString('ru')}">ещё ${days} д.</span>`;
-                    }
-                    dlBtn = `<button class="download-btn" onclick="downloadResult('${task.id}',event)">${label}</button>${expiryNote}`;
-                }
+                const dlBtn = task.fileType !== 'static'
+                    ? `<button class="download-btn" onclick="downloadResult('${task.id}',event)">📥 Скачать .pos</button>` : '';
                 const trBtn = hasCoords
                     ? `<button class="btn-transform" onclick="openTransform(${r.latitude},${r.longitude},${r.height||0},'${task.id}')">🔄 Пересчёт</button>` : '';
                 resultHtml = `<div class="result-block">

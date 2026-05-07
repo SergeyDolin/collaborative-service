@@ -151,6 +151,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	staticHandler := handlers.StaticFileServer(app.logger)
 	router.Handle("/css/*", staticHandler)
 	router.Handle("/js/*", staticHandler)
+	router.Handle("/assets/*", staticHandler)
 
 	// Static pages
 	router.Get("/", handlers.IndexHandler(app.logger))

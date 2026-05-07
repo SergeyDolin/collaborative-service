@@ -1,0 +1,27 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  
+  <polygon points="32,6 54,19 54,45 32,58 10,45 10,19" stroke-width="1.5"></polygon>
+  
+  <polygon points="32,16 47,24.5 47,39.5 32,48 17,39.5 17,24.5" stroke-width="1" opacity="0.55"></polygon>
+  
+  <g stroke-width="0.5" opacity="0.4">
+    <line x1="32" y1="6" x2="32" y2="32"></line>
+    <line x1="54" y1="19" x2="32" y2="32"></line>
+    <line x1="54" y1="45" x2="32" y2="32"></line>
+    <line x1="32" y1="58" x2="32" y2="32"></line>
+    <line x1="10" y1="45" x2="32" y2="32"></line>
+    <line x1="10" y1="19" x2="32" y2="32"></line>
+  </g>
+  
+  <circle cx="32" cy="6" r="2" fill="var(--paper, #f4f1ea)" stroke-width="1.5"></circle>
+  <circle cx="54" cy="19" r="2" fill="var(--paper, #f4f1ea)" stroke-width="1.5"></circle>
+  <circle cx="54" cy="45" r="2" fill="var(--paper, #f4f1ea)" stroke-width="1.5"></circle>
+  <circle cx="32" cy="58" r="2" fill="var(--paper, #f4f1ea)" stroke-width="1.5"></circle>
+  <circle cx="10" cy="45" r="2" fill="var(--paper, #f4f1ea)" stroke-width="1.5"></circle>
+  <circle cx="10" cy="19" r="2" fill="var(--paper, #f4f1ea)" stroke-width="1.5"></circle>
+  
+  <circle cx="32" cy="32" r="5" fill="var(--signal, #c4ff3d)" stroke="var(--graphite, #1a1a1a)" stroke-width="1.5"></circle>
+  <line x1="32" y1="29" x2="32" y2="35" stroke="var(--graphite, #1a1a1a)" stroke-width="1.2"></line>
+  <line x1="29" y1="32" x2="35" y2="32" stroke="var(--graphite, #1a1a1a)" stroke-width="1.2"></line>
+</svg>

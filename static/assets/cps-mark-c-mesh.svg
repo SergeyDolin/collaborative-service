@@ -1,0 +1,60 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+
+  
+  <g stroke="currentColor" stroke-width="0.75" opacity="0.55" stroke-dasharray="2 2">
+    
+    <line x1="14" y1="16" x2="40" y2="32"></line>
+    
+    <line x1="40" y1="32" x2="66" y2="16"></line>
+    
+    <line x1="66" y1="16" x2="66" y2="48"></line>
+    
+    <line x1="66" y1="48" x2="14" y2="48"></line>
+    
+    <line x1="14" y1="16" x2="66" y2="48"></line>
+  </g>
+
+  
+  <g transform="translate(14 16)">
+    <path d="M-5 1 L-4 -2 L4 -2 L5 1 L5 3 L-5 3 Z" fill="var(--paper, #f4f1ea)"></path>
+    <circle cx="-3" cy="3.5" r="1.2" fill="currentColor" stroke="none"></circle>
+    <circle cx="3" cy="3.5" r="1.2" fill="currentColor" stroke="none"></circle>
+    <line x1="0" y1="-2" x2="0" y2="-6"></line>
+    <line x1="-2" y1="-6" x2="2" y2="-6"></line>
+  </g>
+
+  
+  <g transform="translate(66 16)">
+    <line x1="-5" y1="-5" x2="5" y2="5"></line>
+    <line x1="5" y1="-5" x2="-5" y2="5"></line>
+    <circle cx="-5" cy="-5" r="1.8" fill="var(--paper, #f4f1ea)"></circle>
+    <circle cx="5" cy="-5" r="1.8" fill="var(--paper, #f4f1ea)"></circle>
+    <circle cx="5" cy="5" r="1.8" fill="var(--paper, #f4f1ea)"></circle>
+    <circle cx="-5" cy="5" r="1.8" fill="var(--paper, #f4f1ea)"></circle>
+    <rect x="-1.5" y="-1.5" width="3" height="3" fill="var(--paper, #f4f1ea)"></rect>
+  </g>
+
+  
+  <g transform="translate(66 48)">
+    <path d="M-7 1 L-5 -3 L5 -3 L7 1 L7 4 L-7 4 Z" fill="var(--paper, #f4f1ea)"></path>
+    <line x1="-3" y1="-3" x2="-3" y2="-5"></line>
+    <line x1="-3" y1="-5" x2="3" y2="-5"></line>
+    <line x1="3" y1="-5" x2="3" y2="-3"></line>
+    <circle cx="-4" cy="4" r="1.4" fill="currentColor" stroke="none"></circle>
+    <circle cx="4" cy="4" r="1.4" fill="currentColor" stroke="none"></circle>
+  </g>
+
+  
+  <g transform="translate(14 48)">
+    <rect x="-3" y="-6" width="6" height="11" rx="1" fill="var(--paper, #f4f1ea)"></rect>
+    <line x1="-1.5" y1="3.5" x2="1.5" y2="3.5"></line>
+    <line x1="-1.5" y1="-4" x2="1.5" y2="-4"></line>
+  </g>
+
+  
+  <g transform="translate(40 32)">
+    <circle r="5.5" fill="var(--signal, #c4ff3d)" stroke="var(--graphite, #1a1a1a)" stroke-width="1.5"></circle>
+    <circle r="2" fill="var(--graphite, #1a1a1a)" stroke="none"></circle>
+  </g>
+</svg>
