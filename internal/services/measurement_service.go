@@ -201,7 +201,12 @@ func (s *MeasurementService) ProcessMeasurement(
 	}
 
 	result := s.parseResult(outputData, taskID, login, config)
-	result.ExpiresAt = time.Now().Add(24 * time.Hour)
+	// Статические результаты храним дольше — они ценнее и дольше считаются
+	if config.Mode == model.ModeStatic {
+		result.ExpiresAt = time.Now().Add(7 * 24 * time.Hour)
+	} else {
+		result.ExpiresAt = time.Now().Add(24 * time.Hour)
+	}
 
 	if err := s.taskStorage.SaveResult(result); err != nil {
 		s.logger.Errorf("Failed to save result: %v", err)
@@ -284,6 +289,7 @@ func (s *MeasurementService) parseResult(
 	// Счетчики для статистики внутри файла
 	var totalEpochs int
 	var fixEpochs int
+	var maxNSat int // Максимальное количество спутников за всю сессию
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -311,6 +317,10 @@ func (s *MeasurementService) parseResult(
 
 		if len(fields) >= 7 {
 			fmt.Sscanf(fields[6], "%d", &sol.NSat)
+		}
+
+		if sol.NSat > maxNSat {
+			maxNSat = sol.NSat
 		}
 
 		if len(fields) >= 8 {
@@ -381,7 +391,7 @@ func (s *MeasurementService) parseResult(
 		result.Longitude = bestSolution.Lon
 		result.Height = bestSolution.Height
 		result.Q = bestSolution.Q
-		result.NSat = bestSolution.NSat
+		result.NSat = maxNSat // максимум за всю сессию, не последнее значение
 		result.SDX = bestSolution.SDX
 		result.SDY = bestSolution.SDY
 		result.SDZ = bestSolution.SDZ

@@ -89,6 +89,18 @@ func getGPSWeekAndDOW(date time.Time) (week int, dow int) {
 	return
 }
 
+// getWeekSunday возвращает год и DOY воскресенья (начала GPS-недели).
+// Файлы ERP нового формата (IGS0OPSFIN/IGS0OPSRAP) используют DOY воскресенья,
+// а не DOY дня наблюдения. Воскресенье может быть в другом году (например,
+// наблюдение 2025-01-01 → воскресенье 2024-12-29, DOY=364).
+func getWeekSunday(date time.Time) (year int, doy int) {
+	gpsEpoch := time.Date(1980, 1, 6, 0, 0, 0, 0, time.UTC)
+	days := int(date.UTC().Sub(gpsEpoch).Hours() / 24)
+	dow := days % 7
+	sunday := date.UTC().AddDate(0, 0, -dow).Truncate(24 * time.Hour)
+	return sunday.Year(), sunday.YearDay()
+}
+
 // DownloadBroadcastEphemeris скачивает широковещательные эфемериды (BRDC).
 // Структура: /IGS/BRDC/YYYY/DDD/ — по году и DOY (не GPS неделя!)
 func (d *FileDownloader) DownloadBroadcastEphemeris(date time.Time, taskID string) (string, error) {
@@ -119,7 +131,8 @@ func (d *FileDownloader) DownloadBroadcastEphemeris(date time.Time, taskID strin
 
 // DownloadPreciseEphemeris скачивает точные эфемериды SP3 для PPP.
 // Структура: /IGS/products/WWWW/ — по GPS неделе (не год/DOY!)
-// Имя файла содержит YYYY+DOY, но директория — 4-значная GPS неделя.
+// Новый формат имён (с ~недели 2238, ноябрь 2022): IGS0OPSFIN_YYYYDDD...
+// Старый формат (до недели 2238): igs{week}{dow}.sp3.gz / igr{week}{dow}.sp3.gz
 func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string) (string, error) {
 	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
@@ -132,24 +145,41 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 		url    string
 	}
 
+	ftpWeekDir := fmt.Sprintf("/gnss/products/%d", week)
+
 	candidates := []candidate{
-		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
+		// ── Новый формат (после ~2022) ──────────────────────────────────────
+		{"CDDIS_COD_FINAL", ftpWeekDir,
 			fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_COD_RAPID", ftpWeekDir,
 			fmt.Sprintf("COD0OPSRAP_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
-			fmt.Sprintf("COD0OPSULT_%d%03d0000_02D_05M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_IGS_FINAL", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_IGS_RAPID", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_IGS_ULTRA", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_15M_ORB.SP3.gz", year, doy)},
-		{"BKG_FINAL", "",
+		{"BKG_IGS_FINAL", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
-		{"BKG_RAPID", "",
+		{"BKG_IGS_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
-		{"BKG_OLD", "",
+		// ── CODE MGEX (AIUB Bern) — организованы по году, охватывают 2012–наст. ──
+		// Используются для данных до ~2022, когда IGS ещё не перешёл на новый формат.
+		{"AIUB_CODE_MGEX_FINAL", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_05M_ORB.SP3.gz",
+				year, year, doy)},
+		{"AIUB_CODE_MGEX_RAPID", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXRAP_%d%03d0000_01D_05M_ORB.SP3.gz",
+				year, year, doy)},
+		// ── Старый формат (до ~2022, например неделя 2086) ──────────────────
+		// igs = final (~2 нед. задержка), igr = rapid (~17 ч задержка)
+		{"CDDIS_OLD_FINAL", ftpWeekDir,
+			fmt.Sprintf("igs%d%d.sp3.Z", week, dow)},
+		{"CDDIS_OLD_RAPID", ftpWeekDir,
+			fmt.Sprintf("igr%d%d.sp3.Z", week, dow)},
+		{"BKG_OLD_FINAL", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.sp3.gz", week, week, dow)},
+		{"BKG_OLD_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.sp3.gz", week, week, dow)},
 	}
 
@@ -173,8 +203,10 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 		return "", fmt.Errorf("failed to download precise ephemeris: %w", lastErr)
 	}
 
-	unpacked := localFile[:len(localFile)-3]
-	if err := d.gunzipFile(localFile, unpacked); err != nil {
+	// Убираем суффикс сжатия (.gz или .Z) — имя файла всегда .sp3.gz,
+	// но скачанный контент может быть как gzip так и Unix compress (.Z).
+	unpacked := strings.TrimSuffix(strings.TrimSuffix(localFile, ".gz"), ".Z")
+	if err := d.decompressFile(localFile, unpacked); err != nil {
 		return "", fmt.Errorf("failed to unpack SP3: %w", err)
 	}
 
@@ -185,6 +217,8 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 
 // DownloadPreciseClock скачивает точные часы CLK для PPP.
 // Структура та же: /IGS/products/WWWW/
+// Новый формат (с ~недели 2238): IGS0OPSFIN_YYYYDDD..._CLK.CLK.gz
+// Старый формат (до ~2238): igs{week}{dow}.clk.gz / igr{week}{dow}.clk.gz
 func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (string, error) {
 	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
@@ -197,24 +231,39 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 		url    string
 	}
 
+	ftpWeekDir := fmt.Sprintf("/gnss/products/%d", week)
+
 	candidates := []candidate{
-		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
+		// ── Новый формат (после ~2022) ──────────────────────────────────────
+		{"CDDIS_COD_FINAL", ftpWeekDir,
 			fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy)},
-		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_COD_RAPID", ftpWeekDir,
 			fmt.Sprintf("COD0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy)},
-		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
-			fmt.Sprintf("COD0OPSULT_%d%03d0000_02D_05M_CLK.CLK.gz", year, doy)},
-		{"CDDIS_FINAL", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_IGS_FINAL", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy)},
-		{"CDDIS_RAPID", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_IGS_RAPID", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy)},
-		{"CDDIS_ULTRA", fmt.Sprintf("/gnss/products/%d", week),
+		{"CDDIS_IGS_ULTRA", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_05M_CLK.CLK.gz", year, doy)},
-		{"BKG_FINAL", "",
+		{"BKG_IGS_FINAL", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", week, year, doy)},
-		{"BKG_RAPID", "",
+		{"BKG_IGS_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", week, year, doy)},
-		{"BKG_OLD", "",
+		// ── CODE MGEX (AIUB Bern) — организованы по году, охватывают 2012–наст. ──
+		{"AIUB_CODE_MGEX_FINAL", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_30S_CLK.CLK.gz",
+				year, year, doy)},
+		{"AIUB_CODE_MGEX_RAPID", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXRAP_%d%03d0000_01D_30S_CLK.CLK.gz",
+				year, year, doy)},
+		// ── Старый формат (до ~2022, например неделя 2086) ──────────────────
+		{"CDDIS_OLD_FINAL", ftpWeekDir,
+			fmt.Sprintf("igs%d%d.clk_30s.Z", week, dow)},
+		{"CDDIS_OLD_RAPID", ftpWeekDir,
+			fmt.Sprintf("igr%d%d.clk.Z", week, dow)},
+		{"BKG_OLD_FINAL", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.clk.gz", week, week, dow)},
+		{"BKG_OLD_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.clk.gz", week, week, dow)},
 	}
 
@@ -238,8 +287,8 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 		return "", fmt.Errorf("failed to download precise clock: %w", lastErr)
 	}
 
-	unpacked := localFile[:len(localFile)-3]
-	if err := d.gunzipFile(localFile, unpacked); err != nil {
+	unpacked := strings.TrimSuffix(strings.TrimSuffix(localFile, ".gz"), ".Z")
+	if err := d.decompressFile(localFile, unpacked); err != nil {
 		return "", fmt.Errorf("failed to unpack CLK: %w", err)
 	}
 
@@ -249,35 +298,57 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 }
 
 // DownloadERP скачивает параметры вращения Земли (ERP).
-// ERP — недельный файл, лежит в папке по GPS неделе.
+// Новый формат (IGS3, после ~2022): файлы индексируются по DOY воскресенья
+// GPS-недели (не дня наблюдения!). Воскресенье может быть в другом году.
+// Старый формат (до ~2022): COD{WWWW}{D}.ERP.Z на AIUB (HTTP, без авторизации).
 func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, error) {
-	week, _ := getGPSWeekAndDOW(date)
-	year, doy := getYearDay(date)
+	week, dow := getGPSWeekAndDOW(date)
+	sunYear, sunDOY := getWeekSunday(date)
 
 	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_erp.erp.gz", taskID))
 
-	candidates := []struct {
-		label string
-		url   string
-	}{
-		{"FINAL", fmt.Sprintf(
-			"https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_07D_01D_ERP.ERP.gz",
-			week, year, doy)},
-		{"RAPID", fmt.Sprintf(
-			"https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_01D_ERP.ERP.gz",
-			week, year, doy)},
-		{"ULTRA", fmt.Sprintf(
-			"https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSULT_%d%03d0000_02D_01D_ERP.ERP.gz",
-			week, year, doy)},
-		// Старый формат: igs{week}7.erp (недельный файл всегда имеет суффикс 7)
-		{"OLD", fmt.Sprintf(
-			"https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d7.erp.gz",
-			week, week)},
+	ftpWeekDir := fmt.Sprintf("/gnss/products/%d", week)
+
+	type erpCandidate struct {
+		label  string
+		ftpDir string
+		url    string
+	}
+
+	year, doy := getYearDay(date)
+
+	candidates := []erpCandidate{
+		// ── AIUB CODE MGEX FINAL: суточные, DOY наблюдения — самый надёжный ──
+		{"AIUB_COD_MGEX_FINAL", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_12H_ERP.ERP.gz",
+				year, year, doy)},
+		// ── BKG IGS FINAL: недельный, DOY воскресенья ────────────────────────
+		{"BKG_IGS_FINAL", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_07D_01D_ERP.ERP.gz",
+				week, sunYear, sunDOY)},
+		{"CDDIS_IGS_FINAL", ftpWeekDir,
+			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_07D_01D_ERP.ERP.gz", sunYear, sunDOY)},
+		// ── BKG IGS RAPID: суточные, DOY наблюдения ──────────────────────────
+		{"BKG_IGS_RAPID", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_01D_ERP.ERP.gz",
+				week, year, doy)},
+		{"CDDIS_IGS_RAPID", ftpWeekDir,
+			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_01D_ERP.ERP.gz", year, doy)},
+		// ── Старый формат (до ~2022): COD{WWWW}{D}.ERP.Z на AIUB ─────────────
+		{"AIUB_COD_OLD", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE/%d/COD%d%d.ERP.Z",
+				date.Year(), week, dow)},
 	}
 
 	var lastErr error
 	for _, c := range candidates {
-		if err := d.downloadFile(c.url, localFile); err != nil {
+		var err error
+		if c.ftpDir != "" {
+			err = d.downloadFTP(c.ftpDir+"/"+c.url, localFile)
+		} else {
+			err = d.downloadFile(c.url, localFile)
+		}
+		if err != nil {
 			d.logger.Warnf("Failed to download %s ERP: %v", c.label, err)
 			lastErr = err
 			continue
@@ -289,8 +360,8 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 		return "", fmt.Errorf("failed to download ERP: %w", lastErr)
 	}
 
-	unpacked := localFile[:len(localFile)-3]
-	if err := d.gunzipFile(localFile, unpacked); err != nil {
+	unpacked := strings.TrimSuffix(strings.TrimSuffix(localFile, ".gz"), ".Z")
+	if err := d.decompressFile(localFile, unpacked); err != nil {
 		return "", fmt.Errorf("failed to unpack ERP: %w", err)
 	}
 
@@ -300,43 +371,42 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 }
 
 // DownloadDCB скачивает Differential Code Bias.
-// CDDIS требует регистрацию на Earthdata — используем открытый CAS/GIPP.
+// Новый формат (после ~2020): CAS0OPSRAP_YYYYDDD..._DCB.BIA.gz на BKG
+// в папке /root_ftp/IGS/products/{week}/ — без авторизации.
+// Старый формат (до ~2020): COM{WWWW}{D}.DCB.Z на AIUB — по GPS-неделе и DOW.
 func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, error) {
+	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
 	gzFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx.gz", taskID))
 	outFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx", taskID))
 
-	ftpDir := fmt.Sprintf("/gnss/products/bias/%d", year)
-
 	type candidate struct {
 		label   string
-		ftpPath string
 		httpURL string
 	}
 
 	candidates := []candidate{
-		{"CDDIS_CAS",
-			ftpDir + fmt.Sprintf("/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz", year, doy),
-			""},
-		{"CDDIS_CODE",
-			ftpDir + fmt.Sprintf("/COD0OPSFIN_%d%03d0000_01D_01D_DCB.BIA.gz", year, doy),
-			""},
-		{"CAS_HTTP",
-			"",
-			fmt.Sprintf("https://ftp.gipp.org.cn/product/dcb/mgex/%d/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz",
+		// ── AIUB CODE MGEX FINAL: надёжный HTTP, суточные по DOY ─────────────
+		{"AIUB_COD_MGEX_OSB",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_01D_OSB.BIA.gz",
 				year, year, doy)},
+		// ── BKG: CAS DCB, папка products/{week}/ ─────────────────────────────
+		{"BKG_CAS_FINAL",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/CAS0OPSFIN_%d%03d0000_01D_01D_DCB.BIA.gz",
+				week, year, doy)},
+		{"BKG_CAS_RAPID",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz",
+				week, year, doy)},
+		// ── Старый формат: AIUB CODE MGEX, COM{WWWW}{D}.DCB.Z ──────────────
+		{"AIUB_COM_OLD",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COM%d%d.DCB.Z",
+				date.Year(), week, dow)},
 	}
 
 	var lastErr error
 	for _, c := range candidates {
-		var err error
-		if c.ftpPath != "" {
-			err = d.downloadFTP(c.ftpPath, gzFile)
-		} else {
-			err = d.downloadFile(c.httpURL, gzFile)
-		}
-		if err != nil {
+		if err := d.downloadFile(c.httpURL, gzFile); err != nil {
 			d.logger.Warnf("Failed to download %s DCB: %v", c.label, err)
 			lastErr = err
 			continue
@@ -348,7 +418,8 @@ func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, err
 		return "", fmt.Errorf("failed to download DCB: %w", lastErr)
 	}
 
-	if err := d.gunzipFile(gzFile, outFile); err != nil {
+	// Автодетект формата по магическим байтам (gzip или Unix .Z compress).
+	if err := d.decompressFile(gzFile, outFile); err != nil {
 		return "", fmt.Errorf("failed to unpack DCB: %w", err)
 	}
 
@@ -472,6 +543,51 @@ func (d *FileDownloader) gunzipFile(src, dst string) error {
 
 	d.logger.Infof("Unpacked: %s -> %s", src, dst)
 	return nil
+}
+
+// uncompressZ распаковывает файл в формате Unix compress (.Z) через системный uncompress/gunzip.
+// Используется для старых продуктов IGS (DCB до ~2018).
+func (d *FileDownloader) uncompressZ(src, dst string) error {
+	// Пробуем uncompress (стандартный инструмент Unix compress)
+	cmd := exec.Command("uncompress", "-c", src)
+	out, err := cmd.Output()
+	if err != nil {
+		// Fallback: некоторые системы распаковывают .Z через gzip -d
+		cmd2 := exec.Command("gzip", "-dc", src)
+		out, err = cmd2.Output()
+		if err != nil {
+			return fmt.Errorf("cannot decompress .Z file %s: %w", src, err)
+		}
+	}
+	if err := os.WriteFile(dst, out, 0644); err != nil {
+		return fmt.Errorf("write decompressed DCB: %w", err)
+	}
+	d.logger.Infof("Unpacked .Z: %s -> %s (%d bytes)", src, dst, len(out))
+	return nil
+}
+
+// decompressFile автоматически определяет формат сжатия по магическим байтам
+// и распаковывает файл: 0x1f 0x8b → gzip, 0x1f 0x9d → Unix compress (.Z).
+func (d *FileDownloader) decompressFile(src, dst string) error {
+	f, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open for magic detection %s: %w", src, err)
+	}
+	magic := make([]byte, 2)
+	_, err = f.Read(magic)
+	f.Close()
+	if err != nil {
+		return fmt.Errorf("read magic bytes %s: %w", src, err)
+	}
+
+	switch {
+	case magic[0] == 0x1f && magic[1] == 0x8b:
+		return d.gunzipFile(src, dst)
+	case magic[0] == 0x1f && magic[1] == 0x9d:
+		return d.uncompressZ(src, dst)
+	default:
+		return fmt.Errorf("unknown compression format (magic %02x %02x) for %s", magic[0], magic[1], src)
+	}
 }
 
 // DownloadBaseStation скачивает наблюдения с базовой станции

@@ -284,10 +284,16 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// Формируем информативное имя файла: метод_режим_дата.pos
+	method := string(task.Config.Method)
+	mode := string(task.Config.Mode)
+	dateStr := task.CreatedAt.UTC().Format("2006-01-02")
+	downloadName := fmt.Sprintf("solution_%s_%s_%s.pos", method, mode, dateStr)
+
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pos", taskID))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", downloadName))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(result.FullResultFile)))
-	h.logger.Infof("Downloaded result for task %s (user: %s, size: %d bytes)", taskID, login, len(result.FullResultFile))
+	h.logger.Infof("Downloaded result for task %s (user: %s, file: %s, size: %d bytes)", taskID, login, downloadName, len(result.FullResultFile))
 	w.Write(result.FullResultFile)
 }
 
@@ -327,16 +333,6 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 		defaultBLQScript = "./cmd/solver/src/generate_blq.py"
 		defaultBLQConfig = "./cmd/solver/src/fes_ocean_loading.yml"
 	)
-
-	// Отложенная очистка: удаляем всю папку с временными файлами в конце
-	// defer func() {
-	// 	h.logger.Debugf("Cleaning up temporary directory: %s", defaultWorkDir)
-	// 	if err := os.RemoveAll(defaultWorkDir); err != nil {
-	// 		h.logger.Warnf("Failed to remove work directory %s: %v", defaultWorkDir, err)
-	// 	} else {
-	// 		h.logger.Infof("Successfully cleaned up work directory: %s", defaultWorkDir)
-	// 	}
-	// }()
 
 	configGen := services.NewConfigGenerator(defaultConfigDir, defaultWorkDir, h.logger)
 	downloader := services.NewFileDownloader(defaultWorkDir, h.logger)

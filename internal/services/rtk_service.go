@@ -26,26 +26,41 @@ func NewRTKService(rtklibPath, workDir string, logger *zap.SugaredLogger) *RTKSe
 	}
 }
 
+// absPath возвращает абсолютный путь. Если путь уже абсолютный — возвращает как есть.
+func absPath(p string) string {
+	if p == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	return abs
+}
+
 // ProcessPPP запускает PPP обработку с использованием точных файлов
 func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath, taskID string) (string, error) {
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
-	outputFile := filepath.Join(taskDir, "output.pos")
+	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
 
-	// Формируем команду для rnx2rtkp с PPP опциями
+	// Все пути — абсолютные, чтобы rnx2rtkp работал из любой CWD
 	args := []string{
-		"-k", configPath,
+		"-k", absPath(configPath),
 		"-o", outputFile,
-		roverObs,
+		absPath(roverObs),
 	}
 
 	if navFile != "" {
-		args = append(args, navFile, sp3File, clkFile)
+		args = append(args, absPath(navFile), absPath(sp3File), absPath(clkFile))
 	}
 
 	r.logger.Infof("Running PPP with command: %s", strings.Join(args, " "))
 
-	cmd := exec.Command(filepath.Join(r.rtklibPath, "rnx2rtkp"), args...)
+	binPath := absPath(filepath.Join(r.rtklibPath, "rnx2rtkp"))
+	cmd := exec.Command(binPath, args...)
+	// Запускаем из директории бинарника — rnx2rtkp может искать ресурсы рядом с собой
+	cmd.Dir = filepath.Dir(binPath)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -70,22 +85,27 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath,
 func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, taskID string) (string, error) {
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
-	outputFile := filepath.Join(taskDir, "output.pos")
+	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
 
 	args := []string{
-		"-k", configPath,
+		"-k", absPath(configPath),
 		"-o", outputFile,
-		roverObs,
-		baseObs,
+		absPath(roverObs),
+	}
+
+	if baseObs != "" {
+		args = append(args, absPath(baseObs))
 	}
 
 	if navFile != "" {
-		args = append(args, navFile)
+		args = append(args, absPath(navFile))
 	}
 
 	r.logger.Infof("Running Relative positioning with command: %s", strings.Join(args, " "))
 
-	cmd := exec.Command(filepath.Join(r.rtklibPath, "rnx2rtkp"), args...)
+	binPath := absPath(filepath.Join(r.rtklibPath, "rnx2rtkp"))
+	cmd := exec.Command(binPath, args...)
+	cmd.Dir = filepath.Dir(binPath)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -109,21 +129,23 @@ func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, tas
 func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID string) (string, error) {
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
-	outputFile := filepath.Join(taskDir, "output.pos")
+	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
 
 	args := []string{
-		"-k", configPath,
+		"-k", absPath(configPath),
 		"-o", outputFile,
-		roverObs,
+		absPath(roverObs),
 	}
 
 	if navFile != "" {
-		args = append(args, navFile)
+		args = append(args, absPath(navFile))
 	}
 
 	r.logger.Infof("Running Absolute positioning with command: %s", strings.Join(args, " "))
 
-	cmd := exec.Command(filepath.Join(r.rtklibPath, "rnx2rtkp"), args...)
+	binPath := absPath(filepath.Join(r.rtklibPath, "rnx2rtkp"))
+	cmd := exec.Command(binPath, args...)
+	cmd.Dir = filepath.Dir(binPath)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -147,17 +169,19 @@ func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID strin
 func (r *RTKService) ProcessWithConfig(configPath, rinexPath, taskID string) (string, error) {
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
-	outputFile := filepath.Join(taskDir, "output.pos")
+	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
 
 	args := []string{
-		"-k", configPath,
+		"-k", absPath(configPath),
 		"-o", outputFile,
-		rinexPath,
+		absPath(rinexPath),
 	}
 
 	r.logger.Infof("Running rnx2rtkp with config: %s", configPath)
 
-	cmd := exec.Command(filepath.Join(r.rtklibPath, "rnx2rtkp"), args...)
+	binPath := absPath(filepath.Join(r.rtklibPath, "rnx2rtkp"))
+	cmd := exec.Command(binPath, args...)
+	cmd.Dir = filepath.Dir(binPath)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

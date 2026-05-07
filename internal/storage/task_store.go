@@ -334,14 +334,16 @@ func (s *TaskStorage) GetResultByTaskID(taskID string) (*model.ProcessingResult,
 // GetUserTasksWithResults возвращает задачи пользователя с результатами
 func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset int) ([]map[string]interface{}, error) {
 	query := `
-		SELECT t.id, t.user_login, t.config, t.filename, t.status, 
+		SELECT t.id, t.user_login, t.config, t.filename, t.status,
 		       COALESCE(t.error_message, ''), t.created_at, t.completed_at, t.processing_sec,
-		       COALESCE(r.x, 0), COALESCE(r.y, 0), COALESCE(r.z, 0), 
-		       COALESCE(r.latitude, 0), COALESCE(r.longitude, 0), COALESCE(r.height, 0), 
+		       COALESCE(r.x, 0), COALESCE(r.y, 0), COALESCE(r.z, 0),
+		       COALESCE(r.latitude, 0), COALESCE(r.longitude, 0), COALESCE(r.height, 0),
 		       COALESCE(r.q, 0), COALESCE(r.n_sat, 0),
 		       COALESCE(r.sdx, 0), COALESCE(r.sdy, 0), COALESCE(r.sdz, 0),
 		       COALESCE(r.fix_rate, 0),
-		       COALESCE(r.last_solution_line, ''), COALESCE(r.file_type, '')
+		       COALESCE(r.last_solution_line, ''), COALESCE(r.file_type, ''),
+		       (r.full_result_file IS NOT NULL AND octet_length(r.full_result_file) > 0) AS has_result_file,
+		       COALESCE(r.expires_at, NOW()) AS result_expires_at
 		FROM processing_tasks t
 		LEFT JOIN processing_results r ON t.id = r.task_id
 		WHERE t.user_login = $1 AND (r.expires_at IS NULL OR r.expires_at > NOW())
@@ -366,6 +368,8 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 			x, y, z, lat, lon, height                                                 float64
 			q, nSat                                                                   int
 			sdx, sdy, sdz, fixRate                                                    float32
+			hasResultFile                                                             bool
+			resultExpiresAt                                                           time.Time
 		)
 
 		err := rows.Scan(
@@ -374,6 +378,7 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 			&x, &y, &z, &lat, &lon, &height, &q, &nSat,
 			&sdx, &sdy, &sdz, &fixRate,
 			&lastSolutionLine, &fileType,
+			&hasResultFile, &resultExpiresAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan task result: %w", err)
@@ -385,19 +390,20 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		}
 
 		task := map[string]interface{}{
-			"id":        id,
-			"userLogin": userLogin,
-			"config":    config,
-			"filename":  filename,
-			"status":    status,
-			"createdAt": createdAt,
-			"fileType":  fileType,
+			"id":            id,
+			"userLogin":     userLogin,
+			"config":        config,
+			"filename":      filename,
+			"status":        status,
+			"createdAt":     createdAt,
+			"fileType":      fileType,
+			"hasResultFile": hasResultFile,
+			"resultExpiresAt": resultExpiresAt,
 		}
 
 		if completedAt != nil {
 			task["completedAt"] = completedAt
 		}
-
 		if errorMessage != "" {
 			task["errorMessage"] = errorMessage
 		}
@@ -413,7 +419,7 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 			"fixRate": fixRate,
 		}
 
-		if fileType == "static" && lastSolutionLine != "" {
+		if lastSolutionLine != "" {
 			result["lastSolutionLine"] = lastSolutionLine
 		}
 
