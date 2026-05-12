@@ -7,33 +7,31 @@
 <link rel="stylesheet" href="/css/theme.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-body { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
-.header { flex-shrink:0; }
-.pos-layout { display:flex; flex-direction:column; flex:1; min-height:0; }
+html, body { height:100%; margin:0; padding:0; overflow:hidden; }
+body { display:flex; flex-direction:column; }
+.header { flex-shrink:0; position:relative; z-index:10; }
 
 /* Top bar */
 .pos-topbar {
-    flex-shrink:0;
-    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-    padding:12px 24px; border-bottom:1px solid var(--paper-edge);
+    flex-shrink:0; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:10px 24px; border-bottom:1px solid var(--paper-edge);
     background:var(--paper); z-index:10;
 }
 .pos-back {
     background:var(--paper-2); border:1px solid var(--paper-edge); color:var(--ink);
-    padding:7px 14px; border-radius:var(--r-sm); font-family:var(--font-sans);
-    font-size:0.8rem; font-weight:500; cursor:pointer; transition:all var(--t);
-    text-decoration:none; display:inline-flex; align-items:center; gap:6px;
-    white-space:nowrap;
+    padding:6px 14px; border-radius:var(--r-sm); font-size:0.8rem; font-weight:500;
+    cursor:pointer; transition:all var(--t); text-decoration:none;
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
 }
 .pos-back:hover { background:var(--paper-edge); }
 .pos-device-name { font-size:1rem; font-weight:600; color:var(--ink); }
-.pos-device-type { font-size:0.75rem; color:var(--ink-3); font-family:var(--font-mono); }
+.pos-device-type  { font-size:0.75rem; color:var(--ink-3); font-family:var(--font-mono); }
 .pos-status-badge {
     margin-left:auto; padding:5px 14px; border-radius:20px;
     font-family:var(--font-mono); font-size:0.75rem; font-weight:600;
     display:flex; align-items:center; gap:7px;
 }
-.status-idle    { background:var(--paper-2);   color:var(--ink-3);  border:1px solid var(--paper-edge); }
+.status-idle    { background:var(--paper-2); color:var(--ink-3); border:1px solid var(--paper-edge); }
 .status-running { background:var(--ok-bg,#e6faf0); color:var(--ok,#1db954); border:1px solid var(--ok,#1db954); }
 .status-running .pulse {
     width:7px; height:7px; border-radius:50%; background:var(--ok,#1db954);
@@ -41,23 +39,21 @@ body { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
 }
 @keyframes pulseAnim {
     0%,100% { opacity:1; transform:scale(1); }
-    50%      { opacity:0.5; transform:scale(1.5); }
+    50%      { opacity:.5; transform:scale(1.5); }
 }
 .status-stopped { background:var(--warn-bg,#fff8e1); color:var(--warn,#f5a623); border:1px solid var(--warn,#f5a623); }
 
-/* Map */
-#map {
-    flex:1; min-height:0; width:100%; z-index:1;
-}
+/* Map wrapper stretches to fill remaining height */
+.map-wrapper { flex:1; position:relative; min-height:0; }
+#map { width:100%; height:100%; }
 
-/* Info overlay on map */
+/* Info overlay */
 .map-info-overlay {
-    position:absolute; bottom:70px; left:16px; z-index:500;
+    position:absolute; bottom:80px; left:16px; z-index:500;
     background:var(--paper); border:1px solid var(--paper-edge);
     border-radius:var(--r-sm); padding:12px 16px; min-width:260px;
     box-shadow:0 4px 20px rgba(0,0,0,.12);
-    font-family:var(--font-mono); font-size:0.78rem;
-    pointer-events:none;
+    font-family:var(--font-mono); font-size:0.78rem; pointer-events:none;
 }
 [data-theme="dark"] .map-info-overlay { box-shadow:0 4px 20px rgba(0,0,0,.4); }
 .map-info-row { display:flex; justify-content:space-between; gap:16px; margin-bottom:5px; }
@@ -69,51 +65,30 @@ body { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
 .mi-quality-single { color:var(--ink-3); }
 .map-info-overlay.hidden { display:none; }
 
+/* Waiting overlay (shown when positioning is on but no position yet) */
+.map-wait-overlay {
+    position:absolute; inset:0; z-index:400;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:rgba(var(--paper-rgb,255,255,255),.7);
+    font-family:var(--font-mono); font-size:0.85rem; color:var(--ink-3); gap:12px;
+}
+[data-theme="dark"] .map-wait-overlay { background:rgba(20,20,20,.7); }
+.map-wait-overlay.hidden { display:none; }
+.wait-spinner {
+    width:28px; height:28px; border:3px solid var(--paper-edge);
+    border-top-color:var(--signal); border-radius:50%;
+    animation:spin .8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
 /* Bottom controls */
 .pos-controls {
     flex-shrink:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-    padding:14px 24px; border-top:1px solid var(--paper-edge);
-    background:var(--paper); z-index:10;
+    padding:12px 24px; border-top:1px solid var(--paper-edge); background:var(--paper); z-index:10;
 }
-.pos-controls .spacer { flex:1; }
+.pos-hint { font-family:var(--font-mono); font-size:0.8rem; color:var(--ink-3); flex:1; }
 
-/* Modal */
-.modal-overlay {
-    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45);
-    z-index:2000; align-items:center; justify-content:center; padding:16px;
-}
-.modal-overlay.open { display:flex; }
-.modal {
-    background:var(--paper); border:1px solid var(--paper-edge);
-    border-radius:var(--r); padding:32px; max-width:480px; width:100%;
-    max-height:90vh; overflow-y:auto;
-}
-.modal-title { font-size:1.1rem; font-weight:600; color:var(--ink); margin-bottom:20px; }
-.form-group { margin-bottom:16px; }
-.form-label {
-    display:block; font-size:0.78rem; font-weight:600; color:var(--ink-3);
-    font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px;
-}
-.form-input {
-    width:100%; box-sizing:border-box;
-    background:var(--paper-2); border:1px solid var(--paper-edge); color:var(--ink);
-    padding:9px 12px; border-radius:var(--r-sm); font-family:var(--font-mono); font-size:0.88rem;
-    transition:border-color var(--t);
-}
-.form-input:focus { outline:none; border-color:var(--graphite); }
-.form-row { display:grid; grid-template-columns:1fr 120px; gap:10px; }
-.conn-tabs { display:flex; gap:8px; margin-bottom:16px; }
-.conn-tab {
-    padding:7px 18px; border:1px solid var(--paper-edge); border-radius:var(--r-sm);
-    background:var(--paper-2); color:var(--ink-3); font-family:var(--font-mono); font-size:0.8rem;
-    cursor:pointer; transition:all var(--t);
-}
-.conn-tab.active { background:var(--signal); color:var(--signal-ink); border-color:var(--signal); }
-.conn-panel { display:none; }
-.conn-panel.active { display:block; }
-.modal-actions { display:flex; gap:10px; margin-top:24px; justify-content:flex-end; }
-
-/* Leaflet marker override */
+/* Position dot marker */
 .pos-dot {
     width:14px; height:14px; border-radius:50%;
     border:2px solid #fff; box-shadow:0 0 0 2px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.3);
@@ -124,12 +99,10 @@ body { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
 </style>
 </head>
 <body class="bg-grid">
-<header class="header" style="position:relative;z-index:10">
+
+<header class="header">
     <div class="header-content">
-        <a class="logo" href="/">
-            <div class="logo-icon"></div>
-            <div class="logo-text"></div>
-        </a>
+        <a class="logo" href="/"><div class="logo-icon"></div><div class="logo-text"></div></a>
         <div class="user-menu">
             <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема" data-icon="moon" data-icon-size="16"></button>
             <span class="user-name" id="headerLogin">—</span>
@@ -138,136 +111,52 @@ body { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
     </div>
 </header>
 
-<div class="pos-layout">
-    <!-- Top bar -->
-    <div class="pos-topbar">
-        <a class="pos-back" href="/collaborative">← Назад</a>
-        <div>
-            <div class="pos-device-name" id="deviceName">Устройство</div>
-            <div class="pos-device-type" id="deviceType"></div>
-        </div>
-        <div class="pos-status-badge status-idle" id="statusBadge">
-            <span id="statusText">Ожидание</span>
-        </div>
+<div class="pos-topbar">
+    <a class="pos-back" href="/collaborative">← Назад</a>
+    <div>
+        <div class="pos-device-name" id="deviceName">Устройство</div>
+        <div class="pos-device-type" id="deviceType"></div>
     </div>
-
-    <!-- Map -->
-    <div style="position:relative;flex:1;min-height:0">
-        <div id="map"></div>
-        <div class="map-info-overlay hidden" id="infoOverlay">
-            <div class="map-info-row">
-                <span class="mi-label">Широта</span>
-                <span class="mi-val" id="infoLat">—</span>
-            </div>
-            <div class="map-info-row">
-                <span class="mi-label">Долгота</span>
-                <span class="mi-val" id="infoLon">—</span>
-            </div>
-            <div class="map-info-row">
-                <span class="mi-label">Высота</span>
-                <span class="mi-val" id="infoHeight">—</span>
-            </div>
-            <div class="map-info-row">
-                <span class="mi-label">Спутники</span>
-                <span class="mi-val" id="infoNsat">—</span>
-            </div>
-            <div class="map-info-row">
-                <span class="mi-label">Качество</span>
-                <span class="mi-val" id="infoQuality">—</span>
-            </div>
-            <div class="map-info-row">
-                <span class="mi-label">Обновлено</span>
-                <span class="mi-val" id="infoAge">—</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bottom controls -->
-    <div class="pos-controls">
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--ink-3)" id="controlHint">
-            Нажмите «Старт» для запуска абсолютного позиционирования
-        </span>
-        <div class="spacer"></div>
-        <button class="btn btn-secondary" id="btnStop" onclick="stopPositioning()" style="display:none">
-            ■ Стоп
-        </button>
-        <button class="btn btn-primary" id="btnStart" onclick="startPositioning()">
-            ▶ Старт
-        </button>
+    <div class="pos-status-badge status-idle" id="statusBadge">
+        <span>Ожидание</span>
     </div>
 </div>
 
-<!-- Модальное окно подключения -->
-<div class="modal-overlay" id="connectModal">
-    <div class="modal">
-        <div class="modal-title">Настройка подключения</div>
-        <p style="font-size:0.85rem;color:var(--ink-3);margin-bottom:20px">
-            Укажите, как сервер должен получать данные от вашего устройства.
-        </p>
-        <div class="form-group">
-            <div class="form-label">Способ подключения</div>
-            <div class="conn-tabs">
-                <button class="conn-tab active" onclick="switchTab('tcp')">TCP/IP</button>
-                <button class="conn-tab" onclick="switchTab('ntrip')">NTRIP</button>
-            </div>
-        </div>
-        <div class="conn-panel active" id="panel-tcp">
-            <div class="form-group">
-                <label class="form-label">Хост устройства</label>
-                <input class="form-input" id="tcp-host" type="text" placeholder="192.168.1.100">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Порт устройства</label>
-                <input class="form-input" id="tcp-port" type="number" placeholder="9000" min="1" max="65535">
-            </div>
-        </div>
-        <div class="conn-panel" id="panel-ntrip">
-            <div class="form-group">
-                <label class="form-label">Хост NTRIP-кастера</label>
-                <input class="form-input" id="ntrip-host" type="text" placeholder="caster.example.com">
-            </div>
-            <div class="form-group">
-                <div class="form-row">
-                    <div>
-                        <label class="form-label">Маунтпоинт</label>
-                        <input class="form-input" id="ntrip-mountpoint" type="text" placeholder="MOUNT0">
-                    </div>
-                    <div>
-                        <label class="form-label">Порт</label>
-                        <input class="form-input" id="ntrip-port" type="number" placeholder="2101">
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <div class="form-row">
-                    <div>
-                        <label class="form-label">Пользователь</label>
-                        <input class="form-input" id="ntrip-user" type="text">
-                    </div>
-                    <div>
-                        <label class="form-label">Пароль</label>
-                        <input class="form-input" id="ntrip-pass" type="password">
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeConnectModal()">Отмена</button>
-            <button class="btn btn-primary" onclick="submitConnect()">Подключить и запустить</button>
-        </div>
+<div class="map-wrapper">
+    <div id="map"></div>
+
+    <!-- Оверлей ожидания первого решения -->
+    <div class="map-wait-overlay hidden" id="waitOverlay">
+        <div class="wait-spinner"></div>
+        <span>Ожидание первого решения от rtkrcv…</span>
     </div>
+
+    <!-- Инфопанель с координатами -->
+    <div class="map-info-overlay hidden" id="infoOverlay">
+        <div class="map-info-row"><span class="mi-label">Широта</span><span class="mi-val" id="infoLat">—</span></div>
+        <div class="map-info-row"><span class="mi-label">Долгота</span><span class="mi-val" id="infoLon">—</span></div>
+        <div class="map-info-row"><span class="mi-label">Высота</span><span class="mi-val" id="infoHeight">—</span></div>
+        <div class="map-info-row"><span class="mi-label">Спутники</span><span class="mi-val" id="infoNsat">—</span></div>
+        <div class="map-info-row"><span class="mi-label">Качество</span><span class="mi-val" id="infoQuality">—</span></div>
+        <div class="map-info-row"><span class="mi-label">Обновлено</span><span class="mi-val" id="infoAge">—</span></div>
+    </div>
+</div>
+
+<div class="pos-controls">
+    <span class="pos-hint" id="controlHint">Нажмите «Старт» для запуска позиционирования</span>
+    <button class="btn btn-secondary" id="btnStop"  onclick="stopPositioning()"  style="display:none">■ Стоп</button>
+    <button class="btn btn-primary"   id="btnStart" onclick="startPositioning()">▶ Старт</button>
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script src="/js/icons.js"></script>
 <script src="/js/chrome.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ── Auth helpers ────────────────────────────────────────────────────────────
-function getToken()  { return localStorage.getItem('token'); }
-function getLogin()  { return localStorage.getItem('userLogin') || ''; }
-function logout()    { localStorage.removeItem('token'); localStorage.removeItem('userLogin'); window.location.href = '/'; }
+// ── Auth ─────────────────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('token'); }
+function getLogin() { return localStorage.getItem('userLogin') || ''; }
+function logout()   { localStorage.removeItem('token'); localStorage.removeItem('userLogin'); location.href = '/'; }
 
 let _toastTimer;
 function showToast(msg, type = 'ok') {
@@ -276,16 +165,16 @@ function showToast(msg, type = 'ok') {
     clearTimeout(_toastTimer);
     _toastTimer = setTimeout(() => { t.className = 'toast'; }, 3500);
 }
-
 function checkAuth() {
-    if (!getToken() || !getLogin()) { window.location.href = '/login'; return false; }
+    if (!getToken() || !getLogin()) { location.href = '/login'; return false; }
     document.getElementById('headerLogin').textContent = getLogin();
     return true;
 }
 
-// ── State ───────────────────────────────────────────────────────────────────
-const params     = new URLSearchParams(location.search);
-const deviceId   = parseInt(params.get('deviceId')) || 0;
+// ── Constants & state ─────────────────────────────────────────────────────────
+const deviceId = parseInt(new URLSearchParams(location.search).get('deviceId')) || 0;
+if (!deviceId) location.href = '/collaborative';
+
 let currentSession = null;
 let pollTimer      = null;
 let posMarker      = null;
@@ -297,17 +186,13 @@ const QUALITY_LABEL = { 1:'Fix', 2:'Float', 5:'Single' };
 const QUALITY_COLOR = { 1:'#1db954', 2:'#f5a623', 5:'#e74c3c' };
 const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'Смартфон', tablet:'Планшет', other:'Иное' };
 
-if (!deviceId) { location.href = '/collaborative'; }
-
-// ── Map ─────────────────────────────────────────────────────────────────────
-const map = L.map('map', { zoomControl:true }).setView([55.75, 37.62], 12);
-
+// ── Leaflet map ───────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl:true }).setView([55.75, 37.62], 5);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map);
 
-// Fix Leaflet icon path in bundled environments
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -316,48 +201,32 @@ L.Icon.Default.mergeOptions({
 });
 
 function makeDotIcon(quality) {
-    const cls = QUALITY_CLASS[quality] || 'single';
     return L.divIcon({
         className: '',
-        html: `<div class="pos-dot pos-dot-${cls}"></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        html: `<div class="pos-dot pos-dot-${QUALITY_CLASS[quality] || 'single'}"></div>`,
+        iconSize: [14, 14], iconAnchor: [7, 7],
     });
 }
 
 function updateMapPosition(pos) {
     const latlng = [pos.lat, pos.lon];
     const color  = QUALITY_COLOR[pos.quality] || QUALITY_COLOR[5];
-    const pdop   = pos.pdop || 3;
-    const radius = Math.max(3, pdop * 4); // грубая оценка точности в метрах
+    const radius = Math.max(5, (pos.pdop || 3) * 4);
 
-    if (posMarker) {
-        posMarker.setLatLng(latlng).setIcon(makeDotIcon(pos.quality));
-    } else {
-        posMarker = L.marker(latlng, { icon: makeDotIcon(pos.quality) }).addTo(map);
-    }
+    if (posMarker) { posMarker.setLatLng(latlng).setIcon(makeDotIcon(pos.quality)); }
+    else           { posMarker = L.marker(latlng, { icon: makeDotIcon(pos.quality) }).addTo(map); }
 
-    if (accCircle) {
-        accCircle.setLatLng(latlng).setRadius(radius).setStyle({ color, fillColor: color });
-    } else {
-        accCircle = L.circle(latlng, {
-            radius, color, fillColor: color, fillOpacity: 0.15, weight: 1.5
-        }).addTo(map);
-    }
+    if (accCircle) { accCircle.setLatLng(latlng).setRadius(radius).setStyle({ color, fillColor: color }); }
+    else           { accCircle = L.circle(latlng, { radius, color, fillColor: color, fillOpacity: 0.15, weight: 1.5 }).addTo(map); }
 
-    if (!mapCentred) {
-        map.setView(latlng, 16);
-        mapCentred = true;
-    }
+    if (!mapCentred) { map.setView(latlng, 16); mapCentred = true; }
 }
 
 function updateInfoOverlay(pos) {
     const overlay = document.getElementById('infoOverlay');
     if (!pos) { overlay.classList.add('hidden'); return; }
-
-    const ago = Math.round((Date.now() - new Date(pos.updatedAt)) / 1000);
+    const ago    = Math.round((Date.now() - new Date(pos.updatedAt)) / 1000);
     const qClass = 'mi-quality-' + (QUALITY_CLASS[pos.quality] || 'single');
-
     document.getElementById('infoLat').textContent    = pos.lat.toFixed(8) + '°';
     document.getElementById('infoLon').textContent    = pos.lon.toFixed(8) + '°';
     document.getElementById('infoHeight').textContent = pos.height.toFixed(3) + ' м';
@@ -367,23 +236,19 @@ function updateInfoOverlay(pos) {
     overlay.classList.remove('hidden');
 }
 
-// ── Session management ──────────────────────────────────────────────────────
+// ── Session ───────────────────────────────────────────────────────────────────
 async function loadSession() {
     try {
-        const r = await fetch('/api/collaborative/sessions', {
-            headers: { 'Authorization': `Bearer ${getToken()}` }
-        });
+        const r = await fetch('/api/collaborative/sessions', { headers: { 'Authorization': `Bearer ${getToken()}` } });
         if (!r.ok) return null;
-        const sessions = await r.json();
-        return (sessions || []).find(s => s.deviceId === deviceId) || null;
+        const list = await r.json();
+        return (list || []).find(s => s.deviceId === deviceId) || null;
     } catch { return null; }
 }
 
 async function loadDevice() {
     try {
-        const r = await fetch('/api/profile/data', {
-            headers: { 'Authorization': `Bearer ${getToken()}` }
-        });
+        const r = await fetch('/api/profile/data', { headers: { 'Authorization': `Bearer ${getToken()}` } });
         if (!r.ok) return;
         const data = await r.json();
         const dev = (data.devices || []).find(d => d.id === deviceId);
@@ -395,39 +260,45 @@ async function loadDevice() {
     } catch {}
 }
 
+// ── UI state ──────────────────────────────────────────────────────────────────
 function applySessionState(sess) {
     currentSession = sess;
-    const badge     = document.getElementById('statusBadge');
-    const statusTxt = document.getElementById('statusText');
-    const btnStart  = document.getElementById('btnStart');
-    const btnStop   = document.getElementById('btnStop');
-    const hint      = document.getElementById('controlHint');
+    const badge    = document.getElementById('statusBadge');
+    const btnStart = document.getElementById('btnStart');
+    const btnStop  = document.getElementById('btnStop');
+    const hint     = document.getElementById('controlHint');
+    const waitOvl  = document.getElementById('waitOverlay');
 
     if (!sess) {
         badge.className = 'pos-status-badge status-idle';
-        badge.innerHTML = '<span id="statusText">Не подключено</span>';
-        btnStart.style.display = ''; btnStop.style.display = 'none';
-        hint.textContent = 'Нажмите «Старт» для настройки подключения и запуска позиционирования';
+        badge.innerHTML = '<span>Нет сессии</span>';
+        btnStart.style.display = 'none'; btnStop.style.display = 'none';
+        hint.innerHTML = 'Сессия не настроена. <a href="/collaborative" style="color:var(--signal)">Вернитесь на страницу подключений</a>.';
+        waitOvl.classList.add('hidden');
         updateInfoOverlay(null);
         return;
     }
 
     if (sess.enablePositioning) {
         badge.className = 'pos-status-badge status-running';
-        badge.innerHTML = '<div class="pulse"></div><span id="statusText">Идёт позиционирование</span>';
+        badge.innerHTML = '<div class="pulse"></div><span>Идёт позиционирование</span>';
         btnStart.style.display = 'none'; btnStop.style.display = '';
-        hint.textContent = sess.latestPosition
-            ? 'Позиция обновляется каждые 30 с'
-            : 'Ожидание первого решения от rtkrcv…';
         if (sess.latestPosition) {
+            waitOvl.classList.add('hidden');
+            hint.textContent = 'Позиция обновляется каждые 30 с';
             updateMapPosition(sess.latestPosition);
             updateInfoOverlay(sess.latestPosition);
+        } else {
+            waitOvl.classList.remove('hidden');
+            hint.textContent = 'Ожидание первого решения от rtkrcv…';
+            updateInfoOverlay(null);
         }
     } else {
         badge.className = 'pos-status-badge status-stopped';
-        badge.innerHTML = '<span id="statusText">Остановлено</span>';
+        badge.innerHTML = '<span>Остановлено</span>';
         btnStart.style.display = ''; btnStop.style.display = 'none';
-        hint.textContent = 'Подключение настроено. Нажмите «Старт» для запуска позиционирования';
+        waitOvl.classList.add('hidden');
+        hint.textContent = 'Нажмите «Старт» для возобновления позиционирования';
         if (sess.latestPosition) {
             updateMapPosition(sess.latestPosition);
             updateInfoOverlay(sess.latestPosition);
@@ -435,30 +306,21 @@ function applySessionState(sess) {
     }
 }
 
-// ── Polling ─────────────────────────────────────────────────────────────────
+// ── Polling ───────────────────────────────────────────────────────────────────
 function startPoll() {
     if (pollTimer) return;
     pollTimer = setInterval(async () => {
-        const sess = await loadSession();
-        applySessionState(sess);
+        applySessionState(await loadSession());
     }, 5000);
 }
+function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
-function stopPoll() {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-}
-
-// ── Controls ─────────────────────────────────────────────────────────────────
+// ── Controls ──────────────────────────────────────────────────────────────────
 async function startPositioning() {
-    const sess = await loadSession();
+    const sess = currentSession || await loadSession();
+    if (!sess) { location.href = '/collaborative'; return; }
 
-    if (!sess) {
-        // Нет сессии — нужно настроить подключение
-        openConnectModal();
-        return;
-    }
-
-    // Сессия есть — включаем позиционирование
+    document.getElementById('btnStart').disabled = true;
     try {
         const r = await fetch(`/api/collaborative/sessions/${sess.id}/positioning`, {
             method: 'POST',
@@ -468,14 +330,15 @@ async function startPositioning() {
         const data = await r.json();
         if (!r.ok) { showToast(data.error || 'Ошибка', 'err'); return; }
         showToast('Позиционирование запущено', 'ok');
-        const updated = await loadSession();
-        applySessionState(updated);
+        applySessionState(await loadSession());
         startPoll();
     } catch { showToast('Ошибка соединения', 'err'); }
+    finally   { document.getElementById('btnStart').disabled = false; }
 }
 
 async function stopPositioning() {
     if (!currentSession) return;
+    document.getElementById('btnStop').disabled = true;
     try {
         const r = await fetch(`/api/collaborative/sessions/${currentSession.id}/positioning`, {
             method: 'POST',
@@ -486,79 +349,12 @@ async function stopPositioning() {
         if (!r.ok) { showToast(data.error || 'Ошибка', 'err'); return; }
         showToast('Позиционирование остановлено', 'ok');
         stopPoll();
-        const updated = await loadSession();
-        applySessionState(updated);
+        applySessionState(await loadSession());
     } catch { showToast('Ошибка соединения', 'err'); }
+    finally   { document.getElementById('btnStop').disabled = false; }
 }
 
-// ── Connect modal ────────────────────────────────────────────────────────────
-let _activeTab = 'tcp';
-
-function switchTab(tab) {
-    _activeTab = tab;
-    document.querySelectorAll('.conn-tab').forEach((b, i) => {
-        b.classList.toggle('active', (i === 0 && tab === 'tcp') || (i === 1 && tab === 'ntrip'));
-    });
-    document.getElementById('panel-tcp').classList.toggle('active', tab === 'tcp');
-    document.getElementById('panel-ntrip').classList.toggle('active', tab === 'ntrip');
-}
-
-function openConnectModal() {
-    document.getElementById('connectModal').classList.add('open');
-}
-function closeConnectModal() {
-    document.getElementById('connectModal').classList.remove('open');
-}
-document.getElementById('connectModal').addEventListener('click', e => {
-    if (e.target === document.getElementById('connectModal')) closeConnectModal();
-});
-
-async function submitConnect() {
-    const connType = _activeTab;
-    let body = { deviceId, connectionType: connType };
-
-    if (connType === 'tcp') {
-        body.tcpHost = document.getElementById('tcp-host').value.trim();
-        body.tcpPort = parseInt(document.getElementById('tcp-port').value) || 0;
-        if (!body.tcpHost || !body.tcpPort) { showToast('Укажите хост и порт', 'err'); return; }
-    } else {
-        body.ntripHost       = document.getElementById('ntrip-host').value.trim();
-        body.ntripPort       = parseInt(document.getElementById('ntrip-port').value) || 0;
-        body.ntripMountpoint = document.getElementById('ntrip-mountpoint').value.trim();
-        body.ntripUser       = document.getElementById('ntrip-user').value.trim();
-        body.ntripPass       = document.getElementById('ntrip-pass').value;
-        if (!body.ntripHost || !body.ntripPort || !body.ntripMountpoint) {
-            showToast('Укажите хост, порт и маунтпоинт', 'err'); return;
-        }
-    }
-
-    try {
-        // Создаём сессию
-        const rc = await fetch('/api/collaborative/sessions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        const dc = await rc.json();
-        if (!rc.ok) { showToast(dc.error || 'Ошибка создания сессии', 'err'); return; }
-
-        // Включаем позиционирование
-        const rp = await fetch(`/api/collaborative/sessions/${dc.id}/positioning`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: true }),
-        });
-        if (!rp.ok) { showToast('Сессия создана, не удалось запустить позиционирование', 'warn'); }
-
-        closeConnectModal();
-        showToast(`Подключено. Порт ${dc.assignedPort}. Позиционирование запущено.`, 'ok');
-        const sess = await loadSession();
-        applySessionState(sess);
-        startPoll();
-    } catch { showToast('Ошибка соединения', 'err'); }
-}
-
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     if (!checkAuth()) return;
     await loadDevice();

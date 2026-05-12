@@ -48,8 +48,9 @@
     border-radius:var(--r-sm); padding:18px 16px;
     display:flex; flex-direction:column; align-items:flex-start; gap:8px;
     position:relative; transition:all var(--t);
+    cursor:pointer;
 }
-.device-card:hover { border-color:var(--graphite); background:var(--paper-2); }
+.device-card:hover { border-color:var(--signal); background:var(--paper-2); box-shadow:0 0 0 2px var(--signal-soft); }
 .dev-icon { font-size:24px; }
 .dev-name { font-size:0.95rem; font-weight:600; color:var(--ink); word-break:break-word; }
 .dev-badges { display:flex; flex-wrap:wrap; gap:5px; }
@@ -278,7 +279,7 @@ input:checked + .toggle-slider::before { transform:translateX(16px); background:
 
         <div class="modal-actions">
             <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
-            <button class="btn btn-primary" onclick="submitConnect()">Подключить</button>
+            <button class="btn btn-primary" onclick="submitConnect()">▶ Старт</button>
         </div>
     </div>
 </div>
@@ -324,7 +325,7 @@ function renderDevices(devices) {
         return;
     }
     el.innerHTML = `<div class="devices-grid">${devices.map(d => `
-        <div class="device-card">
+        <div class="device-card" onclick="openConnectModal(${d.id}, '${escHtml(d.name).replace(/'/g,"\\'")}')">
             <span class="dev-icon" data-icon="${DEVICE_ICONS[d.deviceType] || 'other'}" data-icon-size="22"></span>
             <div class="dev-name">${escHtml(d.name)}</div>
             <div class="dev-badges">
@@ -333,10 +334,7 @@ function renderDevices(devices) {
             </div>
             ${d.antennaName ? `<div class="dev-antenna-label">Антенна</div><div class="dev-antenna">${escHtml(d.antennaName)}</div>` : ''}
             ${d.description ? `<div class="dev-desc">${escHtml(d.description)}</div>` : ''}
-            <a class="btn btn-primary" href="/positioning?deviceId=${d.id}"
-                style="margin-top:4px;font-size:0.8rem;padding:7px 14px;text-decoration:none">
-                → Позиционирование
-            </a>
+            <div style="margin-top:6px;font-family:var(--font-mono);font-size:0.72rem;color:var(--ink-3)">Нажмите для позиционирования →</div>
         </div>`).join('')}
     </div>`;
     if (window.applyIcons) window.applyIcons(el);
@@ -391,26 +389,44 @@ async function submitConnect() {
     if (connType === 'tcp') {
         body.tcpHost = document.getElementById('tcp-host').value.trim();
         body.tcpPort = parseInt(document.getElementById('tcp-port').value) || 0;
+        if (!body.tcpHost || !body.tcpPort) { showToast('Укажите хост и порт устройства', 'err'); return; }
     } else {
-        body.ntripHost        = document.getElementById('ntrip-host').value.trim();
-        body.ntripPort        = parseInt(document.getElementById('ntrip-port').value) || 0;
-        body.ntripMountpoint  = document.getElementById('ntrip-mountpoint').value.trim();
-        body.ntripUser        = document.getElementById('ntrip-user').value.trim();
-        body.ntripPass        = document.getElementById('ntrip-pass').value;
+        body.ntripHost       = document.getElementById('ntrip-host').value.trim();
+        body.ntripPort       = parseInt(document.getElementById('ntrip-port').value) || 0;
+        body.ntripMountpoint = document.getElementById('ntrip-mountpoint').value.trim();
+        body.ntripUser       = document.getElementById('ntrip-user').value.trim();
+        body.ntripPass       = document.getElementById('ntrip-pass').value;
+        if (!body.ntripHost || !body.ntripPort || !body.ntripMountpoint) {
+            showToast('Укажите хост, порт и маунтпоинт', 'err'); return;
+        }
     }
 
+    const btn = document.querySelector('#connectModal .btn-primary');
+    btn.disabled = true; btn.textContent = 'Запуск…';
+
     try {
-        const r = await fetch('/api/collaborative/sessions', {
+        // 1. Создаём сессию
+        const rc = await fetch('/api/collaborative/sessions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
-        const data = await r.json();
-        if (!r.ok) { showToast(data.error || 'Ошибка создания сессии', 'err'); return; }
-        closeModal();
-        showToast(`Подключение создано. Порт: ${data.assignedPort}`, 'ok');
-        loadSessions();
-    } catch { showToast('Ошибка соединения', 'err'); }
+        const session = await rc.json();
+        if (!rc.ok) { showToast(session.error || 'Ошибка создания сессии', 'err'); btn.disabled = false; btn.textContent = '▶ Старт'; return; }
+
+        // 2. Включаем позиционирование
+        await fetch(`/api/collaborative/sessions/${session.id}/positioning`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: true }),
+        });
+
+        // 3. Переходим на страницу карты
+        window.location.href = `/positioning?deviceId=${deviceId}`;
+    } catch {
+        showToast('Ошибка соединения', 'err');
+        btn.disabled = false; btn.textContent = '▶ Старт';
+    }
 }
 
 // ── Sessions ───────────────────────────────────────────────────────────────
