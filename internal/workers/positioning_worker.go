@@ -133,7 +133,6 @@ func (pw *PositioningWorker) startProcess(ctx context.Context, sess model.Collab
 	// -s: автозапуск RTK-сервера (без него rtkrcv ждёт команду start из stdin)
 	// -d 5: максимальный уровень трассировки в файл
 	cmd := exec.CommandContext(procCtx, pw.rtkrcvPath, "-s", "-o", configPath, "-d", "5")
-	cmd.Dir = pw.workDir
 
 	// Захватываем stderr для диагностики в логах
 	cmd.Stderr = &rtkrcvLogWriter{logger: pw.logger, sessionID: sess.ID}
@@ -191,7 +190,11 @@ func (pw *PositioningWorker) generateConfig(sess model.CollaborativeSession) (co
 		return "", "", fmt.Errorf("read template %q: %w", pw.configTmpl, err)
 	}
 
-	sessDir := filepath.Join(pw.workDir, fmt.Sprintf("collab_%d", sess.ID))
+	absWorkDir, err := filepath.Abs(pw.workDir)
+	if err != nil {
+		return "", "", fmt.Errorf("abs workdir: %w", err)
+	}
+	sessDir := filepath.Join(absWorkDir, fmt.Sprintf("collab_%d", sess.ID))
 	if err := os.MkdirAll(sessDir, 0755); err != nil {
 		return "", "", fmt.Errorf("mkdir %q: %w", sessDir, err)
 	}
