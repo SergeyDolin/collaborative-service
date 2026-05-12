@@ -130,9 +130,11 @@ func (pw *PositioningWorker) startProcess(ctx context.Context, sess model.Collab
 	}
 
 	procCtx, cancel := context.WithCancel(ctx)
-	// -s: автозапуск RTK-сервера (без него rtkrcv ждёт команду start из stdin)
-	// -d 5: максимальный уровень трассировки в файл
-	cmd := exec.CommandContext(procCtx, pw.rtkrcvPath, "-s", "-p", "0", "-o", configPath, "-d", "5")
+	// -s: автозапуск RTK-сервера без ожидания команды start из stdin
+	// -d 5: максимальный уровень трассировки
+	// cmd.Dir совпадает с директорией бинаря — туда rtkrcv пишет nav-кэш и trace-файлы
+	cmd := exec.CommandContext(procCtx, pw.rtkrcvPath, "-s", "-o", configPath, "-d", "5")
+	cmd.Dir = filepath.Dir(pw.rtkrcvPath)
 
 	// Захватываем stderr для диагностики в логах
 	cmd.Stderr = &rtkrcvLogWriter{logger: pw.logger, sessionID: sess.ID}
