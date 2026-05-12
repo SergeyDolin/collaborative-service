@@ -130,8 +130,13 @@ func (pw *PositioningWorker) startProcess(ctx context.Context, sess model.Collab
 	}
 
 	procCtx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(procCtx, pw.rtkrcvPath, "-o", configPath, "-d", "5")
+	// -s: автозапуск RTK-сервера (без него rtkrcv ждёт команду start из stdin)
+	// -d 5: максимальный уровень трассировки в файл
+	cmd := exec.CommandContext(procCtx, pw.rtkrcvPath, "-s", "-o", configPath, "-d", "5")
 	cmd.Dir = pw.workDir
+
+	// Захватываем stderr для диагностики в логах
+	cmd.Stderr = &rtkrcvLogWriter{logger: pw.logger, sessionID: sess.ID}
 
 	if err := cmd.Start(); err != nil {
 		cancel()
@@ -143,8 +148,23 @@ func (pw *PositioningWorker) startProcess(ctx context.Context, sess model.Collab
 		solFile: solFile,
 		cancel:  cancel,
 	}
-	pw.logger.Infof("PositioningWorker: started rtkrcv for session %d (port %d)", sess.ID, sess.AssignedPort)
+	pw.logger.Infof("PositioningWorker: started rtkrcv pid=%d session=%d port=%d",
+		cmd.Process.Pid, sess.ID, sess.AssignedPort)
 	return nil
+}
+
+// rtkrcvLogWriter пишет stderr rtkrcv в zap-логгер
+type rtkrcvLogWriter struct {
+	logger    *zap.SugaredLogger
+	sessionID int64
+}
+
+func (w *rtkrcvLogWriter) Write(p []byte) (int, error) {
+	msg := strings.TrimSpace(string(p))
+	if msg != "" {
+		w.logger.Debugf("rtkrcv[%d]: %s", w.sessionID, msg)
+	}
+	return len(p), nil
 }
 
 func (pw *PositioningWorker) stopProcess(id int64, entry *processEntry) {
