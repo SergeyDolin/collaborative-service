@@ -6,6 +6,7 @@
 <title>Позиционирование — CPS</title>
 <link rel="stylesheet" href="/css/theme.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://tile0.maps.2gis.com">
 <style>
 html, body { height:100%; margin:0; padding:0; overflow:hidden; }
 body { display:flex; flex-direction:column; }
@@ -188,9 +189,10 @@ const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'�
 
 // ── Leaflet map ───────────────────────────────────────────────────────────────
 const map = L.map('map', { zoomControl:true }).setView([55.75, 37.62], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+L.tileLayer('https://tile{s}.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=1.3', {
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 18,
+    attribution: '© <a href="https://2gis.ru">2ГИС</a>',
 }).addTo(map);
 
 delete L.Icon.Default.prototype._getIconUrl;

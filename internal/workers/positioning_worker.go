@@ -177,8 +177,28 @@ func (pw *PositioningWorker) generateConfig(sess model.CollaborativeSession) (co
 	solFile = filepath.Join(sessDir, "solution.pos")
 	configPath = filepath.Join(sessDir, "rtkrcv.conf")
 
+	// Определяем тип и путь входного потока rover из настроек подключения сессии
+	var roverType, roverPath string
+	switch sess.ConnectionType {
+	case model.ConnectionTypeTCP:
+		roverType = "tcpcli"
+		roverPath = fmt.Sprintf("%s:%d", sess.TCPHost, sess.TCPPort)
+	case model.ConnectionTypeNTRIP:
+		roverType = "ntrip"
+		if sess.NTRIPUser != "" {
+			roverPath = fmt.Sprintf("%s:%s@%s:%d/%s",
+				sess.NTRIPUser, sess.NTRIPPass,
+				sess.NTRIPHost, sess.NTRIPPort, sess.NTRIPMountpoint)
+		} else {
+			roverPath = fmt.Sprintf("%s:%d/%s", sess.NTRIPHost, sess.NTRIPPort, sess.NTRIPMountpoint)
+		}
+	default:
+		return "", "", fmt.Errorf("неизвестный тип подключения: %s", sess.ConnectionType)
+	}
+
 	content := string(tmplData)
-	content = strings.ReplaceAll(content, "{{PORT}}", strconv.Itoa(sess.AssignedPort))
+	content = strings.ReplaceAll(content, "{{ROVER_TYPE}}", roverType)
+	content = strings.ReplaceAll(content, "{{ROVER_PATH}}", roverPath)
 	content = strings.ReplaceAll(content, "{{SOL_FILE}}", solFile)
 	content = strings.ReplaceAll(content, "{{ATX_FILE}}", pw.atxFile)
 
