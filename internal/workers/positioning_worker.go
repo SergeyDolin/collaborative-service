@@ -184,7 +184,7 @@ func (pw *PositioningWorker) generateConfig(sess model.CollaborativeSession) (co
 		roverType = "tcpcli"
 		roverPath = fmt.Sprintf("%s:%d", sess.TCPHost, sess.TCPPort)
 	case model.ConnectionTypeNTRIP:
-		roverType = "6"
+		roverType = "ntripcli"
 		if sess.NTRIPUser != "" {
 			roverPath = fmt.Sprintf("%s:%s@%s:%d/%s",
 				sess.NTRIPUser, sess.NTRIPPass,

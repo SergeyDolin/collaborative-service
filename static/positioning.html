@@ -188,12 +188,12 @@ const QUALITY_COLOR = { 1:'#1db954', 2:'#f5a623', 5:'#e74c3c' };
 const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'Смартфон', tablet:'Планшет', other:'Иное' };
 
 // ── Leaflet map ───────────────────────────────────────────────────────────────
-const map = L.map('map', { zoomControl:true }).setView([55.75, 37.62], 5);
+const map = L.map('map', { zoomControl:true, attributionControl:false }).setView([55.75, 37.62], 5);
 L.tileLayer('https://tile{s}.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=1.3', {
     subdomains: ['0', '1', '2', '3'],
     maxZoom: 18,
-    attribution: '© <a href="https://2gis.ru">2ГИС</a>',
 }).addTo(map);
+L.control.attribution({ prefix: '© <a href="https://2gis.ru">2ГИС</a>' }).addTo(map);
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -313,7 +313,7 @@ function startPoll() {
     if (pollTimer) return;
     pollTimer = setInterval(async () => {
         applySessionState(await loadSession());
-    }, 5000);
+    }, 30000);
 }
 function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
