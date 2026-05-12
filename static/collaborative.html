@@ -292,6 +292,9 @@ const DEVICE_ICONS  = { gnss_receiver:'gnss_receiver', smartphone:'smartphone', 
 const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'Смартфон', tablet:'Планшет', other:'Иное' };
 const MOUNT_LABELS  = { car:'Автомобиль', permanent_station:'Пост. станция', uav:'БПЛА', rod:'Веха', man:'Человек' };
 
+// deviceId → session, populated on each loadSessions call
+let _sessionsByDeviceId = {};
+
 function getToken()  { return localStorage.getItem('token'); }
 function getLogin()  { return localStorage.getItem('userLogin') || ''; }
 function logout()    { localStorage.removeItem('token'); localStorage.removeItem('userLogin'); window.location.href = '/'; }
@@ -363,9 +366,13 @@ function switchTab(tab) {
 }
 
 function openConnectModal(deviceId, deviceName) {
+    // If session already exists for this device — go straight to map
+    if (_sessionsByDeviceId[deviceId]) {
+        window.location.href = `/positioning?deviceId=${deviceId}`;
+        return;
+    }
     document.getElementById('modalDeviceId').value = deviceId;
     document.getElementById('modalDeviceName').textContent = 'Подключить: ' + deviceName;
-    // Reset
     ['tcp-host','tcp-port','ntrip-host','ntrip-port','ntrip-mountpoint','ntrip-user','ntrip-pass']
         .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     switchTab('tcp');
@@ -438,21 +445,41 @@ function qualityLabel(q) {
     return `<span>${q}</span>`;
 }
 
+function parseTs(s) {
+    if (!s) return null;
+    // Postgres may return timestamps without tz; append Z to treat as UTC
+    if (typeof s === 'string' && !/Z$|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+    return new Date(s);
+}
+
+function timeAgo(ts) {
+    const d = parseTs(ts);
+    if (!d) return '—';
+    const sec = Math.round((Date.now() - d) / 1000);
+    if (sec <= 0) return 'только что';
+    if (sec < 60) return sec + ' с назад';
+    return Math.round(sec / 60) + ' мин назад';
+}
+
 function renderPosition(pos) {
     if (!pos) return '';
-    const ago = Math.round((Date.now() - new Date(pos.updatedAt)) / 1000);
     return `<div class="position-block">
         <span class="pos-item">Φ <span class="pos-val">${pos.lat.toFixed(7)}°</span></span>
         <span class="pos-item">λ <span class="pos-val">${pos.lon.toFixed(7)}°</span></span>
         <span class="pos-item">H <span class="pos-val">${pos.height.toFixed(3)} м</span></span>
         <span class="pos-item">nSat <span class="pos-val">${pos.nsat}</span></span>
         <span class="pos-item">${qualityLabel(pos.quality)}</span>
-        <span class="pos-age">${ago}с назад</span>
+        <span class="pos-age">${timeAgo(pos.updatedAt)}</span>
     </div>`;
 }
 
 function renderSessions(sessions) {
     const el = document.getElementById('sessionsContent');
+
+    // Rebuild lookup map
+    _sessionsByDeviceId = {};
+    (sessions || []).forEach(s => { _sessionsByDeviceId[s.deviceId] = s; });
+
     if (!sessions || sessions.length === 0) {
         el.innerHTML = `<div class="no-devices" style="padding:24px">
             Нет активных подключений. Добавьте устройство выше.
@@ -471,7 +498,10 @@ function renderSessions(sessions) {
                     <div class="session-name">${escHtml(s.deviceName)}</div>
                     <div class="session-meta">${connInfo}</div>
                 </div>
-                <div class="session-port">Порт ${s.assignedPort}</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <a href="/positioning?deviceId=${s.deviceId}" class="btn btn-secondary" style="font-size:0.78rem;padding:5px 12px">Карта →</a>
+                    <div class="session-port">Порт ${s.assignedPort}</div>
+                </div>
             </div>
 
             <div class="session-cmd">

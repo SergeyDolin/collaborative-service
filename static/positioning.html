@@ -224,17 +224,30 @@ function updateMapPosition(pos) {
     if (!mapCentred) { map.setView(latlng, 16); mapCentred = true; }
 }
 
+function parseTs(s) {
+    if (!s) return null;
+    if (typeof s === 'string' && !/Z$|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+    return new Date(s);
+}
+function timeAgo(ts) {
+    const d = parseTs(ts);
+    if (!d) return '—';
+    const sec = Math.round((Date.now() - d) / 1000);
+    if (sec <= 0) return 'только что';
+    if (sec < 60) return sec + ' с назад';
+    return Math.round(sec / 60) + ' мин назад';
+}
+
 function updateInfoOverlay(pos) {
     const overlay = document.getElementById('infoOverlay');
     if (!pos) { overlay.classList.add('hidden'); return; }
-    const ago    = Math.round((Date.now() - new Date(pos.updatedAt)) / 1000);
     const qClass = 'mi-quality-' + (QUALITY_CLASS[pos.quality] || 'single');
     document.getElementById('infoLat').textContent    = pos.lat.toFixed(8) + '°';
     document.getElementById('infoLon').textContent    = pos.lon.toFixed(8) + '°';
     document.getElementById('infoHeight').textContent = pos.height.toFixed(3) + ' м';
     document.getElementById('infoNsat').textContent   = pos.nsat;
     document.getElementById('infoQuality').innerHTML  = `<span class="${qClass}">${QUALITY_LABEL[pos.quality] || pos.quality}</span>`;
-    document.getElementById('infoAge').textContent    = ago + ' с назад';
+    document.getElementById('infoAge').textContent    = timeAgo(pos.updatedAt);
     overlay.classList.remove('hidden');
 }
 
