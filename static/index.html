@@ -243,7 +243,7 @@ body { background:var(--paper); }
             <div class="logo-text"></div>
         </a>
         <div style="display:flex;align-items:center;gap:10px;">
-            <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема">☾</button>
+            <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема" data-icon="moon" data-icon-size="16"></button>
             <div class="user-info" id="userInfo"></div>
         </div>
     </div>
@@ -256,7 +256,6 @@ body { background:var(--paper); }
             <p>Обработка ГНСС-измерений, коллаборативные сети и сантиметровая точность — от профессиональных приёмников до смартфонов.</p>
             <div class="welcome-meta">
                 <span>GPS · ГЛОНАСС · Galileo · BeiDou</span>
-                <span>L1 · L2 · L5</span>
             </div>
         </div>
         <div class="welcome-art">
@@ -418,8 +417,9 @@ body { background:var(--paper); }
 </main>
 <div id="notification" class="notification"></div>
 <footer class="footer">
-    <div class="footer-content">© 2026 · CPS — Collaborative Positioning Service · ITRF2014</div>
+    <div class="footer-content">© 2026 · CPS — Collaborative Positioning Service</div>
 </footer>
+<script src="/js/icons.js"></script>
 <script src="/js/chrome.js"></script>
 <script src="/js/main.js?v=2"></script>
 </body>

@@ -101,6 +101,9 @@ function renderHeader(authenticated) {
     wrap.appendChild(avatarEl);
     wrap.appendChild(logoutEl);
 
+    // Make sure chrome.js doesn't add a duplicate avatar after we've painted ours
+    if (window._cpsRefreshAvatar) window._cpsRefreshAvatar();
+
     // Асинхронно заменяем инициал на фото (если есть)
     loadAvatar(login).then(src => {
         if (src) avatarEl.replaceWith(makeAvatar(login, src));

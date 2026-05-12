@@ -68,9 +68,12 @@
   }
   function syncToggleButtons(theme) {
     document.querySelectorAll('.theme-toggle').forEach(function (b) {
-      b.textContent = theme === 'dark' ? '☀' : '☾';
+      b.setAttribute('data-icon', theme === 'dark' ? 'sun' : 'moon');
+      b.setAttribute('data-icon-size','16');
+      b.textContent = '';
       b.title = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
       b.setAttribute('aria-label', b.title);
+      if (window.applyIcons) window.applyIcons(b.parentNode || document);
     });
   }
   function applyTheme(theme) {
@@ -97,4 +100,57 @@
 
   // For dynamic insertions (e.g. main.js writes auth-buttons after fetch)
   window._cpsRefreshChrome = mountLogoMarks;
+
+  // ── Global header avatar (appears on every page when authenticated) ──────
+  // Looks for `.user-menu` or `.user-info` and prepends a clickable avatar
+  // chip that always navigates to /profile. Hidden on the profile page itself.
+  function mountAvatarLink() {
+    const isAuth   = !!localStorage.getItem('token');
+    const onProfile = location.pathname.replace(/\/$/, '') === '/profile';
+    if (!isAuth) return;
+    const slots = document.querySelectorAll('.user-menu, .user-info');
+    slots.forEach(function (slot) {
+    if (slot.querySelector('.cps-avatar-link, .user-avatar')) return;
+      // Skip if it's inside a hero/profile context (avoid double avatar in profile hero)
+      if (slot.closest('.profile-hero')) return;
+      const a = document.createElement('a');
+      a.href = '/profile';
+      a.className = 'cps-avatar-link';
+      a.title = onProfile ? 'Личный кабинет' : 'Перейти в личный кабинет';
+      a.setAttribute('aria-label', a.title);
+      // Build avatar with initial letter (if login known) or user icon fallback
+      const login = localStorage.getItem('userLogin') || '';
+      const avatarUrl = localStorage.getItem('userAvatar')
+                     || localStorage.getItem('_av_cache')
+                     || '';
+      if (avatarUrl) {
+        a.innerHTML = '<img src="' + avatarUrl + '" alt=""/>';
+      } else if (login) {
+        a.innerHTML = '<span class="cps-avatar-initial">' + login.charAt(0).toUpperCase() + '</span>';
+      } else {
+        a.innerHTML = '<span data-icon="user" data-icon-size="18"></span>';
+      }
+      // Prepend so avatar sits before name/logout
+      slot.insertBefore(a, slot.firstChild);
+
+      // If no cached avatar, fetch and inject when it arrives
+      if (!avatarUrl && localStorage.getItem('token')) {
+        fetch('/api/profile/data', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (d && d.avatar) {
+              localStorage.setItem('_av_login', login);
+              localStorage.setItem('_av_cache', d.avatar);
+              a.innerHTML = '<img src="' + d.avatar + '" alt=""/>';
+            }
+          })
+          .catch(() => {});
+      }
+    });
+    if (window.applyIcons) window.applyIcons(document);
+  }
+
+  document.addEventListener('DOMContentLoaded', mountAvatarLink);
+  // Re-mount if main.js or others repaint the user menu
+  window._cpsRefreshAvatar = mountAvatarLink;
 })();

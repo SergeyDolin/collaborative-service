@@ -22,8 +22,11 @@
             const next = cur === 'dark' ? 'light' : 'dark';
             apply(next);
             document.querySelectorAll('.theme-toggle').forEach(btn => {
-                btn.textContent = next === 'dark' ? '☀️' : '🌙';
+                btn.setAttribute('data-icon', next === 'dark' ? 'sun' : 'moon');
+                btn.setAttribute('data-icon-size','16');
+                btn.textContent = '';
                 btn.title = next === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+                if (window.applyIcons) window.applyIcons(btn.parentNode);
             });
         },
         current() {
@@ -33,8 +36,11 @@
         syncButtons() {
             const isDark = ThemeManager.current() === 'dark';
             document.querySelectorAll('.theme-toggle').forEach(btn => {
-                btn.textContent = isDark ? '☀️' : '🌙';
+                btn.setAttribute('data-icon', isDark ? 'sun' : 'moon');
+                btn.setAttribute('data-icon-size','16');
+                btn.textContent = '';
                 btn.title = isDark ? 'Светлая тема' : 'Тёмная тема';
+                if (window.applyIcons) window.applyIcons(btn.parentNode);
             });
         }
     };

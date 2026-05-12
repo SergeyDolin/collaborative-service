@@ -5,12 +5,12 @@ let selectedDeviceType = null;
 
 const methodDetails = {
     single: {
-        title: "📍 Абсолютный метод (SPP)",
+        title: "Абсолютный метод (SPP)",
         description: "Одиночное точечное позиционирование с использованием псевдодальностей и широковещательных эфемерид.",
         features: [
-            "✅ Не требует базовой станции",
-            "✅ Быстрая обработка (несколько секунд)",
-            "✅ Подходит для навигации"
+            "Не требует базовой станции",
+            "Быстрая обработка (несколько секунд)",
+            "Подходит для навигации"
         ],
         config: { 
             method: "single", 
@@ -25,13 +25,13 @@ const methodDetails = {
         }
     },
     "ppp-kinematic": {
-        title: "🎯 PPP-AR Кинематика",
+        title: "PPP-AR Кинематика",
         description: "Прецизионное точечное позиционирование с разрешением неоднозначностей для движущихся объектов.",
         features: [
-            "✅ Не требует базовой станции",
-            "✅ Разрешение целочисленных неоднозначностей (AR)",
-            "✅ Для движущихся объектов",
-            "⚠️ Требует 15-30 минут для инициализации"
+            "Не требует базовой станции",
+            "Разрешение целочисленных неоднозначностей (AR)",
+            "Для движущихся объектов",
+            "Требует 15-30 минут для инициализации"
         ],
         config: { 
             method: "ppp", 
@@ -51,13 +51,13 @@ const methodDetails = {
         }
     },
     "ppp-static": {
-        title: "🎯 PPP-AR Статика",
+        title: "PPP-AR Статика",
         description: "Прецизионное точечное позиционирование с разрешением неоднозначностей для неподвижных объектов.",
         features: [
-            "✅ Не требует базовой станции",
-            "✅ Разрешение целочисленных неоднозначностей (AR)",
-            "✅ Для неподвижных объектов",
-            "✅ Накопление решения со временем"
+            "Не требует базовой станции",
+            "Разрешение целочисленных неоднозначностей (AR)",
+            "Для неподвижных объектов",
+            "Накопление решения со временем"
         ],
         config: { 
             method: "ppp", 
@@ -112,8 +112,9 @@ function selectMethod(method) {
     document.getElementById('methodDetail').innerHTML = `
         <h4>${detail.title}</h4>
         <p>${detail.description}</p>
-        <ul>${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>
+        <ul class="method-features">${detail.features.map(f => `<li><span class="mf-check" data-icon="check" data-icon-size="14"></span>${f}</li>`).join('')}</ul>
     `;
+    if (window.applyIcons) window.applyIcons(document.getElementById('methodDetail'));
     
     document.getElementById('deviceSection').style.display = 'block';
     updateButtonState();
@@ -140,16 +141,16 @@ function updateButtonState() {
     const ready = selectedMethod && selectedFile && selectedDeviceType;
     if (ready) {
         btn.disabled = false;
-        btn.textContent = '🚀 Запустить обработку';
+        btn.textContent = 'Запустить обработку';
     } else if (!selectedMethod) {
         btn.disabled = true;
         btn.textContent = 'Выберите метод и файл';
     } else if (!selectedDeviceType) {
         btn.disabled = true;
-        btn.textContent = '📡 Выберите тип устройства';
+        btn.textContent = 'Выберите тип устройства';
     } else if (!selectedFile) {
         btn.disabled = true;
-        btn.textContent = '📁 Выберите файл наблюдений';
+        btn.textContent = 'Выберите файл наблюдений';
     } else {
         btn.disabled = true;
         btn.textContent = 'Выберите метод и файл';

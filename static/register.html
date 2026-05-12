@@ -224,7 +224,7 @@ input[type="number"] { font-family:var(--font-mono); }
         </div>
         <div class="steps-body">
             <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-                <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема">☾</button>
+                <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема" data-icon="moon" data-icon-size="16"></button>
             </div>
             <div id="alertBox" class="alert err"></div>
 
@@ -247,7 +247,7 @@ input[type="number"] { font-family:var(--font-mono); }
                 <div class="step-subtitle">Имя и фото помогут другим участникам вас узнать <span style="color:var(--ink-faint);">(необязательно)</span></div>
                 <div class="avatar-zone">
                     <div class="avatar-preview" id="avatarPreview" onclick="document.getElementById('avatarFile').click()">
-                        <span class="av-icon">👤</span>
+                        <span class="av-icon" data-icon="user" data-icon-size="36"></span>
                         <img id="avatarImg" alt="avatar">
                     </div>
                     <div class="avatar-hint">
@@ -272,20 +272,20 @@ input[type="number"] { font-family:var(--font-mono); }
                 <div class="field">
                     <label>Тип устройства</label>
                     <div class="type-grid">
-                        <div class="type-card" data-type="gnss_receiver" onclick="selectType(this)"><span class="ti">📡</span><span class="tl">ГНСС-приёмник</span></div>
-                        <div class="type-card" data-type="smartphone"    onclick="selectType(this)"><span class="ti">📱</span><span class="tl">Смартфон</span></div>
-                        <div class="type-card" data-type="tablet"        onclick="selectType(this)"><span class="ti">📟</span><span class="tl">Планшет</span></div>
-                        <div class="type-card" data-type="other"         onclick="selectType(this)"><span class="ti">🔧</span><span class="tl">Иное</span></div>
+                        <div class="type-card" data-type="gnss_receiver" onclick="selectType(this)"><span class="ti" data-icon="gnss_receiver" data-icon-size="24"></span><span class="tl">ГНСС-приёмник</span></div>
+                        <div class="type-card" data-type="smartphone"    onclick="selectType(this)"><span class="ti" data-icon="smartphone" data-icon-size="24"></span><span class="tl">Смартфон</span></div>
+                        <div class="type-card" data-type="tablet"        onclick="selectType(this)"><span class="ti" data-icon="tablet" data-icon-size="24"></span><span class="tl">Планшет</span></div>
+                        <div class="type-card" data-type="other"         onclick="selectType(this)"><span class="ti" data-icon="other" data-icon-size="24"></span><span class="tl">Иное</span></div>
                     </div>
                 </div>
 
                 <div class="field" id="mountField" style="display:none">
                     <label>Устанавливается на</label>
                     <div class="mount-grid">
-                        <div class="mount-card" data-mount="car"               onclick="selectMount(this)"><span class="mi">🚗</span><span class="ml">Автомобиль</span></div>
-                        <div class="mount-card" data-mount="permanent_station" onclick="selectMount(this)"><span class="mi">🏛️</span><span class="ml">Постоянно действующая станция</span></div>
-                        <div class="mount-card" data-mount="uav"               onclick="selectMount(this)"><span class="mi">🚁</span><span class="ml">БПЛА</span></div>
-                        <div class="mount-card" data-mount="rod"               onclick="selectMount(this)"><span class="mi">📏</span><span class="ml">Веха</span></div>
+                        <div class="mount-card" data-mount="car"               onclick="selectMount(this)"><span class="mi" data-icon="car" data-icon-size="24"></span><span class="ml">Автомобиль</span></div>
+                        <div class="mount-card" data-mount="permanent_station" onclick="selectMount(this)"><span class="mi" data-icon="permanent_station" data-icon-size="24"></span><span class="ml">Постоянно действующая станция</span></div>
+                        <div class="mount-card" data-mount="uav"               onclick="selectMount(this)"><span class="mi" data-icon="uav" data-icon-size="24"></span><span class="ml">БПЛА</span></div>
+                        <div class="mount-card" data-mount="rod"               onclick="selectMount(this)"><span class="mi" data-icon="rod" data-icon-size="24"></span><span class="ml">Веха</span></div>
                     </div>
                 </div>
 
@@ -327,7 +327,7 @@ input[type="number"] { font-family:var(--font-mono); }
                         </div>
                     </div>
                     <div id="autoWarning" style="display:none;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn);border-radius:var(--r-sm);padding:10px 12px;font-size:0.78rem;line-height:1.5;font-family:var(--font-mono);letter-spacing:0.01em;">
-                        ⚠ Без поправки на фазовый центр антенны точность сантиметрового уровня <strong>недоступна</strong>.
+                        <span data-icon="warn" data-icon-size="14"></span> Без поправки на фазовый центр антенны точность сантиметрового уровня <strong>недоступна</strong>.
                     </div>
                     <div id="manualOffsets" style="display:none;margin-top:10px;">
                         <label style="margin-bottom:6px;display:block;">Смещения ENU <span style="color:var(--err);">*</span> <span style="color:var(--ink-faint);font-weight:400;">(метры)</span></label>
@@ -360,7 +360,7 @@ input[type="number"] { font-family:var(--font-mono); }
             <!-- Success -->
             <div class="step" id="stepOk">
                 <div class="success-screen">
-                    <div class="success-icon">✓</div>
+                    <div class="success-icon" data-icon="check" data-icon-size="40"></div>
                     <h2>Добро пожаловать!</h2>
                     <p>Аккаунт создан. Переходим в личный кабинет…</p>
                 </div>
@@ -369,6 +369,7 @@ input[type="number"] { font-family:var(--font-mono); }
     </div>
     <div class="footer-link"><a href="/">← Вернуться на главную</a></div>
 </div>
+<script src="/js/icons.js"></script>
 <script src="/js/chrome.js"></script>
 <script src="/js/register.js?v=2"></script>
 </body>

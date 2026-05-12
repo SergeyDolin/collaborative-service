@@ -83,9 +83,10 @@ function renderProfile(p) {
 /* ════════════════════════════════════════════
    DEVICES
 ════════════════════════════════════════════ */
-const DEVICE_ICONS  = { gnss_receiver:'📡', smartphone:'📱', tablet:'📟', other:'🔧' };
+const DEVICE_ICONS  = { gnss_receiver:'gnss_receiver', smartphone:'smartphone', tablet:'tablet', other:'other' };
 const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'Смартфон', tablet:'Планшет', other:'Иное' };
 const MOUNT_LABELS  = { car:'Автомобиль', permanent_station:'Пост. станция', uav:'БПЛА', rod:'Веха',  man: "Человек" };
+function icon(name, size = 18) { return (window.ICONS && window.ICONS[name]) ? window.ICONS[name]({ size }) : ''; }
 
 function renderDeviceExtra(d) {
     if (d.deviceType === 'gnss_receiver') {
@@ -101,7 +102,7 @@ function renderDeviceExtra(d) {
         const expired = until < now;
         const fmt = until.toLocaleString('ru', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
         return `<div class="dev-pc ${expired ? 'dev-pc-expired' : 'dev-pc-ok'}">
-            ${expired ? '⚠️ Калибровка истекла' : '🤖 Авто до ' + fmt}
+            <span class="icon">${expired ? icon('warn',14) : icon('bot',14)}</span>${expired ? 'Калибровка истекла' : 'Авто до ' + fmt}
         </div>`;
     }
     if (d.phaseCenterMethod === 'manual' && (d.antennaE || d.antennaN || d.antennaU)) {
@@ -113,13 +114,13 @@ function renderDeviceExtra(d) {
 function renderDevices(devices) {
     const el = document.getElementById('devicesContent');
     if (!devices || devices.length === 0) {
-        el.innerHTML = `<div class="no-devices"><span class="nd-icon">📡</span>Нет зарегистрированных устройств.<br>Добавьте устройство для участия в коллаборативном позиционировании.</div>`;
+        el.innerHTML = `<div class="no-devices"><span class="nd-icon">${icon('gnss_receiver', 36)}</span>Нет зарегистрированных устройств.<br>Добавьте устройство для участия в коллаборативном позиционировании.</div>`;
         return;
     }
     el.innerHTML = `<div class="devices-grid">${devices.map(d => `
         <div class="device-card">
-            <button class="dev-delete" onclick="deleteDevice(${d.id})" title="Удалить">✕</button>
-            <span class="dev-icon">${DEVICE_ICONS[d.deviceType] || '🔧'}</span>
+            <button class="dev-delete" onclick="deleteDevice(${d.id})" title="Удалить">${icon('close',14)}</button>
+            <span class="dev-icon">${icon(DEVICE_ICONS[d.deviceType] || 'other', 22)}</span>
             <div class="dev-name">${escHtml(d.name)}</div>
             <div class="dev-badges">
                 <span class="badge badge-type">${DEVICE_LABELS[d.deviceType] || d.deviceType}</span>
@@ -129,7 +130,7 @@ function renderDevices(devices) {
             ${d.description ? `<div class="dev-desc">${escHtml(d.description)}</div>` : ''}
         </div>`).join('')}
         <button class="add-device-card" onclick="openAddDevice()">
-            <span class="add-icon">＋</span><span>Добавить устройство</span>
+            <span class="add-icon">${icon('plus',22)}</span><span>Добавить устройство</span>
         </button>
     </div>`;
 }
@@ -292,15 +293,15 @@ function escHtml(s) {
 function formatCoord(v) { const n = Number(v); return isNaN(n) ? '—' : n.toFixed(8); }
 function formatH(v)     { const n = Number(v); return isNaN(n) ? '—' : n.toFixed(3); }
 function getMethodName(m) {
-    return { absolute:'📍 SPP', single:'📍 SPP', relative:'🔗 Относительный', ppp:'🎯 PPP-AR' }[m?.toLowerCase()] || m || '—';
+    return { absolute:'SPP', single:'SPP', relative:'Относительный', ppp:'PPP-AR' }[m?.toLowerCase()] || m || '—';
 }
 function getStatusText(s) {
     return { pending:'⏳ В очереди', processing:'🔄 Обработка…', completed:'✅ Завершено', failed:'❌ Ошибка' }[s] || s;
 }
 function getSolutionStatus(q) {
-    if (q===1) return '<span class="fix-badge">🎯 FIX</span>';
-    if (q===6) return '<span class="float-badge">📊 FLOAT</span>';
-    if (q===0) return '<span style="color:var(--err)">❌ NO FIX</span>';
+    if (q===1) return '<span class="fix-badge">FIX</span>';
+    if (q===6) return '<span class="float-badge">FLOAT</span>';
+    if (q===0) return '<span style="color:var(--err)">NO FIX</span>';
     if (q)     return `<span>Q=${q}</span>`;
     return '';
 }
@@ -358,11 +359,11 @@ async function loadHistory() {
                     coordsHtml = `<div class="coords-mono">B: ${formatCoord(r.latitude)}°<br>L: ${formatCoord(r.longitude)}°<br>H: ${formatH(r.height)} м</div>`;
                 }
                 const dlBtn = task.fileType !== 'static'
-                    ? `<button class="download-btn" onclick="downloadResult('${task.id}',event)">📥 Скачать .pos</button>` : '';
+                    ? `<button class="download-btn" onclick="downloadResult('${task.id}',event)"><span data-icon="download" data-icon-size="14"></span> Скачать .pos</button>` : '';
                 const trBtn = hasCoords
-                    ? `<button class="btn-transform" onclick="openTransform(${r.latitude},${r.longitude},${r.height||0},'${task.id}')">🔄 Пересчёт</button>` : '';
+                    ? `<button class="btn-transform" onclick="openTransform(${r.latitude},${r.longitude},${r.height||0},'${task.id}')"><span data-icon="refresh" data-icon-size="14"></span> Пересчёт</button>` : '';
                 resultHtml = `<div class="result-block">
-                    <div class="stats-info">${getSolutionStatus(r.q)}${fixRate?` <span>(${fixRate}%)</span>`:''} ${r.nSat?`<span>🛰️ ${r.nSat}</span>`:''}</div>
+                    <div class="stats-info">${getSolutionStatus(r.q)}${fixRate?` <span>(${fixRate}%)</span>`:''} ${r.nSat?`<span><span data-icon="satellite" data-icon-size="12"></span> ${r.nSat}</span>`:''}</div>
                     ${coordsHtml}
                     <div class="action-buttons">${dlBtn}${trBtn}</div>
                 </div>`;
@@ -373,19 +374,20 @@ async function loadHistory() {
                 <div class="item-body">
                     <div class="history-header-row">
                         <div class="history-info">
-                            <div class="history-date">📅 ${date}</div>
+                            <div class="history-date"><span data-icon="calendar" data-icon-size="12"></span> ${date}</div>
                             <div class="history-method">${method} · ${mode}</div>
-                            <div class="history-file">📁 ${escHtml(task.filename||'—')}</div>
+                            <div class="history-file"><span data-icon="file" data-icon-size="12"></span> ${escHtml(task.filename||'—')}</div>
                         </div>
                         <div class="history-status">
                             <span class="status-badge status-${status}">${getStatusText(status)}</span>
-                            <button class="btn-delete-single" onclick="confirmDeleteOne('${task.id}')">🗑️ Удалить</button>
+                            <button class="btn-delete-single" onclick="confirmDeleteOne('${task.id}')"><span data-icon="trash" data-icon-size="12"></span> Удалить</button>
                         </div>
                     </div>
                     ${resultHtml}${errHtml}
                 </div>
             </div>`;
         }).join('');
+        if (window.applyIcons) window.applyIcons(el);
         if (selectMode) el.classList.add('select-mode');
     } catch(e) { console.error(e); el.innerHTML = '<div class="empty-history">❌ Ошибка соединения</div>'; }
     finally { isHistLoading = false; }
@@ -399,7 +401,7 @@ function toggleSelectMode() {
     list.classList.toggle('select-mode', selectMode);
     bar.classList.toggle('visible', selectMode);
     btn.classList.toggle('active', selectMode);
-    btn.textContent = selectMode ? '✖ Отмена' : '☑️ Выбрать';
+    btn.textContent = selectMode ? 'Отмена' : 'Выбрать';
     document.getElementById('btnDeleteAll').style.display = (!selectMode && !!document.querySelector('.history-item')) ? 'block' : 'none';
     document.querySelectorAll('.history-item').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.task-checkbox').forEach(cb => { cb.checked = false; });
@@ -502,8 +504,8 @@ async function openTransform(lat, lon, height, taskId) {
         if (r.ok) {
             const d = await r.json();
             document.getElementById('sourceEpoch').value = d.date;
-            document.getElementById('obsDateInfo').innerHTML = `<span style="color:var(--ok);">✓ Дата наблюдения: ${new Date(d.date).toLocaleDateString('ru')}</span>`;
-        } else { document.getElementById('obsDateInfo').textContent = '⚠️ Не удалось определить дату'; document.getElementById('sourceEpoch').value = new Date().toISOString().slice(0,10); }
+            document.getElementById('obsDateInfo').innerHTML = `<span style="color:var(--ok);display:inline-flex;align-items:center;gap:4px;">${icon('check',14)} Дата наблюдения: ${new Date(d.date).toLocaleDateString('ru')}</span>`;
+        } else { document.getElementById('obsDateInfo').innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;color:var(--warn);">${icon('warn',14)} Не удалось определить дату</span>`; document.getElementById('sourceEpoch').value = new Date().toISOString().slice(0,10); }
     } catch { document.getElementById('obsDateInfo').textContent = ''; }
 }
 function swapSystems() {
@@ -558,7 +560,7 @@ function displayTransformResult(result, targetType) {
             const tgtL   = STATIC_CRS.has(tgtCRS)?'(статическая)':`(${tgtEp})`;
             const fmt10  = v => Number(v).toFixed(10);
             const fmt4   = v => Number(v).toFixed(4);
-            const meta   = `<div style="font-size:0.7rem;color:var(--muted);margin-bottom:10px;padding:8px;background:#dbeafe;border-radius:6px;line-height:1.6;"><div>📐 <strong>${srcCRS}</strong> ${srcL} → <strong>${tgtCRS}</strong> ${tgtL}</div><div style="font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#93c5fd;word-break:break-all;">${opCode}</div></div>`;
+            const meta   = `<div style="font-size:0.7rem;color:var(--ink-3);margin-bottom:10px;padding:8px;background:var(--paper-2);border:1px solid var(--paper-edge);border-radius:6px;line-height:1.6;"><div><strong>${srcCRS}</strong> ${srcL} → <strong>${tgtCRS}</strong> ${tgtL}</div><div style="font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#93c5fd;word-break:break-all;">${opCode}</div></div>`;
             let html = meta;
             if (targetType === 'BLH') {
                 html += `<div style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;line-height:1.8;">B = ${fmt10(coords[1])}°<br>L = ${fmt10(coords[0])}°<br>${coords[2]?`H = ${fmt4(coords[2])} м`:''}</div>`;

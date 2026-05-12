@@ -57,7 +57,8 @@
 [data-theme="dark"] .dev-antenna { color:var(--signal); }
 .dev-antenna-label { font-family:var(--font-mono); font-size:0.66rem; color:var(--ink-faint); margin-bottom:1px; text-transform:uppercase; letter-spacing:0.1em; }
 .dev-enu { font-size:0.7rem; color:var(--ink-3); font-family:var(--font-mono); }
-.dev-pc { font-size:0.7rem; padding:2px 8px; border-radius:20px; display:inline-block; font-family:var(--font-mono); letter-spacing:0.02em; }
+.dev-pc { font-size:0.7rem; padding:2px 8px; border-radius:20px; display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); letter-spacing:0.02em; }
+.dev-pc .icon, .dev-pc .icon svg { display:inline-flex; }
 .dev-pc-ok      { background:var(--ok-bg); color:var(--ok); }
 .dev-pc-expired { background:var(--warn-bg); color:var(--warn); }
 
@@ -76,7 +77,7 @@
             <div class="logo-text"></div>
         </a>
         <div class="user-menu">
-            <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема">☾</button>
+            <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема" data-icon="moon" data-icon-size="16"></button>
             <span class="user-name" id="headerLogin">—</span>
             <button class="btn-logout" onclick="logout()">Выйти</button>
         </div>
@@ -100,9 +101,10 @@
     </div>
 </main>
 <div class="toast" id="toast"></div>
+<script src="/js/icons.js"></script>
 <script src="/js/chrome.js"></script>
 <script>
-const DEVICE_ICONS  = { gnss_receiver:'📡', smartphone:'📱', tablet:'📟', other:'🔧' };
+const DEVICE_ICONS  = { gnss_receiver:'gnss_receiver', smartphone:'smartphone', tablet:'tablet', other:'other' };
 const DEVICE_LABELS = { gnss_receiver:'ГНСС-приёмник', smartphone:'Смартфон', tablet:'Планшет', other:'Иное' };
 const MOUNT_LABELS  = { car:'Автомобиль', permanent_station:'Пост. станция', uav:'БПЛА', rod:'Веха', man:'Человек' };
 
@@ -137,7 +139,7 @@ function renderDeviceExtra(d) {
         const until   = new Date(d.phaseCenterValidUntil);
         const expired = until < new Date();
         const fmt     = until.toLocaleString('ru', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-        return `<div class="dev-pc ${expired ? 'dev-pc-expired' : 'dev-pc-ok'}">${expired ? '⚠️ Калибровка истекла' : '🤖 Авто до ' + fmt}</div>`;
+        return `<div class="dev-pc ${expired ? 'dev-pc-expired' : 'dev-pc-ok'}"><span class="icon" data-icon="${expired?'warn':'bot'}" data-icon-size="14"></span>${expired ? 'Калибровка истекла' : 'Авто до ' + fmt}</div>`;
     }
     if (d.phaseCenterMethod === 'manual') {
         return `<div class="dev-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`;
@@ -149,7 +151,7 @@ function renderDevices(devices) {
     const el = document.getElementById('devicesContent');
     if (!devices || devices.length === 0) {
         el.innerHTML = `<div class="no-devices">
-            <span class="nd-icon">📡</span>
+            <span class="nd-icon" data-icon="gnss_receiver" data-icon-size="36"></span>
             Нет зарегистрированных устройств.<br>
             Добавьте устройство в <a href="/profile">личном кабинете</a>.
         </div>`;
@@ -157,7 +159,7 @@ function renderDevices(devices) {
     }
     el.innerHTML = `<div class="devices-grid">${devices.map(d => `
         <div class="device-card">
-            <span class="dev-icon">${DEVICE_ICONS[d.deviceType] || '🔧'}</span>
+            <span class="dev-icon" data-icon="${DEVICE_ICONS[d.deviceType] || 'other'}" data-icon-size="22"></span>
             <div class="dev-name">${escHtml(d.name)}</div>
             <div class="dev-badges">
                 <span class="badge badge-type">${DEVICE_LABELS[d.deviceType] || d.deviceType}</span>
@@ -167,6 +169,7 @@ function renderDevices(devices) {
             ${d.description ? `<div class="dev-desc">${escHtml(d.description)}</div>` : ''}
         </div>`).join('')}
     </div>`;
+    if (window.applyIcons) window.applyIcons(el);
 }
 
 async function loadDevices() {
