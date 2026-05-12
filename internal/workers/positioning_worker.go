@@ -20,7 +20,6 @@ import (
 
 const (
 	positioningInterval = 30 * time.Second
-	rtkrcvBinary        = "rtkrcv"
 	ephemerisNTRIP      = "Dolin:SergeySGGABG12@products.igs-ip.net:2101/BCEP00BKG0"
 )
 
@@ -38,6 +37,7 @@ type PositioningWorker struct {
 	workDir    string
 	configTmpl string // путь к single-rtk.conf
 	atxFile    string // путь к igs20.atx
+	rtkrcvPath string // абсолютный путь к бинарю rtkrcv
 	procs      map[int64]*processEntry
 	mu         sync.Mutex
 }
@@ -49,6 +49,7 @@ func NewPositioningWorker(
 	workDir string,
 	configTmpl string,
 	atxFile string,
+	rtkrcvPath string,
 ) *PositioningWorker {
 	return &PositioningWorker{
 		db:         db,
@@ -56,6 +57,7 @@ func NewPositioningWorker(
 		workDir:    workDir,
 		configTmpl: configTmpl,
 		atxFile:    atxFile,
+		rtkrcvPath: rtkrcvPath,
 		procs:      make(map[int64]*processEntry),
 	}
 }
@@ -128,7 +130,7 @@ func (pw *PositioningWorker) startProcess(ctx context.Context, sess model.Collab
 	}
 
 	procCtx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(procCtx, rtkrcvBinary, "-o", configPath, "-d", "5")
+	cmd := exec.CommandContext(procCtx, pw.rtkrcvPath, "-o", configPath, "-d", "5")
 	cmd.Dir = pw.workDir
 
 	if err := cmd.Start(); err != nil {
@@ -184,7 +186,7 @@ func (pw *PositioningWorker) generateConfig(sess model.CollaborativeSession) (co
 		roverType = "tcpcli"
 		roverPath = fmt.Sprintf("%s:%d", sess.TCPHost, sess.TCPPort)
 	case model.ConnectionTypeNTRIP:
-		roverType = "ntripcli"
+		roverType = "6"
 		if sess.NTRIPUser != "" {
 			roverPath = fmt.Sprintf("%s:%s@%s:%d/%s",
 				sess.NTRIPUser, sess.NTRIPPass,

@@ -33,6 +33,7 @@ const (
 	MaxUploadSize       = 1 << 30
 	RTKConfTemplate     = "./cmd/solver/configs/single-rtk.conf"
 	ATXFile             = "./cmd/solver/src/igs20.atx"
+	RTKRCVBinary        = "./cmd/solver/app/rtkrcv"
 )
 
 // Application представляет приложение с управлением жизненным циклом
@@ -90,8 +91,9 @@ func NewApplication(cfg *config.Config, logger *zap.SugaredLogger) (*Application
 	if app.dbStorage != nil {
 		atxAbs, _ := filepath.Abs(ATXFile)
 		tmplAbs, _ := filepath.Abs(RTKConfTemplate)
+		rtkrcvAbs, _ := filepath.Abs(RTKRCVBinary)
 		app.posWorker = workers.NewPositioningWorker(
-			app.dbStorage, app.logger, DefaultWorkDir, tmplAbs, atxAbs,
+			app.dbStorage, app.logger, DefaultWorkDir, tmplAbs, atxAbs, rtkrcvAbs,
 		)
 	}
 
