@@ -333,10 +333,10 @@ function renderDevices(devices) {
             </div>
             ${d.antennaName ? `<div class="dev-antenna-label">Антенна</div><div class="dev-antenna">${escHtml(d.antennaName)}</div>` : ''}
             ${d.description ? `<div class="dev-desc">${escHtml(d.description)}</div>` : ''}
-            <button class="btn btn-primary" style="margin-top:4px;font-size:0.8rem;padding:7px 14px"
-                onclick="openConnectModal(${d.id}, '${escHtml(d.name).replace(/'/g,"\\'")}')">
-                ＋ Подключить к сети
-            </button>
+            <a class="btn btn-primary" href="/positioning?deviceId=${d.id}"
+                style="margin-top:4px;font-size:0.8rem;padding:7px 14px;text-decoration:none">
+                → Позиционирование
+            </a>
         </div>`).join('')}
     </div>`;
     if (window.applyIcons) window.applyIcons(el);

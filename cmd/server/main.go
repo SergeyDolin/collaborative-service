@@ -179,6 +179,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	router.Get("/profile", handlers.ProfilePageHandler(app.logger))
 	router.Get("/measurements", handlers.MeasurementsPageHandler(app.logger))
 	router.Get("/collaborative", handlers.CollaborativePageHandler(app.logger))
+	router.Get("/positioning", handlers.PositioningPageHandler(app.logger))
 
 	// Public API
 	router.Post("/api/register", handlers.RegisterHandler(app.dbStorage, app.logger))
