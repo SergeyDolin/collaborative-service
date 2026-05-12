@@ -41,6 +41,7 @@
     background:var(--signal); box-shadow:0 0 0 3px var(--signal-soft);
 }
 
+/* Devices grid */
 .devices-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
 .device-card {
     background:var(--paper); border:1px solid var(--paper-edge);
@@ -56,17 +57,122 @@
 .dev-antenna { font-family:var(--font-mono); font-size:0.72rem; color:var(--graphite); word-break:break-all; }
 [data-theme="dark"] .dev-antenna { color:var(--signal); }
 .dev-antenna-label { font-family:var(--font-mono); font-size:0.66rem; color:var(--ink-faint); margin-bottom:1px; text-transform:uppercase; letter-spacing:0.1em; }
-.dev-enu { font-size:0.7rem; color:var(--ink-3); font-family:var(--font-mono); }
-.dev-pc { font-size:0.7rem; padding:2px 8px; border-radius:20px; display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); letter-spacing:0.02em; }
-.dev-pc .icon, .dev-pc .icon svg { display:inline-flex; }
-.dev-pc-ok      { background:var(--ok-bg); color:var(--ok); }
-.dev-pc-expired { background:var(--warn-bg); color:var(--warn); }
 
 .no-devices { text-align:center; padding:40px 20px; color:var(--ink-3); font-size:0.9rem; line-height:1.7; font-family:var(--font-mono); }
 .no-devices .nd-icon { font-size:36px; display:block; margin-bottom:10px; }
 .no-devices a { color:var(--graphite); font-weight:600; }
 [data-theme="dark"] .no-devices a { color:var(--signal); }
 .loading { text-align:center; padding:32px; color:var(--ink-3); font-size:0.9rem; font-family:var(--font-mono); }
+
+/* Modal */
+.modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45);
+    z-index:1000; align-items:center; justify-content:center; padding:16px;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+    background:var(--paper); border:1px solid var(--paper-edge);
+    border-radius:var(--r); padding:32px; max-width:480px; width:100%;
+    max-height:90vh; overflow-y:auto;
+}
+.modal-title {
+    font-size:1.1rem; font-weight:600; color:var(--ink); margin-bottom:20px;
+}
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-size:0.78rem; font-weight:600; color:var(--ink-3); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px; }
+.form-input {
+    width:100%; box-sizing:border-box;
+    background:var(--paper-2); border:1px solid var(--paper-edge); color:var(--ink);
+    padding:9px 12px; border-radius:var(--r-sm); font-family:var(--font-mono); font-size:0.88rem;
+    transition:border-color var(--t);
+}
+.form-input:focus { outline:none; border-color:var(--graphite); }
+.form-row { display:grid; grid-template-columns:1fr 120px; gap:10px; }
+.form-section { margin-top:4px; }
+.conn-tabs { display:flex; gap:8px; margin-bottom:16px; }
+.conn-tab {
+    padding:7px 18px; border:1px solid var(--paper-edge); border-radius:var(--r-sm);
+    background:var(--paper-2); color:var(--ink-3); font-family:var(--font-mono); font-size:0.8rem;
+    cursor:pointer; transition:all var(--t);
+}
+.conn-tab.active {
+    background:var(--signal); color:var(--signal-ink);
+    border-color:var(--signal);
+}
+.conn-panel { display:none; }
+.conn-panel.active { display:block; }
+.modal-actions { display:flex; gap:10px; margin-top:24px; justify-content:flex-end; }
+
+/* Sessions list */
+.sessions-list { display:flex; flex-direction:column; gap:14px; }
+.session-card {
+    background:var(--paper); border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); padding:20px;
+    display:flex; flex-direction:column; gap:12px;
+}
+.session-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.session-name { font-size:1rem; font-weight:600; color:var(--ink); }
+.session-meta { font-family:var(--font-mono); font-size:0.75rem; color:var(--ink-3); }
+.session-port {
+    font-family:var(--font-mono); font-size:0.82rem; font-weight:700;
+    color:var(--signal); background:var(--signal-soft); padding:3px 10px;
+    border-radius:20px; white-space:nowrap;
+}
+.session-cmd {
+    background:var(--paper-2); border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); padding:10px 14px;
+    font-family:var(--font-mono); font-size:0.75rem; color:var(--ink);
+    white-space:pre-wrap; word-break:break-all; position:relative;
+}
+.cmd-label { font-size:0.66rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-faint); margin-bottom:4px; }
+.copy-btn {
+    position:absolute; top:8px; right:8px;
+    background:var(--paper); border:1px solid var(--paper-edge);
+    color:var(--ink-3); padding:3px 8px; border-radius:var(--r-sm);
+    font-size:0.7rem; cursor:pointer; font-family:var(--font-mono);
+    transition:all var(--t);
+}
+.copy-btn:hover { background:var(--paper-2); color:var(--ink); }
+
+.position-block { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.pos-item { font-family:var(--font-mono); font-size:0.78rem; color:var(--ink-3); }
+.pos-val { color:var(--ink); font-weight:600; }
+.pos-quality-fix    { color:var(--ok); }
+.pos-quality-float  { color:var(--warn); }
+.pos-quality-single { color:var(--ink-3); }
+.pos-age { font-size:0.7rem; color:var(--ink-faint); }
+
+.positioning-toggle { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.toggle-label { font-size:0.82rem; color:var(--ink-3); font-family:var(--font-mono); }
+.toggle-switch { position:relative; display:inline-block; width:38px; height:22px; }
+.toggle-switch input { opacity:0; width:0; height:0; }
+.toggle-slider {
+    position:absolute; cursor:pointer; inset:0;
+    background:var(--paper-edge); border-radius:22px; transition:all var(--t);
+}
+.toggle-slider::before {
+    content:''; position:absolute; height:16px; width:16px; left:3px; bottom:3px;
+    background:var(--ink-faint); border-radius:50%; transition:all var(--t);
+}
+input:checked + .toggle-slider { background:var(--signal); }
+input:checked + .toggle-slider::before { transform:translateX(16px); background:#fff; }
+
+.session-footer { display:flex; justify-content:flex-end; }
+.btn-delete-session {
+    background:none; border:1px solid var(--paper-edge); color:var(--ink-3);
+    padding:6px 14px; border-radius:var(--r-sm); font-family:var(--font-mono);
+    font-size:0.75rem; cursor:pointer; transition:all var(--t);
+}
+.btn-delete-session:hover { border-color:var(--err,#e55); color:var(--err,#e55); }
+
+/* Positioning offer banner */
+.pos-offer {
+    background:var(--signal-soft); border:1px solid var(--signal);
+    border-radius:var(--r-sm); padding:16px 20px; margin-top:16px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.pos-offer-text { font-size:0.88rem; color:var(--ink); }
+.pos-offer-actions { display:flex; gap:8px; }
 </style>
 </head>
 <body class="bg-grid">
@@ -83,23 +189,100 @@
         </div>
     </div>
 </header>
+
 <main class="main-content">
     <div class="page-eyebrow"><span>SVC-C · Collaborative network</span></div>
     <div class="page-title-row">
         <div>
             <h1 class="page-title">Коллаборативное <em>позиционирование</em></h1>
-            <div class="page-subtitle">Ваши устройства, участвующие в сети позиционирования</div>
+            <div class="page-subtitle">Подключите устройства к сети и получите конфигурацию для str2str</div>
         </div>
         <a class="page-back" href="/">← На главную</a>
     </div>
+
+    <!-- Устройства -->
     <div class="card">
         <div class="card-header">
             <div class="card-title">Мои устройства</div>
-            <button class="btn btn-primary" onclick="window.location.href='/profile'">＋ Управление устройствами</button>
+            <button class="btn btn-secondary" onclick="window.location.href='/profile'">Управление устройствами</button>
         </div>
         <div id="devicesContent"><div class="loading">Загрузка…</div></div>
     </div>
+
+    <!-- Активные сессии -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Активные подключения</div>
+        </div>
+        <div id="sessionsContent"><div class="loading">Загрузка…</div></div>
+    </div>
 </main>
+
+<!-- Модальное окно подключения устройства -->
+<div class="modal-overlay" id="connectModal">
+    <div class="modal">
+        <div class="modal-title" id="modalDeviceName">Подключить устройство</div>
+        <input type="hidden" id="modalDeviceId">
+
+        <div class="form-group">
+            <div class="form-label">Способ подключения</div>
+            <div class="conn-tabs">
+                <button class="conn-tab active" onclick="switchTab('tcp')">TCP/IP</button>
+                <button class="conn-tab" onclick="switchTab('ntrip')">NTRIP</button>
+            </div>
+        </div>
+
+        <!-- TCP/IP -->
+        <div class="conn-panel active" id="panel-tcp">
+            <div class="form-group">
+                <label class="form-label">Хост устройства</label>
+                <input class="form-input" id="tcp-host" type="text" placeholder="192.168.1.100">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Порт устройства</label>
+                <input class="form-input" id="tcp-port" type="number" placeholder="9000" min="1" max="65535">
+            </div>
+        </div>
+
+        <!-- NTRIP -->
+        <div class="conn-panel" id="panel-ntrip">
+            <div class="form-group">
+                <label class="form-label">Хост NTRIP-кастера</label>
+                <input class="form-input" id="ntrip-host" type="text" placeholder="caster.example.com">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <div>
+                        <label class="form-label">Маунтпоинт</label>
+                        <input class="form-input" id="ntrip-mountpoint" type="text" placeholder="MOUNT0">
+                    </div>
+                    <div>
+                        <label class="form-label">Порт</label>
+                        <input class="form-input" id="ntrip-port" type="number" placeholder="2101" min="1" max="65535">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <div>
+                        <label class="form-label">Пользователь</label>
+                        <input class="form-input" id="ntrip-user" type="text" placeholder="login">
+                    </div>
+                    <div>
+                        <label class="form-label">Пароль</label>
+                        <input class="form-input" id="ntrip-pass" type="password" placeholder="••••••">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+            <button class="btn btn-primary" onclick="submitConnect()">Подключить</button>
+        </div>
+    </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script src="/js/icons.js"></script>
 <script src="/js/chrome.js"></script>
@@ -114,11 +297,11 @@ function logout()    { localStorage.removeItem('token'); localStorage.removeItem
 function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 let _toastTimer;
-function showToast(msg, type = 'ok') {
+function showToast(msg, type='ok') {
     const t = document.getElementById('toast');
     t.textContent = msg; t.className = `toast ${type} show`;
     clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
+    _toastTimer = setTimeout(() => { t.className = 'toast'; }, 3500);
 }
 
 function checkAuth() {
@@ -127,25 +310,7 @@ function checkAuth() {
     return true;
 }
 
-function renderDeviceExtra(d) {
-    if (d.deviceType === 'gnss_receiver') {
-        if (!d.antennaName) return '';
-        const enu = (d.antennaE || d.antennaN || d.antennaU)
-            ? `<div class="dev-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`
-            : '';
-        return `<div class="dev-antenna-label">Антенна</div><div class="dev-antenna">${escHtml(d.antennaName)}</div>${enu}`;
-    }
-    if (d.phaseCenterMethod === 'auto' && d.phaseCenterValidUntil) {
-        const until   = new Date(d.phaseCenterValidUntil);
-        const expired = until < new Date();
-        const fmt     = until.toLocaleString('ru', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-        return `<div class="dev-pc ${expired ? 'dev-pc-expired' : 'dev-pc-ok'}"><span class="icon" data-icon="${expired?'warn':'bot'}" data-icon-size="14"></span>${expired ? 'Калибровка истекла' : 'Авто до ' + fmt}</div>`;
-    }
-    if (d.phaseCenterMethod === 'manual') {
-        return `<div class="dev-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`;
-    }
-    return '';
-}
+// ── Devices ────────────────────────────────────────────────────────────────
 
 function renderDevices(devices) {
     const el = document.getElementById('devicesContent');
@@ -155,6 +320,7 @@ function renderDevices(devices) {
             Нет зарегистрированных устройств.<br>
             Добавьте устройство в <a href="/profile">личном кабинете</a>.
         </div>`;
+        if (window.applyIcons) window.applyIcons(el);
         return;
     }
     el.innerHTML = `<div class="devices-grid">${devices.map(d => `
@@ -165,8 +331,12 @@ function renderDevices(devices) {
                 <span class="badge badge-type">${DEVICE_LABELS[d.deviceType] || d.deviceType}</span>
                 <span class="badge badge-mount">${MOUNT_LABELS[d.mountType] || d.mountType}</span>
             </div>
-            ${renderDeviceExtra(d)}
+            ${d.antennaName ? `<div class="dev-antenna-label">Антенна</div><div class="dev-antenna">${escHtml(d.antennaName)}</div>` : ''}
             ${d.description ? `<div class="dev-desc">${escHtml(d.description)}</div>` : ''}
+            <button class="btn btn-primary" style="margin-top:4px;font-size:0.8rem;padding:7px 14px"
+                onclick="openConnectModal(${d.id}, '${escHtml(d.name).replace(/'/g,"\\'")}')">
+                ＋ Подключить к сети
+            </button>
         </div>`).join('')}
     </div>`;
     if (window.applyIcons) window.applyIcons(el);
@@ -175,15 +345,195 @@ function renderDevices(devices) {
 async function loadDevices() {
     try {
         const r = await fetch('/api/profile/data', { headers: { 'Authorization': `Bearer ${getToken()}` } });
-        if (!r.ok) { showToast('Ошибка загрузки данных', 'err'); return; }
+        if (!r.ok) { showToast('Ошибка загрузки устройств', 'err'); return; }
         const data = await r.json();
         renderDevices(data.devices || []);
     } catch { showToast('Ошибка соединения', 'err'); }
 }
 
+// ── Modal ──────────────────────────────────────────────────────────────────
+
+let _activeTab = 'tcp';
+
+function switchTab(tab) {
+    _activeTab = tab;
+    document.querySelectorAll('.conn-tab').forEach((b, i) => {
+        b.classList.toggle('active', (i === 0 && tab === 'tcp') || (i === 1 && tab === 'ntrip'));
+    });
+    document.getElementById('panel-tcp').classList.toggle('active', tab === 'tcp');
+    document.getElementById('panel-ntrip').classList.toggle('active', tab === 'ntrip');
+}
+
+function openConnectModal(deviceId, deviceName) {
+    document.getElementById('modalDeviceId').value = deviceId;
+    document.getElementById('modalDeviceName').textContent = 'Подключить: ' + deviceName;
+    // Reset
+    ['tcp-host','tcp-port','ntrip-host','ntrip-port','ntrip-mountpoint','ntrip-user','ntrip-pass']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    switchTab('tcp');
+    document.getElementById('connectModal').classList.add('open');
+}
+
+function closeModal() {
+    document.getElementById('connectModal').classList.remove('open');
+}
+
+document.getElementById('connectModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('connectModal')) closeModal();
+});
+
+async function submitConnect() {
+    const deviceId = parseInt(document.getElementById('modalDeviceId').value);
+    const connType = _activeTab;
+
+    let body = { deviceId, connectionType: connType };
+
+    if (connType === 'tcp') {
+        body.tcpHost = document.getElementById('tcp-host').value.trim();
+        body.tcpPort = parseInt(document.getElementById('tcp-port').value) || 0;
+    } else {
+        body.ntripHost        = document.getElementById('ntrip-host').value.trim();
+        body.ntripPort        = parseInt(document.getElementById('ntrip-port').value) || 0;
+        body.ntripMountpoint  = document.getElementById('ntrip-mountpoint').value.trim();
+        body.ntripUser        = document.getElementById('ntrip-user').value.trim();
+        body.ntripPass        = document.getElementById('ntrip-pass').value;
+    }
+
+    try {
+        const r = await fetch('/api/collaborative/sessions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        if (!r.ok) { showToast(data.error || 'Ошибка создания сессии', 'err'); return; }
+        closeModal();
+        showToast(`Подключение создано. Порт: ${data.assignedPort}`, 'ok');
+        loadSessions();
+    } catch { showToast('Ошибка соединения', 'err'); }
+}
+
+// ── Sessions ───────────────────────────────────────────────────────────────
+
+function qualityLabel(q) {
+    if (q === 1) return '<span class="pos-quality-fix">Fix</span>';
+    if (q === 2) return '<span class="pos-quality-float">Float</span>';
+    if (q === 5) return '<span class="pos-quality-single">Single</span>';
+    return `<span>${q}</span>`;
+}
+
+function renderPosition(pos) {
+    if (!pos) return '';
+    const ago = Math.round((Date.now() - new Date(pos.updatedAt)) / 1000);
+    return `<div class="position-block">
+        <span class="pos-item">Φ <span class="pos-val">${pos.lat.toFixed(7)}°</span></span>
+        <span class="pos-item">λ <span class="pos-val">${pos.lon.toFixed(7)}°</span></span>
+        <span class="pos-item">H <span class="pos-val">${pos.height.toFixed(3)} м</span></span>
+        <span class="pos-item">nSat <span class="pos-val">${pos.nsat}</span></span>
+        <span class="pos-item">${qualityLabel(pos.quality)}</span>
+        <span class="pos-age">${ago}с назад</span>
+    </div>`;
+}
+
+function renderSessions(sessions) {
+    const el = document.getElementById('sessionsContent');
+    if (!sessions || sessions.length === 0) {
+        el.innerHTML = `<div class="no-devices" style="padding:24px">
+            Нет активных подключений. Добавьте устройство выше.
+        </div>`;
+        return;
+    }
+
+    el.innerHTML = `<div class="sessions-list">${sessions.map(s => {
+        const connInfo = s.connectionType === 'tcp'
+            ? `TCP/IP → ${escHtml(s.tcpHost)}:${s.tcpPort}`
+            : `NTRIP → ${escHtml(s.ntripHost)}:${s.ntripPort}/${escHtml(s.ntripMountpoint)}`;
+
+        return `<div class="session-card" id="session-${s.id}">
+            <div class="session-header">
+                <div>
+                    <div class="session-name">${escHtml(s.deviceName)}</div>
+                    <div class="session-meta">${connInfo}</div>
+                </div>
+                <div class="session-port">Порт ${s.assignedPort}</div>
+            </div>
+
+            <div class="session-cmd">
+                <div class="cmd-label">str2str команда</div>
+                ${escHtml(s.str2strCmd)}
+                <button class="copy-btn" onclick="copyCmd('${escHtml(s.str2strCmd).replace(/'/g,"\\'")}')">Копировать</button>
+            </div>
+
+            <div class="positioning-toggle">
+                <span class="toggle-label">Определять местоположение на сервере (rtkrcv, каждые 30 с)</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="pos-toggle-${s.id}"
+                        ${s.enablePositioning ? 'checked' : ''}
+                        onchange="togglePositioning(${s.id}, this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            ${s.enablePositioning && s.latestPosition ? renderPosition(s.latestPosition) : ''}
+            ${s.enablePositioning && !s.latestPosition ? `<div class="session-meta">Ожидание первого решения…</div>` : ''}
+
+            <div class="session-footer">
+                <button class="btn-delete-session" onclick="deleteSession(${s.id})">Удалить</button>
+            </div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+async function loadSessions() {
+    try {
+        const r = await fetch('/api/collaborative/sessions', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (!r.ok) { showToast('Ошибка загрузки сессий', 'err'); return; }
+        const sessions = await r.json();
+        renderSessions(sessions);
+    } catch { showToast('Ошибка соединения', 'err'); }
+}
+
+async function deleteSession(id) {
+    if (!confirm('Удалить подключение?')) return;
+    try {
+        const r = await fetch(`/api/collaborative/sessions/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (!r.ok) { const d = await r.json(); showToast(d.error || 'Ошибка удаления', 'err'); return; }
+        showToast('Подключение удалено', 'ok');
+        loadSessions();
+    } catch { showToast('Ошибка соединения', 'err'); }
+}
+
+async function togglePositioning(id, enabled) {
+    try {
+        const r = await fetch(`/api/collaborative/sessions/${id}/positioning`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+        });
+        const data = await r.json();
+        if (!r.ok) { showToast(data.error || 'Ошибка', 'err'); return; }
+        showToast(data.message, 'ok');
+        setTimeout(loadSessions, 500);
+    } catch { showToast('Ошибка соединения', 'err'); }
+}
+
+function copyCmd(cmd) {
+    navigator.clipboard.writeText(cmd).then(() => showToast('Команда скопирована', 'ok'));
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', () => {
     if (!checkAuth()) return;
     loadDevices();
+    loadSessions();
+    // Обновляем позиции каждые 30 секунд
+    setInterval(loadSessions, 30000);
 });
 </script>
 </body>

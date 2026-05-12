@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -30,6 +31,8 @@ const (
 	DefaultWorkDir      = "./tmp"
 	ConfigDir           = "./cmd/solver/app"
 	MaxUploadSize       = 1 << 30
+	RTKConfTemplate     = "./cmd/solver/configs/single-rtk.conf"
+	ATXFile             = "./cmd/solver/src/igs20.atx"
 )
 
 // Application представляет приложение с управлением жизненным циклом
@@ -39,6 +42,7 @@ type Application struct {
 	dbStorage   *storage.DBStorage
 	taskStorage *storage.TaskStorage
 	workerMgr   *workers.Manager
+	posWorker   *workers.PositioningWorker
 	ctx         context.Context
 	cancel      context.CancelFunc
 }
@@ -83,6 +87,14 @@ func NewApplication(cfg *config.Config, logger *zap.SugaredLogger) (*Application
 		DefaultWorkDir,
 	)
 
+	if app.dbStorage != nil {
+		atxAbs, _ := filepath.Abs(ATXFile)
+		tmplAbs, _ := filepath.Abs(RTKConfTemplate)
+		app.posWorker = workers.NewPositioningWorker(
+			app.dbStorage, app.logger, DefaultWorkDir, tmplAbs, atxAbs,
+		)
+	}
+
 	router := app.setupRoutes(cfg)
 
 	app.server = &http.Server{
@@ -122,6 +134,13 @@ func (app *Application) initStorage(cfg *config.Config) error {
 		app.logger.Warnf("Profile schema init warning: %v", err)
 	} else {
 		app.logger.Info("Profile schema initialized")
+	}
+
+	// Инициализируем схему коллаборативного позиционирования
+	if err := app.dbStorage.InitCollaborativeSchema(); err != nil {
+		app.logger.Warnf("Collaborative schema init warning: %v", err)
+	} else {
+		app.logger.Info("Collaborative schema initialized")
 	}
 
 	return nil
@@ -198,6 +217,15 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Get("/api/measurements/observation-date", observationHandler.GetObservationDate)
 			r.Delete("/api/measurements/delete", measurementHandler.DeleteTaskHandler)
 			r.Delete("/api/measurements/delete-all", measurementHandler.DeleteAllTasksHandler)
+
+			// Collaborative positioning
+			if app.dbStorage != nil {
+				collabHandler := handlers.NewCollaborativeHandler(app.dbStorage, app.logger)
+				r.Post("/api/collaborative/sessions", collabHandler.CreateSession)
+				r.Get("/api/collaborative/sessions", collabHandler.ListSessions)
+				r.Delete("/api/collaborative/sessions/{id}", collabHandler.DeleteSession)
+				r.Post("/api/collaborative/sessions/{id}/positioning", collabHandler.SetPositioning)
+			}
 		})
 	}
 
@@ -208,6 +236,11 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 func (app *Application) Run() error {
 	app.workerMgr.Start(app.ctx)
 	app.logger.Info("Background workers started")
+
+	if app.posWorker != nil {
+		app.posWorker.Start(app.ctx)
+		app.logger.Info("Positioning worker started")
+	}
 
 	go func() {
 		app.logger.Infof("Running server on %s", app.server.Addr)
