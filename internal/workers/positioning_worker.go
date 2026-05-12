@@ -33,13 +33,13 @@ type processEntry struct {
 
 // PositioningWorker управляет процессами rtkrcv и периодически читает их решения
 type PositioningWorker struct {
-	db          *storage.DBStorage
-	logger      *zap.SugaredLogger
-	workDir     string
-	configTmpl  string // путь к single-rtk.conf
-	atxFile     string // путь к igs20.atx
-	procs       map[int64]*processEntry
-	mu          sync.Mutex
+	db         *storage.DBStorage
+	logger     *zap.SugaredLogger
+	workDir    string
+	configTmpl string // путь к single-rtk.conf
+	atxFile    string // путь к igs20.atx
+	procs      map[int64]*processEntry
+	mu         sync.Mutex
 }
 
 // NewPositioningWorker создаёт воркер позиционирования
@@ -184,7 +184,7 @@ func (pw *PositioningWorker) generateConfig(sess model.CollaborativeSession) (co
 		roverType = "tcpcli"
 		roverPath = fmt.Sprintf("%s:%d", sess.TCPHost, sess.TCPPort)
 	case model.ConnectionTypeNTRIP:
-		roverType = "ntrip"
+		roverType = "6"
 		if sess.NTRIPUser != "" {
 			roverPath = fmt.Sprintf("%s:%s@%s:%d/%s",
 				sess.NTRIPUser, sess.NTRIPPass,
