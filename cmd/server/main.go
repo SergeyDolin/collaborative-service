@@ -38,14 +38,15 @@ const (
 
 // Application представляет приложение с управлением жизненным циклом
 type Application struct {
-	server      *http.Server
-	logger      *zap.SugaredLogger
-	dbStorage   *storage.DBStorage
-	taskStorage *storage.TaskStorage
-	workerMgr   *workers.Manager
-	posWorker   *workers.PositioningWorker
-	ctx         context.Context
-	cancel      context.CancelFunc
+	server        *http.Server
+	logger        *zap.SugaredLogger
+	dbStorage     *storage.DBStorage
+	taskStorage   *storage.TaskStorage
+	workerMgr     *workers.Manager
+	posWorker     *workers.PositioningWorker
+	streamWorker  *workers.StreamWorker
+	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 func main() {
@@ -97,6 +98,9 @@ func NewApplication(cfg *config.Config, logger *zap.SugaredLogger) (*Application
 		)
 	}
 
+	str2strAbs, _ := filepath.Abs(filepath.Join(ConfigDir, "str2str"))
+	app.streamWorker = workers.NewStreamWorker(str2strAbs, app.logger)
+
 	router := app.setupRoutes(cfg)
 
 	app.server = &http.Server{
@@ -143,6 +147,13 @@ func (app *Application) initStorage(cfg *config.Config) error {
 		app.logger.Warnf("Collaborative schema init warning: %v", err)
 	} else {
 		app.logger.Info("Collaborative schema initialized")
+	}
+
+	// Инициализируем схему онлайн-сессий
+	if err := app.dbStorage.InitOnlineSchema(); err != nil {
+		app.logger.Warnf("Online schema init warning: %v", err)
+	} else {
+		app.logger.Info("Online schema initialized")
 	}
 
 	return nil
@@ -207,7 +218,9 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Post("/api/profile/update", handlers.UpdateProfileHandler(app.dbStorage, app.logger))
 
 			// Devices
+			r.Get("/api/devices", handlers.GetDevicesHandler(app.dbStorage, app.logger))
 			r.Post("/api/devices", handlers.AddDeviceHandler(app.dbStorage, app.logger))
+			r.Put("/api/devices", handlers.UpdateDeviceHandler(app.dbStorage, app.logger))
 			r.Delete("/api/devices", handlers.DeleteDeviceHandler(app.dbStorage, app.logger))
 
 			// Measurements
@@ -228,6 +241,12 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 				r.Get("/api/collaborative/sessions", collabHandler.ListSessions)
 				r.Delete("/api/collaborative/sessions/{id}", collabHandler.DeleteSession)
 				r.Post("/api/collaborative/sessions/{id}/positioning", collabHandler.SetPositioning)
+
+				// Online real-time positioning (client app)
+				onlineHandler := handlers.NewOnlineHandler(app.dbStorage, app.logger)
+				r.Post("/api/online/register", onlineHandler.Register)
+				r.Post("/api/online/status", onlineHandler.UpdateStatus)
+				r.Delete("/api/online/session", onlineHandler.Delete)
 			}
 		})
 	}
@@ -244,6 +263,9 @@ func (app *Application) Run() error {
 		app.posWorker.Start(app.ctx)
 		app.logger.Info("Positioning worker started")
 	}
+
+	app.streamWorker.Start(app.ctx)
+	app.logger.Info("EPH/SSR stream worker started")
 
 	go func() {
 		app.logger.Infof("Running server on %s", app.server.Addr)

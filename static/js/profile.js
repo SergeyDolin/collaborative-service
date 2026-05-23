@@ -94,7 +94,17 @@ function renderDeviceExtra(d) {
         const enu = (d.antennaE || d.antennaN || d.antennaU)
             ? `<div class="dev-antenna-enu">ENU: ${(+d.antennaE).toFixed(3)} / ${(+d.antennaN).toFixed(3)} / ${(+d.antennaU).toFixed(3)} м</div>`
             : '';
-        return `<div class="dev-antenna">${escHtml(d.antennaName)}</div>${enu}`;
+        let rcvHtml = '';
+        if (d.receiverHost) {
+            const rcvType = d.receiverType || 'tcp';
+            const rcvAddr = rcvType === 'ntrip'
+                ? `NTRIP ${escHtml(d.receiverHost)}:${d.receiverPort}/${escHtml(d.receiverMount || '')}`
+                : rcvType === 'serial'
+                ? `Serial ${escHtml(d.receiverHost)}`
+                : `TCP ${escHtml(d.receiverHost)}:${d.receiverPort}`;
+            rcvHtml = `<div class="dev-antenna-enu">${rcvAddr}</div>`;
+        }
+        return `<div class="dev-antenna">${escHtml(d.antennaName)}</div>${enu}${rcvHtml}`;
     }
     if (d.phaseCenterMethod === 'auto' && d.phaseCenterValidUntil) {
         const until = new Date(d.phaseCenterValidUntil);
@@ -112,6 +122,7 @@ function renderDeviceExtra(d) {
 }
 
 function renderDevices(devices) {
+    window._profileDevices = devices || [];
     const el = document.getElementById('devicesContent');
     if (!devices || devices.length === 0) {
         el.innerHTML = `<div class="no-devices"><span class="nd-icon">${icon('gnss_receiver', 36)}</span>Нет зарегистрированных устройств.<br>Добавьте устройство для участия в коллаборативном позиционировании.</div>`;
@@ -119,7 +130,8 @@ function renderDevices(devices) {
     }
     el.innerHTML = `<div class="devices-grid">${devices.map(d => `
         <div class="device-card">
-            <button class="dev-delete" onclick="deleteDevice(${d.id})" title="Удалить">${icon('close',14)}</button>
+            <button class="dev-edit"   onclick="openEditDevice(${d.id})" title="Редактировать">${icon('edit',14)}</button>
+            <button class="dev-delete" onclick="deleteDevice(${d.id})"   title="Удалить">${icon('close',14)}</button>
             <span class="dev-icon">${icon(DEVICE_ICONS[d.deviceType] || 'other', 22)}</span>
             <div class="dev-name">${escHtml(d.name)}</div>
             <div class="dev-badges">
@@ -135,25 +147,87 @@ function renderDevices(devices) {
     </div>`;
 }
 
-function openAddDevice() {
+let editingDeviceId = null;
+
+function resetDeviceModal() {
     newDevType = null; newMountType = null; newPcMethod = null;
+    editingDeviceId = null;
     document.querySelectorAll('.tc').forEach(c => c.classList.remove('chosen'));
     document.querySelectorAll('.mc').forEach(c => c.classList.remove('chosen'));
     document.querySelectorAll('.pc-card').forEach(c => c.classList.remove('chosen'));
-    document.getElementById('newDevName').value   = '';
-    document.getElementById('newDevDesc').value   = '';
+    document.getElementById('newDevName').value     = '';
+    document.getElementById('newDevDesc').value     = '';
     document.getElementById('devAntennaName').value = '';
-    document.getElementById('devAntennaE').value  = '0';
-    document.getElementById('devAntennaN').value  = '0';
-    document.getElementById('devAntennaU').value  = '0';
+    document.getElementById('devAntennaE').value    = '0';
+    document.getElementById('devAntennaN').value    = '0';
+    document.getElementById('devAntennaU').value    = '0';
     document.getElementById('devPcE').value = '0';
     document.getElementById('devPcN').value = '0';
     document.getElementById('devPcU').value = '0';
     document.getElementById('devAntennaField').style.display       = 'none';
     document.getElementById('devAntennaOffsetField').style.display = 'none';
     document.getElementById('devPhaseCenterField').style.display   = 'none';
-    document.getElementById('devAutoWarning').style.display   = 'none';
-    document.getElementById('devManualOffsets').style.display = 'none';
+    document.getElementById('devAutoWarning').style.display        = 'none';
+    document.getElementById('devManualOffsets').style.display      = 'none';
+    document.getElementById('gnssReceiverSection').style.display   = 'none';
+    document.getElementById('devReceiverType').value  = 'tcp';
+    document.getElementById('devReceiverHost').value  = '';
+    document.getElementById('devReceiverPort').value  = '';
+    document.getElementById('ntripFields').style.display = 'none';
+    document.getElementById('devReceiverMount').value = '';
+    document.getElementById('devReceiverUser').value  = '';
+    document.getElementById('devReceiverPass').value  = '';
+    document.getElementById('addDeviceModalTitle').textContent = 'Добавить устройство';
+}
+
+function openAddDevice() {
+    resetDeviceModal();
+    openModal('addDeviceModal');
+}
+
+function openEditDevice(id) {
+    const d = (window._profileDevices || []).find(x => x.id === id);
+    if (!d) return;
+    resetDeviceModal();
+    editingDeviceId = id;
+    document.getElementById('addDeviceModalTitle').textContent = 'Редактировать устройство';
+    document.getElementById('newDevName').value = d.name || '';
+    document.getElementById('newDevDesc').value = d.description || '';
+
+    // Тип устройства
+    const tcEl = document.querySelector(`.tc[data-type="${d.deviceType}"]`);
+    if (tcEl) { tcEl.classList.add('chosen'); newDevType = d.deviceType; }
+
+    // Тип установки
+    const mcEl = document.querySelector(`.mc[data-mount="${d.mountType}"]`);
+    if (mcEl) { mcEl.classList.add('chosen'); newMountType = d.mountType; }
+
+    if (d.deviceType === 'gnss_receiver') {
+        document.getElementById('devAntennaField').style.display       = 'block';
+        document.getElementById('devAntennaOffsetField').style.display = 'block';
+        document.getElementById('gnssReceiverSection').style.display   = 'block';
+        document.getElementById('devAntennaName').value = d.antennaName || '';
+        document.getElementById('devAntennaE').value    = d.antennaE ?? 0;
+        document.getElementById('devAntennaN').value    = d.antennaN ?? 0;
+        document.getElementById('devAntennaU').value    = d.antennaU ?? 0;
+        document.getElementById('devReceiverType').value = d.receiverType || 'tcp';
+        document.getElementById('devReceiverHost').value = d.receiverHost || '';
+        document.getElementById('devReceiverPort').value = d.receiverPort || '';
+        document.getElementById('devReceiverMount').value = d.receiverMount || '';
+        document.getElementById('devReceiverUser').value  = d.receiverUser  || '';
+        document.getElementById('devReceiverPass').value  = d.receiverPass  || '';
+        toggleReceiverFields();
+    } else {
+        document.getElementById('devPhaseCenterField').style.display = 'block';
+        const pcEl = document.querySelector(`.pc-card[data-method="${d.phaseCenterMethod}"]`);
+        if (pcEl) { pcEl.classList.add('chosen'); newPcMethod = d.phaseCenterMethod; }
+        if (d.phaseCenterMethod === 'manual') {
+            document.getElementById('devManualOffsets').style.display = 'block';
+            document.getElementById('devPcE').value = d.antennaE ?? 0;
+            document.getElementById('devPcN').value = d.antennaN ?? 0;
+            document.getElementById('devPcU').value = d.antennaU ?? 0;
+        }
+    }
     openModal('addDeviceModal');
 }
 function pickType(el) {
@@ -165,11 +239,32 @@ function pickType(el) {
     document.getElementById('devAntennaField').style.display       = isGNSS ? 'block' : 'none';
     document.getElementById('devAntennaOffsetField').style.display = isGNSS ? 'block' : 'none';
     document.getElementById('devPhaseCenterField').style.display   = isGNSS ? 'none'  : 'block';
+    document.getElementById('gnssReceiverSection').style.display   = isGNSS ? 'block' : 'none';
 
     newPcMethod = null;
     document.querySelectorAll('.pc-card').forEach(c => c.classList.remove('chosen'));
     document.getElementById('devAutoWarning').style.display   = 'none';
     document.getElementById('devManualOffsets').style.display = 'none';
+}
+function toggleReceiverFields() {
+    const type = document.getElementById('devReceiverType').value;
+    const isNtrip  = type === 'ntrip';
+    const isSerial = type === 'serial';
+    document.getElementById('ntripFields').style.display = isNtrip ? 'block' : 'none';
+    const label = document.getElementById('devHostLabel');
+    if (isSerial) {
+        label.textContent = 'Порт устройства / Скорость (бод)';
+        document.getElementById('devReceiverHost').placeholder = '/dev/ttyUSB0';
+        document.getElementById('devReceiverPort').placeholder = '115200';
+    } else if (isNtrip) {
+        label.textContent = 'Хост NTRIP / Порт';
+        document.getElementById('devReceiverHost').placeholder = 'caster.example.com';
+        document.getElementById('devReceiverPort').placeholder = '2101';
+    } else {
+        label.textContent = 'Хост / Порт устройства';
+        document.getElementById('devReceiverHost').placeholder = '192.168.1.100';
+        document.getElementById('devReceiverPort').placeholder = '9001';
+    }
 }
 function pickMount(el) {
     document.querySelectorAll('.mc').forEach(c => c.classList.remove('chosen'));
@@ -202,6 +297,14 @@ async function saveDevice() {
         payload.antennaE = parseFloat(document.getElementById('devAntennaE').value) || 0;
         payload.antennaN = parseFloat(document.getElementById('devAntennaN').value) || 0;
         payload.antennaU = parseFloat(document.getElementById('devAntennaU').value) || 0;
+        payload.receiverType = document.getElementById('devReceiverType').value || 'tcp';
+        payload.receiverHost = document.getElementById('devReceiverHost').value.trim();
+        payload.receiverPort = parseInt(document.getElementById('devReceiverPort').value) || 0;
+        if (payload.receiverType === 'ntrip') {
+            payload.receiverMount = document.getElementById('devReceiverMount').value.trim();
+            payload.receiverUser  = document.getElementById('devReceiverUser').value.trim();
+            payload.receiverPass  = document.getElementById('devReceiverPass').value;
+        }
     } else {
         if (!newPcMethod) { showToast('Укажите метод определения фазового центра', 'err'); return; }
         payload.phaseCenterMethod = newPcMethod;
@@ -217,18 +320,20 @@ async function saveDevice() {
     }
 
     try {
-        const r = await fetch('/api/devices', {
-            method: 'POST',
+        const isEdit = !!editingDeviceId;
+        const url    = isEdit ? `/api/devices?id=${editingDeviceId}` : '/api/devices';
+        const r = await fetch(url, {
+            method: isEdit ? 'PUT' : 'POST',
             headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
         if (!r.ok) {
             const err = await r.json().catch(() => ({}));
-            showToast(err.error || 'Ошибка добавления', 'err');
+            showToast(err.error || (isEdit ? 'Ошибка сохранения' : 'Ошибка добавления'), 'err');
             return;
         }
         closeModal('addDeviceModal');
-        showToast('Устройство добавлено');
+        showToast(isEdit ? 'Устройство сохранено' : 'Устройство добавлено');
         loadProfile();
     } catch { showToast('Ошибка добавления', 'err'); }
 }

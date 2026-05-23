@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 820" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c1445"/>
+      <stop offset="100%" stop-color="#060d2e"/>
+    </linearGradient>
+    <linearGradient id="oceanGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#1e40af"/>
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000" flood-opacity="0.7"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrG" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4ade80"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="820" fill="url(#bg)"/>
+
+  <!-- Decorative wave at bottom -->
+  <path d="M0,740 Q275,700 550,730 Q825,760 1100,720 L1100,820 L0,820 Z" fill="#0c1f4a" opacity="0.5"/>
+  <path d="M0,760 Q275,730 550,755 Q825,780 1100,750 L1100,820 L0,820 Z" fill="#0a1836" opacity="0.5"/>
+
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" fill="#bfdbfe" font-size="22" font-weight="700">Океанические приливы и BLQ-файл</text>
+  <text x="550" y="62" text-anchor="middle" fill="#60a5fa" font-size="13">blq_service.go · generate_blq.py · pyfes (FES2022) · RTKLIB tide_corr</text>
+  <line x1="40" y1="74" x2="1060" y2="74" stroke="#1e3a5f" stroke-width="1"/>
+
+  <!-- ════════════════════════════════
+       TOP ROW: WHAT + WHY
+  ════════════════════════════════ -->
+
+  <!-- WHAT IS OCEAN LOADING -->
+  <rect x="30" y="85" width="490" height="165" rx="12" fill="#0f1e4a" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="85" width="490" height="36" rx="12" fill="url(#oceanGrad)"/>
+  <rect x="30" y="108" width="490" height="13" fill="url(#oceanGrad)"/>
+  <text x="275" y="108" text-anchor="middle" fill="#dbeafe" font-size="14" font-weight="700">Что такое океаническая приливная нагрузка?</text>
+  <text x="50" y="138" fill="#93c5fd" font-size="12">Океанские приливы создают переменную нагрузку на</text>
+  <text x="50" y="155" fill="#93c5fd" font-size="12">земную кору — она деформируется с амплитудой до</text>
+  <text x="50" y="172" fill="#93c5fd" font-size="12">нескольких сантиметров (вертикаль) и миллиметров</text>
+  <text x="50" y="189" fill="#93c5fd" font-size="12">(горизонталь), особенно в прибрежных зонах.</text>
+  <text x="50" y="212" fill="#60a5fa" font-size="11" font-style="italic">Без коррекции PPP-AR не достигает мм-точности:</text>
+  <text x="50" y="228" fill="#60a5fa" font-size="11" font-style="italic">ошибка периодична с периодом 12.4 ч (M2), 24 ч (K1)...</text>
+
+  <!-- WHY IT MATTERS -->
+  <rect x="580" y="85" width="490" height="165" rx="12" fill="#0f1e4a" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="580" y="85" width="490" height="36" rx="12" fill="url(#oceanGrad)"/>
+  <rect x="580" y="108" width="490" height="13" fill="url(#oceanGrad)"/>
+  <text x="825" y="108" text-anchor="middle" fill="#dbeafe" font-size="14" font-weight="700">Влияние на ГНСС-позиционирование</text>
+  <text x="600" y="138" fill="#93c5fd" font-size="12">• Вертикаль (U): до 50–80 мм в прибрежных районах</text>
+  <text x="600" y="155" fill="#93c5fd" font-size="12">• Горизонталь (N/E): до 10–15 мм у берегов</text>
+  <text x="600" y="172" fill="#93c5fd" font-size="12">• В центре континентов: 1–5 мм (всё равно важно)</text>
+  <text x="600" y="189" fill="#93c5fd" font-size="12">• Сигнал периодический — коррелирует с суточным сеансом</text>
+  <text x="600" y="212" fill="#bfdbfe" font-size="11" font-weight="600">Активируется в конфиге RTKLIB:</text>
+  <rect x="600" y="216" width="440" height="24" rx="4" fill="#0c1a36"/>
+  <text x="612" y="232" fill="#4ade80" font-size="11" font-family="'Courier New', monospace">tidecorr  =1   blqfile  =/path/TASK_ID.blq</text>
+
+  <!-- ════════════════════════════════
+       PIPELINE FLOW
+  ════════════════════════════════ -->
+  <text x="550" y="278" text-anchor="middle" fill="#60a5fa" font-size="13" font-weight="600" letter-spacing="1">КОНВЕЙЕР ГЕНЕРАЦИИ BLQ</text>
+  <line x1="100" y1="285" x2="1000" y2="285" stroke="#1e3a5f" stroke-width="1"/>
+
+  <!-- Step 1: Coordinates -->
+  <rect x="30" y="295" width="190" height="130" rx="10" fill="#0f2040" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="295" width="190" height="30" rx="10" fill="#1d4ed8"/>
+  <rect x="30" y="312" width="190" height="13" fill="#1d4ed8"/>
+  <text x="125" y="313" text-anchor="middle" fill="#dbeafe" font-size="12" font-weight="700">① Координаты</text>
+  <text x="48" y="340" fill="#93c5fd" font-size="11">Lon, Lat станции</text>
+  <text x="48" y="356" fill="#93c5fd" font-size="11">из профиля задачи</text>
+  <text x="48" y="374" fill="#7dd3fc" font-size="10">Имя станции (4 chr)</text>
+  <text x="48" y="390" fill="#7dd3fc" font-size="10">→ заголовок BLQ</text>
+  <text x="48" y="408" fill="#60a5fa" font-size="10" font-style="italic">model.Task.Lat/Lon</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="222" y1="360" x2="258" y2="360" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 2: generate_blq.py -->
+  <rect x="260" y="295" width="200" height="130" rx="10" fill="#0f2040" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="260" y="295" width="200" height="30" rx="10" fill="#1d4ed8"/>
+  <rect x="260" y="312" width="200" height="13" fill="#1d4ed8"/>
+  <text x="360" y="313" text-anchor="middle" fill="#dbeafe" font-size="12" font-weight="700">② generate_blq.py</text>
+  <text x="278" y="338" fill="#93c5fd" font-size="11">Python-скрипт</text>
+  <text x="278" y="354" fill="#93c5fd" font-size="11">Аргументы:</text>
+  <text x="278" y="370" fill="#7dd3fc" font-size="10">  station_name</text>
+  <text x="278" y="384" fill="#7dd3fc" font-size="10">  lon lat</text>
+  <text x="278" y="398" fill="#7dd3fc" font-size="10">  fes_ocean_loading.yml</text>
+  <text x="278" y="412" fill="#7dd3fc" font-size="10">  output_path.blq</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="462" y1="360" x2="498" y2="360" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 3: pyfes FES2022 -->
+  <rect x="500" y="295" width="210" height="130" rx="10" fill="#0f2040" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="500" y="295" width="210" height="30" rx="10" fill="#1d4ed8"/>
+  <rect x="500" y="312" width="210" height="13" fill="#1d4ed8"/>
+  <text x="605" y="313" text-anchor="middle" fill="#dbeafe" font-size="12" font-weight="700">③ pyfes · FES2022</text>
+  <text x="518" y="338" fill="#93c5fd" font-size="11">Глобальная приливная модель</text>
+  <text x="518" y="354" fill="#93c5fd" font-size="11">Вычисляет нагрузочный потенц.</text>
+  <text x="518" y="370" fill="#7dd3fc" font-size="10">Сетка 1/16° × 1/16° (≈7 км)</text>
+  <text x="518" y="386" fill="#7dd3fc" font-size="10">Интерполяция на точку станции</text>
+  <text x="518" y="402" fill="#7dd3fc" font-size="10">AVISO-FES (sergeydolin fork)</text>
+  <text x="518" y="418" fill="#60a5fa" font-size="10" font-style="italic">fes_ocean_loading.yml</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="712" y1="360" x2="748" y2="360" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 4: BLQ file -->
+  <rect x="750" y="295" width="310" height="130" rx="10" fill="#0f2040" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="750" y="295" width="310" height="30" rx="10" fill="#1d4ed8"/>
+  <rect x="750" y="312" width="310" height="13" fill="#1d4ed8"/>
+  <text x="905" y="313" text-anchor="middle" fill="#dbeafe" font-size="12" font-weight="700">④ BLQ-файл (TASK_ID.blq)</text>
+  <text x="768" y="338" fill="#93c5fd" font-size="11">BLQ = Body Loading Quasi-static format</text>
+  <text x="768" y="354" fill="#93c5fd" font-size="11">11 волн × 3 компоненты × 2 (ампл+фаза)</text>
+  <text x="768" y="370" fill="#7dd3fc" font-size="10">Единицы: миллиметры + градусы фазы</text>
+  <text x="768" y="386" fill="#7dd3fc" font-size="10">Читается RTKLIB при tide_corr=1</text>
+  <text x="768" y="402" fill="#7dd3fc" font-size="10">Best-effort: ошибка → обработка без BLQ</text>
+
+  <!-- ════════════════════════════════
+       TIDAL CONSTITUENTS TABLE
+  ════════════════════════════════ -->
+  <rect x="30" y="445" width="680" height="315" rx="12" fill="#0a1630" stroke="#1d4ed8" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="445" width="680" height="36" rx="12" fill="#1e40af"/>
+  <rect x="30" y="468" width="680" height="13" fill="#1e40af"/>
+  <text x="370" y="469" text-anchor="middle" fill="#dbeafe" font-size="14" font-weight="700">11 приливных составляющих (Darwin-обозначения)</text>
+
+  <!-- Table header -->
+  <rect x="50" y="481" width="640" height="22" rx="3" fill="#1d4ed8"/>
+  <text x="105" y="496" text-anchor="middle" fill="#dbeafe" font-size="11" font-weight="700">Волна</text>
+  <text x="210" y="496" text-anchor="middle" fill="#dbeafe" font-size="11" font-weight="700">Тип</text>
+  <text x="340" y="496" text-anchor="middle" fill="#dbeafe" font-size="11" font-weight="700">Период</text>
+  <text x="490" y="496" text-anchor="middle" fill="#dbeafe" font-size="11" font-weight="700">Описание</text>
+  <text x="640" y="496" text-anchor="middle" fill="#dbeafe" font-size="11" font-weight="700">Амплитуда</text>
+
+  <!-- Data rows -->
+  <rect x="50" y="503" width="640" height="18" fill="#0f1e40"/>
+  <text x="105" y="516" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">M2</text>
+  <text x="210" y="516" text-anchor="middle" fill="#93c5fd" font-size="11">Полусуточный</text>
+  <text x="340" y="516" text-anchor="middle" fill="#a5b4fc" font-size="11">12.42 ч</text>
+  <text x="490" y="516" text-anchor="middle" fill="#bfdbfe" font-size="11">Главный лунный — доминирующий</text>
+  <text x="640" y="516" text-anchor="middle" fill="#34d399" font-size="11">~30 мм (берег)</text>
+
+  <rect x="50" y="521" width="640" height="18" fill="#0c1836"/>
+  <text x="105" y="534" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">S2</text>
+  <text x="210" y="534" text-anchor="middle" fill="#93c5fd" font-size="11">Полусуточный</text>
+  <text x="340" y="534" text-anchor="middle" fill="#a5b4fc" font-size="11">12.00 ч</text>
+  <text x="490" y="534" text-anchor="middle" fill="#bfdbfe" font-size="11">Главный солнечный</text>
+  <text x="640" y="534" text-anchor="middle" fill="#34d399" font-size="11">~10 мм</text>
+
+  <rect x="50" y="539" width="640" height="18" fill="#0f1e40"/>
+  <text x="105" y="552" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">N2</text>
+  <text x="210" y="552" text-anchor="middle" fill="#93c5fd" font-size="11">Полусуточный</text>
+  <text x="340" y="552" text-anchor="middle" fill="#a5b4fc" font-size="11">12.66 ч</text>
+  <text x="490" y="552" text-anchor="middle" fill="#bfdbfe" font-size="11">Лунный эллиптический</text>
+  <text x="640" y="552" text-anchor="middle" fill="#34d399" font-size="11">~6 мм</text>
+
+  <rect x="50" y="557" width="640" height="18" fill="#0c1836"/>
+  <text x="105" y="570" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">K2</text>
+  <text x="210" y="570" text-anchor="middle" fill="#93c5fd" font-size="11">Полусуточный</text>
+  <text x="340" y="570" text-anchor="middle" fill="#a5b4fc" font-size="11">11.97 ч</text>
+  <text x="490" y="570" text-anchor="middle" fill="#bfdbfe" font-size="11">Лунно-солнечный декл.</text>
+  <text x="640" y="570" text-anchor="middle" fill="#34d399" font-size="11">~3 мм</text>
+
+  <rect x="50" y="575" width="640" height="18" fill="#0f1e40"/>
+  <text x="105" y="588" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700">K1</text>
+  <text x="210" y="588" text-anchor="middle" fill="#93c5fd" font-size="11">Суточный</text>
+  <text x="340" y="588" text-anchor="middle" fill="#a5b4fc" font-size="11">23.93 ч</text>
+  <text x="490" y="588" text-anchor="middle" fill="#bfdbfe" font-size="11">Лунно-солнечный декл.</text>
+  <text x="640" y="588" text-anchor="middle" fill="#34d399" font-size="11">~15 мм</text>
+
+  <rect x="50" y="593" width="640" height="18" fill="#0c1836"/>
+  <text x="105" y="606" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700">O1</text>
+  <text x="210" y="606" text-anchor="middle" fill="#93c5fd" font-size="11">Суточный</text>
+  <text x="340" y="606" text-anchor="middle" fill="#a5b4fc" font-size="11">25.82 ч</text>
+  <text x="490" y="606" text-anchor="middle" fill="#bfdbfe" font-size="11">Главный лунный суточный</text>
+  <text x="640" y="606" text-anchor="middle" fill="#34d399" font-size="11">~10 мм</text>
+
+  <rect x="50" y="611" width="640" height="18" fill="#0f1e40"/>
+  <text x="105" y="624" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700">P1</text>
+  <text x="210" y="624" text-anchor="middle" fill="#93c5fd" font-size="11">Суточный</text>
+  <text x="340" y="624" text-anchor="middle" fill="#a5b4fc" font-size="11">24.07 ч</text>
+  <text x="490" y="624" text-anchor="middle" fill="#bfdbfe" font-size="11">Главный солнечный суточный</text>
+  <text x="640" y="624" text-anchor="middle" fill="#34d399" font-size="11">~5 мм</text>
+
+  <rect x="50" y="629" width="640" height="18" fill="#0c1836"/>
+  <text x="105" y="642" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700">Q1</text>
+  <text x="210" y="642" text-anchor="middle" fill="#93c5fd" font-size="11">Суточный</text>
+  <text x="340" y="642" text-anchor="middle" fill="#a5b4fc" font-size="11">26.87 ч</text>
+  <text x="490" y="642" text-anchor="middle" fill="#bfdbfe" font-size="11">Лунный эллиптический суточный</text>
+  <text x="640" y="642" text-anchor="middle" fill="#34d399" font-size="11">~2 мм</text>
+
+  <rect x="50" y="647" width="640" height="18" fill="#0f1e40"/>
+  <text x="105" y="660" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="700">Mf</text>
+  <text x="210" y="660" text-anchor="middle" fill="#93c5fd" font-size="11">Двухнедельный</text>
+  <text x="340" y="660" text-anchor="middle" fill="#a5b4fc" font-size="11">13.66 дн</text>
+  <text x="490" y="660" text-anchor="middle" fill="#bfdbfe" font-size="11">Лунный двухнедельный</text>
+  <text x="640" y="660" text-anchor="middle" fill="#34d399" font-size="11">~2 мм</text>
+
+  <rect x="50" y="665" width="640" height="18" fill="#0c1836"/>
+  <text x="105" y="678" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="700">Mm</text>
+  <text x="210" y="678" text-anchor="middle" fill="#93c5fd" font-size="11">Месячный</text>
+  <text x="340" y="678" text-anchor="middle" fill="#a5b4fc" font-size="11">27.55 дн</text>
+  <text x="490" y="678" text-anchor="middle" fill="#bfdbfe" font-size="11">Лунный месячный</text>
+  <text x="640" y="678" text-anchor="middle" fill="#34d399" font-size="11">~1 мм</text>
+
+  <rect x="50" y="683" width="640" height="18" fill="#0f1e40"/>
+  <text x="105" y="696" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="700">Ssa</text>
+  <text x="210" y="696" text-anchor="middle" fill="#93c5fd" font-size="11">Полугодовой</text>
+  <text x="340" y="696" text-anchor="middle" fill="#a5b4fc" font-size="11">182.6 дн</text>
+  <text x="490" y="696" text-anchor="middle" fill="#bfdbfe" font-size="11">Полугодовой солнечный</text>
+  <text x="640" y="696" text-anchor="middle" fill="#34d399" font-size="11">~1 мм</text>
+
+  <text x="50" y="750" fill="#60a5fa" font-size="11" font-style="italic">Суперпозиция всех 11 волн → комплексная приливная функция смещения земной коры</text>
+
+  <!-- ════════════════════════════════
+       RIGHT: BLQ FORMAT
+  ════════════════════════════════ -->
+  <rect x="730" y="445" width="340" height="315" rx="12" fill="#0a1630" stroke="#1d4ed8" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="730" y="445" width="340" height="36" rx="12" fill="#1e40af"/>
+  <rect x="730" y="468" width="340" height="13" fill="#1e40af"/>
+  <text x="900" y="469" text-anchor="middle" fill="#dbeafe" font-size="14" font-weight="700">Формат BLQ-файла</text>
+
+  <rect x="748" y="484" width="304" height="260" rx="6" fill="#060d1a"/>
+  <text x="758" y="500" fill="#64748b" font-size="9" font-family="'Courier New', monospace">$$ Ocean loading file</text>
+  <text x="758" y="514" fill="#64748b" font-size="9" font-family="'Courier New', monospace">$$ FES2022 · pyfes · Station: RIGA</text>
+  <text x="758" y="528" fill="#64748b" font-size="9" font-family="'Courier New', monospace">$$</text>
+  <text x="758" y="542" fill="#4ade80" font-size="9" font-family="'Courier New', monospace">  RIGA</text>
+  <text x="758" y="556" fill="#60a5fa" font-size="9" font-family="'Courier New', monospace">$$ amp (m): M2   S2   N2   K2   K1   O1</text>
+  <text x="758" y="570" fill="#a5b4fc" font-size="9" font-family="'Courier New', monospace">  0.0023 0.0008 0.0005 0.0002 0.0012 0.0008</text>
+  <text x="758" y="584" fill="#60a5fa" font-size="9" font-family="'Courier New', monospace">$$ amp (m): P1   Q1   Mf   Mm   Ssa</text>
+  <text x="758" y="598" fill="#a5b4fc" font-size="9" font-family="'Courier New', monospace">  0.0004 0.0001 0.0001 0.0001 0.0001</text>
+  <text x="758" y="612" fill="#60a5fa" font-size="9" font-family="'Courier New', monospace">$$ phs (deg): M2  S2  N2  K2  K1  O1</text>
+  <text x="758" y="626" fill="#a5b4fc" font-size="9" font-family="'Courier New', monospace">   -62.1 -62.3 -61.4 -59.2  57.3  33.4</text>
+  <text x="758" y="640" fill="#60a5fa" font-size="9" font-family="'Courier New', monospace">$$ phs (deg): P1  Q1  Mf  Mm  Ssa</text>
+  <text x="758" y="654" fill="#a5b4fc" font-size="9" font-family="'Courier New', monospace">   57.5 30.1 136.8 124.1 107.3</text>
+  <text x="758" y="668" fill="#64748b" font-size="9" font-family="'Courier New', monospace">$$ (3 компоненты: U/N/E)</text>
+  <text x="758" y="690" fill="#fbbf24" font-size="9" font-style="italic">Амплитуды: метры · Фазы: градусы</text>
+  <text x="758" y="706" fill="#fbbf24" font-size="9" font-style="italic">3 компоненты: вертикаль (U),</text>
+  <text x="758" y="720" fill="#fbbf24" font-size="9" font-style="italic">север (N), восток (E)</text>
+  <text x="758" y="736" fill="#f87171" font-size="9" font-weight="600">tide_corr=1 → RTKLIB вычитает</text>
+  <text x="758" y="750" fill="#f87171" font-size="9" font-weight="600">смещение на каждой эпохе</text>
+
+  <!-- Footer -->
+  <line x1="40" y1="770" x2="1060" y2="770" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="550" y="790" text-anchor="middle" fill="#334155" font-size="11">
+    BLQService.GenerateBLQ() → python3 generate_blq.py → pyfes FES2022 → IERS Conventions 2010
+  </text>
+</svg>

@@ -301,8 +301,9 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *http.Request) {
 	if h.taskStorage == nil {
 		SendJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"activeUsers":       0,
-			"measurementsToday": 0,
+			"activeUsers":         0,
+			"measurementsToday":   0,
+			"onlineParticipants":  0,
 		}, h.logger)
 		return
 	}
@@ -311,10 +312,17 @@ func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		h.logger.Errorf("Failed to get system stats: %v", err)
 		SendJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"activeUsers":       0,
-			"measurementsToday": 0,
+			"activeUsers":         0,
+			"measurementsToday":   0,
+			"onlineParticipants":  0,
 		}, h.logger)
 		return
+	}
+
+	if h.dbStorage != nil {
+		if n, err := h.dbStorage.CountOnlineSessions(); err == nil {
+			stats["onlineParticipants"] = n
+		}
 	}
 
 	SendJSONResponse(w, http.StatusOK, stats, h.logger)

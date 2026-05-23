@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a0533"/>
+      <stop offset="100%" stop-color="#0d0220"/>
+    </linearGradient>
+    <linearGradient id="pppGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="arGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9333ea"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#000" flood-opacity="0.7"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrG" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+    </marker>
+    <marker id="arrR" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f87171"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="900" fill="url(#bg)"/>
+
+  <!-- Starfield decoration -->
+  <circle cx="100" cy="50" r="1" fill="#a78bfa" opacity="0.5"/>
+  <circle cx="300" cy="30" r="1.5" fill="#c4b5fd" opacity="0.4"/>
+  <circle cx="700" cy="20" r="1" fill="#a78bfa" opacity="0.6"/>
+  <circle cx="1000" cy="45" r="1.5" fill="#c4b5fd" opacity="0.3"/>
+  <circle cx="1100" cy="60" r="1" fill="#a78bfa" opacity="0.5"/>
+
+  <!-- Title -->
+  <text x="600" y="42" text-anchor="middle" fill="#ede9fe" font-size="23" font-weight="700" filter="url(#glow)">PPP-AR: Precise Point Positioning with Ambiguity Resolution</text>
+  <text x="600" y="65" text-anchor="middle" fill="#8b5cf6" font-size="13">rtk_service.go · ppp.conf (ar-mode=3) · BIA/OSB (CODE) · RTKLIB rnx2rtkp</text>
+  <line x1="40" y1="76" x2="1160" y2="76" stroke="#2d1b69" stroke-width="1"/>
+
+  <!-- ════════════════════════════════
+       TOP SECTION: PPP vs PPP-AR
+  ════════════════════════════════ -->
+
+  <!-- PPP Float box -->
+  <rect x="30" y="88" width="540" height="195" rx="12" fill="#1a0a3a" stroke="#6d28d9" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="88" width="540" height="36" rx="12" fill="url(#pppGrad)"/>
+  <rect x="30" y="111" width="540" height="13" fill="url(#pppGrad)"/>
+  <text x="300" y="112" text-anchor="middle" fill="#ede9fe" font-size="14" font-weight="700">PPP Float — без фиксации неоднозначностей</text>
+
+  <text x="50" y="142" fill="#c4b5fd" font-size="12">Наблюдательные уравнения (ионос.-свободная комб.):</text>
+  <rect x="50" y="148" width="500" height="50" rx="5" fill="#0d0820"/>
+  <text x="60" y="165" fill="#818cf8" font-size="11" font-family="'Courier New', monospace">P₃ = ρ + c·dt - c·dT + T + λ₃·N₃_float + ε_P</text>
+  <text x="60" y="181" fill="#818cf8" font-size="11" font-family="'Courier New', monospace">Φ₃ = ρ + c·dt - c·dT + T + λ₃·N₃_float + ε_Φ</text>
+  <text x="60" y="196" fill="#6366f1" font-size="10" font-family="'Courier New', monospace">  IF-комбинация: f1²·L1 - f2²·L2 / (f1²-f2²) → исключает ионосферу</text>
+
+  <text x="50" y="222" fill="#c4b5fd" font-size="12">• N₃_float — вещественное решение, содержит смещения кода/фазы</text>
+  <text x="50" y="238" fill="#c4b5fd" font-size="12">• Сходимость: 20–60 мин до стабилизации фильтра Калмана</text>
+  <text x="50" y="254" fill="#c4b5fd" font-size="12">• Точность (static): 1–3 см после сходимости</text>
+  <text x="50" y="270" fill="#a78bfa" font-size="11" font-style="italic">ar-mode=off · Широкополосная фиксация невозможна без OSB</text>
+
+  <!-- PPP-AR box -->
+  <rect x="630" y="88" width="540" height="195" rx="12" fill="#1a0a3a" stroke="#a21cfa" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="630" y="88" width="540" height="36" rx="12" fill="#7c3aed"/>
+  <rect x="630" y="111" width="540" height="13" fill="#7c3aed"/>
+  <text x="900" y="112" text-anchor="middle" fill="#ede9fe" font-size="14" font-weight="700">PPP-AR — фиксация целочисленных неоднозн.</text>
+
+  <text x="650" y="142" fill="#c4b5fd" font-size="12">После применения OSB (Observable-Specific Bias):</text>
+  <rect x="650" y="148" width="500" height="50" rx="5" fill="#0d0820"/>
+  <text x="660" y="165" fill="#a78bfa" font-size="11" font-family="'Courier New', monospace">Φ'₁ = ρ + c·dt - c·dT + T - I + λ₁·N₁_int + ε</text>
+  <text x="660" y="181" fill="#a78bfa" font-size="11" font-family="'Courier New', monospace">Φ'₂ = ρ + c·dt - c·dT + T - f₁²/f₂²·I + λ₂·N₂_int + ε</text>
+  <text x="660" y="196" fill="#7c3aed" font-size="10" font-family="'Courier New', monospace">  N₁, N₂ ∈ ℤ  ← целые числа циклов несущей</text>
+
+  <text x="650" y="222" fill="#c4b5fd" font-size="12">• BIA-файл содержит спутниковые фазовые смещения (OSB)</text>
+  <text x="650" y="238" fill="#c4b5fd" font-size="12">• Устраняет дробные части → N становится целым (LAMBDA)</text>
+  <text x="650" y="254" fill="#c4b5fd" font-size="12">• Сходимость: 10–20 мин, точность: 5–15 мм</text>
+  <text x="650" y="270" fill="#a78bfa" font-size="11" font-style="italic">ar-mode=3 (fix-and-hold) · BIA от CODE или IGS HMW/UCM</text>
+
+  <!-- VS arrow -->
+  <line x1="572" y1="186" x2="628" y2="186" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="600" y="181" text-anchor="middle" fill="#64748b" font-size="11" font-weight="700">vs</text>
+
+  <!-- ════════════════════════════════
+       CORRECTIONS PIPELINE
+  ════════════════════════════════ -->
+  <text x="600" y="310" text-anchor="middle" fill="#8b5cf6" font-size="13" font-weight="600" letter-spacing="1">ПОПРАВКИ В PPP-AR РЕШЕНИИ</text>
+  <line x1="60" y1="318" x2="1140" y2="318" stroke="#2d1b69" stroke-width="1"/>
+
+  <!-- Corrections row -->
+  <!-- SP3 -->
+  <rect x="30" y="328" width="170" height="155" rx="10" fill="#140a30" stroke="#6d28d9" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="328" width="170" height="28" rx="10" fill="#5b21b6"/>
+  <rect x="30" y="343" width="170" height="13" fill="#5b21b6"/>
+  <text x="115" y="344" text-anchor="middle" fill="#ede9fe" font-size="12" font-weight="700">SP3 Эфемериды</text>
+  <text x="48" y="370" fill="#c4b5fd" font-size="11">Точные орбиты IGS</text>
+  <text x="48" y="386" fill="#a5b4fc" font-size="10">• Точность: ~2 см</text>
+  <text x="48" y="400" fill="#a5b4fc" font-size="10">• Шаг: 15 мин (900s)</text>
+  <text x="48" y="414" fill="#a5b4fc" font-size="10">• Интерполяция: Лагранж</text>
+  <text x="48" y="428" fill="#a5b4fc" font-size="10">• GPS/GLO/GAL/BDS</text>
+  <text x="48" y="450" fill="#7c3aed" font-size="9" font-style="italic">vs broadcast: 1–3 м</text>
+  <text x="48" y="464" fill="#7c3aed" font-size="9" font-style="italic">улучшение: 100×</text>
+
+  <!-- CLK -->
+  <rect x="215" y="328" width="170" height="155" rx="10" fill="#140a30" stroke="#6d28d9" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="215" y="328" width="170" height="28" rx="10" fill="#5b21b6"/>
+  <rect x="215" y="343" width="170" height="13" fill="#5b21b6"/>
+  <text x="300" y="344" text-anchor="middle" fill="#ede9fe" font-size="12" font-weight="700">CLK Часы</text>
+  <text x="233" y="370" fill="#c4b5fd" font-size="11">Точные часы спутников</text>
+  <text x="233" y="386" fill="#a5b4fc" font-size="10">• Точность: ~0.1 нс</text>
+  <text x="233" y="400" fill="#a5b4fc" font-size="10">• Шаг: 30s (Final) / 5s</text>
+  <text x="233" y="414" fill="#a5b4fc" font-size="10">• IGS Final (13 дней)</text>
+  <text x="233" y="428" fill="#a5b4fc" font-size="10">• Rapid (1 день)</text>
+  <text x="233" y="450" fill="#7c3aed" font-size="9" font-style="italic">vs broadcast: нс→пс</text>
+  <text x="233" y="464" fill="#7c3aed" font-size="9" font-style="italic">1нс ≈ 30 см ошибки</text>
+
+  <!-- DCB -->
+  <rect x="400" y="328" width="170" height="155" rx="10" fill="#140a30" stroke="#6d28d9" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="400" y="328" width="170" height="28" rx="10" fill="#5b21b6"/>
+  <rect x="400" y="343" width="170" height="13" fill="#5b21b6"/>
+  <text x="485" y="344" text-anchor="middle" fill="#ede9fe" font-size="12" font-weight="700">DCB Смещения</text>
+  <text x="418" y="370" fill="#c4b5fd" font-size="11">Дифф. кодовые смещ.</text>
+  <text x="418" y="386" fill="#a5b4fc" font-size="10">• P1-P2, P1-C1, C1-C2</text>
+  <text x="418" y="400" fill="#a5b4fc" font-size="10">• Аппаратные задержки</text>
+  <text x="418" y="414" fill="#a5b4fc" font-size="10">• CODE Monthly DCB</text>
+  <text x="418" y="428" fill="#a5b4fc" font-size="10">• Устраняет межсист. смещ.</text>
+  <text x="418" y="450" fill="#7c3aed" font-size="9" font-style="italic">Влияние: 2–5 нс</text>
+  <text x="418" y="464" fill="#7c3aed" font-size="9" font-style="italic">(≈ 0.5–1.5 м)</text>
+
+  <!-- ERP -->
+  <rect x="585" y="328" width="170" height="155" rx="10" fill="#140a30" stroke="#6d28d9" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="585" y="328" width="170" height="28" rx="10" fill="#5b21b6"/>
+  <rect x="585" y="343" width="170" height="13" fill="#5b21b6"/>
+  <text x="670" y="344" text-anchor="middle" fill="#ede9fe" font-size="12" font-weight="700">ERP Вращение Земли</text>
+  <text x="603" y="370" fill="#c4b5fd" font-size="11">Earth Rotation Params</text>
+  <text x="603" y="386" fill="#a5b4fc" font-size="10">• x/y полюса (мас)</text>
+  <text x="603" y="400" fill="#a5b4fc" font-size="10">• UT1-UTC (мс)</text>
+  <text x="603" y="414" fill="#a5b4fc" font-size="10">• dX, dY (нутация)</text>
+  <text x="603" y="428" fill="#a5b4fc" font-size="10">• IGS finals2000A</text>
+  <text x="603" y="450" fill="#7c3aed" font-size="9" font-style="italic">1 мас ≈ 3 см на Earth</text>
+  <text x="603" y="464" fill="#7c3aed" font-size="9" font-style="italic">поверхности</text>
+
+  <!-- BIA -->
+  <rect x="770" y="328" width="190" height="155" rx="10" fill="#2a0a40" stroke="#a21cfa" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="770" y="328" width="190" height="28" rx="10" fill="#7c3aed"/>
+  <rect x="770" y="343" width="190" height="13" fill="#7c3aed"/>
+  <text x="865" y="344" text-anchor="middle" fill="#ede9fe" font-size="12" font-weight="700">BIA Фазовые смещения</text>
+  <text x="788" y="370" fill="#e9d5ff" font-size="11">Ключевой файл для AR!</text>
+  <text x="788" y="386" fill="#c4b5fd" font-size="10">• OSB (Observable Specific Bias)</text>
+  <text x="788" y="400" fill="#c4b5fd" font-size="10">• FCB (Fractional Cycle Bias)</text>
+  <text x="788" y="414" fill="#c4b5fd" font-size="10">• Спутниковые фазовые смещ.</text>
+  <text x="788" y="428" fill="#c4b5fd" font-size="10">• CODE / IGS Bias продукт</text>
+  <text x="788" y="442" fill="#c4b5fd" font-size="10">• L1/L2/L5 отдельно</text>
+  <text x="788" y="456" fill="#a78bfa" font-size="9" font-style="italic">Делает N вещественное → целое</text>
+  <text x="788" y="470" fill="#a78bfa" font-size="9" font-style="italic">BIA = key to PPP-AR</text>
+
+  <!-- BLQ in corrections -->
+  <rect x="975" y="328" width="190" height="155" rx="10" fill="#0a1e30" stroke="#0ea5e9" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="975" y="328" width="190" height="28" rx="10" fill="#0369a1"/>
+  <rect x="975" y="343" width="190" height="13" fill="#0369a1"/>
+  <text x="1070" y="344" text-anchor="middle" fill="#e0f2fe" font-size="12" font-weight="700">BLQ + ATX</text>
+  <text x="993" y="370" fill="#bae6fd" font-size="11">Геофизич. коррекции</text>
+  <text x="993" y="386" fill="#7dd3fc" font-size="10">BLQ: приливная нагрузка</text>
+  <text x="993" y="400" fill="#7dd3fc" font-size="10">  → пересчёт на каждой эпохе</text>
+  <text x="993" y="414" fill="#7dd3fc" font-size="10">ATX: фазовый центр ант.</text>
+  <text x="993" y="428" fill="#7dd3fc" font-size="10">  PCO + PCV(el, az)</text>
+  <text x="993" y="442" fill="#7dd3fc" font-size="10">Твёрдые приливы Земли</text>
+  <text x="993" y="456" fill="#7dd3fc" font-size="10">  (RTKLIB внутренне)</text>
+  <text x="993" y="470" fill="#38bdf8" font-size="9" font-style="italic">tide_corr=1 обязательно</text>
+
+  <!-- ════════════════════════════════
+       AR PROCESS
+  ════════════════════════════════ -->
+  <text x="600" y="510" text-anchor="middle" fill="#8b5cf6" font-size="13" font-weight="600" letter-spacing="1">АЛГОРИТМ ФИКСАЦИИ НЕОДНОЗНАЧНОСТЕЙ</text>
+  <line x1="60" y1="518" x2="1140" y2="518" stroke="#2d1b69" stroke-width="1"/>
+
+  <!-- AR steps -->
+  <rect x="30" y="528" width="220" height="130" rx="10" fill="#140a30" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="140" y="550" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">① Wide-lane (WL)</text>
+  <text x="48" y="570" fill="#a5b4fc" font-size="11">λ_WL ≈ 86 см</text>
+  <text x="48" y="586" fill="#a5b4fc" font-size="11">N_WL = N₁ - N₂</text>
+  <text x="48" y="602" fill="#a5b4fc" font-size="11">Легко фиксируется</text>
+  <text x="48" y="618" fill="#a5b4fc" font-size="11">MW-комбинация</text>
+  <text x="48" y="640" fill="#7c3aed" font-size="10" font-style="italic">Первый шаг AR</text>
+
+  <line x1="252" y1="593" x2="288" y2="593" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="290" y="528" width="220" height="130" rx="10" fill="#140a30" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="400" y="550" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">② Narrow-lane (NL)</text>
+  <text x="308" y="570" fill="#a5b4fc" font-size="11">λ_NL ≈ 10.7 см</text>
+  <text x="308" y="586" fill="#a5b4fc" font-size="11">N_NL = N₁ + N₂</text>
+  <text x="308" y="602" fill="#a5b4fc" font-size="11">Труднее, нужна OSB</text>
+  <text x="308" y="618" fill="#a5b4fc" font-size="11">BIA → N_NL ∈ ℤ</text>
+  <text x="308" y="640" fill="#7c3aed" font-size="10" font-style="italic">Второй шаг AR</text>
+
+  <line x1="512" y1="593" x2="548" y2="593" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="550" y="528" width="220" height="130" rx="10" fill="#140a30" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="660" y="550" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700">③ LAMBDA / ILS</text>
+  <text x="568" y="570" fill="#a5b4fc" font-size="11">Integer Least Squares</text>
+  <text x="568" y="586" fill="#a5b4fc" font-size="11">Поиск N ∈ ℤ с мин.</text>
+  <text x="568" y="602" fill="#a5b4fc" font-size="11">квадр. невязкой</text>
+  <text x="568" y="618" fill="#a5b4fc" font-size="11">Ratio-test: R > 3.0</text>
+  <text x="568" y="640" fill="#7c3aed" font-size="10" font-style="italic">Критерий принятия Fix</text>
+
+  <line x1="772" y1="593" x2="808" y2="593" stroke="#34d399" stroke-width="2" marker-end="url(#arrG)"/>
+
+  <rect x="810" y="528" width="350" height="130" rx="10" fill="#0a2010" stroke="#059669" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="810" y="528" width="350" height="28" rx="10" fill="url(#greenGrad)"/>
+  <rect x="810" y="543" width="350" height="13" fill="url(#greenGrad)"/>
+  <text x="985" y="544" text-anchor="middle" fill="#d1fae5" font-size="12" font-weight="700">④ Результат: Fix Solution</text>
+  <text x="828" y="568" fill="#6ee7b7" font-size="11">N₁, N₂ зафиксированы как целые → вычитаются</text>
+  <text x="828" y="584" fill="#6ee7b7" font-size="11">Точность координат: 5–15 мм (PPP-AR static)</text>
+  <text x="828" y="600" fill="#6ee7b7" font-size="11">Время сходимости: 10–20 мин (vs 30–60 у Float)</text>
+  <text x="828" y="616" fill="#6ee7b7" font-size="11">Fix% (эпохи с фиксацией) — KPI качества сессии</text>
+  <text x="828" y="638" fill="#34d399" font-size="10" font-style="italic">ar-mode=3 (fix-and-hold): удерживает фиксацию</text>
+
+  <!-- ════════════════════════════════
+       CONVERGENCE DIAGRAM
+  ════════════════════════════════ -->
+  <text x="600" y="682" text-anchor="middle" fill="#8b5cf6" font-size="13" font-weight="600" letter-spacing="1">СХОДИМОСТЬ МЕТОДОВ (схема)</text>
+  <line x1="60" y1="690" x2="1140" y2="690" stroke="#2d1b69" stroke-width="1"/>
+
+  <!-- Convergence plot area -->
+  <rect x="60" y="700" width="1080" height="160" rx="10" fill="#0d0820" stroke="#2d1b69" stroke-width="1"/>
+
+  <!-- Axes -->
+  <line x1="130" y1="840" x2="1100" y2="840" stroke="#334155" stroke-width="1.5"/>
+  <line x1="130" y1="710" x2="130" y2="845" stroke="#334155" stroke-width="1.5"/>
+  <text x="615" y="860" text-anchor="middle" fill="#475569" font-size="11">Время сессии (минуты)</text>
+  <text x="90" y="780" text-anchor="middle" fill="#475569" font-size="11" transform="rotate(-90 90 780)">Ошибка позиции</text>
+
+  <!-- Time axis labels -->
+  <text x="130" y="858" text-anchor="middle" fill="#475569" font-size="10">0</text>
+  <text x="300" y="858" text-anchor="middle" fill="#475569" font-size="10">10 мин</text>
+  <text x="490" y="858" text-anchor="middle" fill="#475569" font-size="10">20 мин</text>
+  <text x="680" y="858" text-anchor="middle" fill="#475569" font-size="10">30 мин</text>
+  <text x="870" y="858" text-anchor="middle" fill="#475569" font-size="10">45 мин</text>
+  <text x="1050" y="858" text-anchor="middle" fill="#475569" font-size="10">60 мин</text>
+
+  <!-- Y axis labels -->
+  <text x="125" y="720" text-anchor="end" fill="#475569" font-size="10">1м</text>
+  <text x="125" y="760" text-anchor="end" fill="#475569" font-size="10">10см</text>
+  <text x="125" y="800" text-anchor="end" fill="#475569" font-size="10">3см</text>
+  <text x="125" y="835" text-anchor="end" fill="#475569" font-size="10">1см</text>
+
+  <!-- Grid -->
+  <line x1="130" y1="720" x2="1100" y2="720" stroke="#1e293b" stroke-width="1" stroke-dasharray="3,5"/>
+  <line x1="130" y1="760" x2="1100" y2="760" stroke="#1e293b" stroke-width="1" stroke-dasharray="3,5"/>
+  <line x1="130" y1="800" x2="1100" y2="800" stroke="#1e293b" stroke-width="1" stroke-dasharray="3,5"/>
+
+  <!-- Single curve (flat, high) -->
+  <path d="M130,725 C200,724 350,722 500,723 C700,723 900,722 1100,723" stroke="#f87171" stroke-width="2" fill="none" stroke-dasharray="6,4"/>
+  <text x="1108" y="724" fill="#f87171" font-size="11" font-weight="600">Single</text>
+
+  <!-- PPP Float curve -->
+  <path d="M130,715 C170,730 230,755 310,775 C410,790 530,800 680,805 C820,807 960,808 1100,808" stroke="#60a5fa" stroke-width="2" fill="none"/>
+  <text x="1108" y="808" fill="#60a5fa" font-size="11" font-weight="600">PPP Float</text>
+
+  <!-- PPP-AR curve (faster convergence, lower) -->
+  <path d="M130,715 C165,732 220,758 290,775 C360,785 410,800 460,836 C480,839 500,840 1100,840" stroke="#a78bfa" stroke-width="2.5" fill="none" filter="url(#glow)"/>
+  <!-- Fix annotation -->
+  <circle cx="460" cy="836" r="5" fill="#a78bfa" filter="url(#glow)"/>
+  <text x="470" y="826" fill="#a78bfa" font-size="10" font-weight="700">Fix!</text>
+  <text x="1108" y="840" fill="#a78bfa" font-size="11" font-weight="700">PPP-AR</text>
+
+  <!-- Vertical line at fix -->
+  <line x1="460" y1="710" x2="460" y2="845" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <text x="460" y="706" text-anchor="middle" fill="#a78bfa" font-size="9">~18 мин</text>
+
+  <!-- Footer -->
+  <line x1="40" y1="876" x2="1160" y2="876" stroke="#2d1b69" stroke-width="1"/>
+  <text x="600" y="893" text-anchor="middle" fill="#334155" font-size="11">
+    ar-mode: 0=off · 1=continuous · 2=instantaneous · 3=fix-and-hold · 4=ppp-ar  |  RTKLIB RTKPOST / rnx2rtkp
+  </text>
+</svg>

@@ -195,7 +195,7 @@ body { background:var(--paper); }
 .menu-item.disabled .menu-tag { background:var(--warn-bg); color:var(--warn); border-color:transparent; }
 
 .stats-section {
-    display:grid; grid-template-columns:repeat(2,1fr); gap:0;
+    display:grid; grid-template-columns:repeat(3,1fr); gap:0;
     border:1px solid var(--paper-edge); border-radius:var(--r-lg);
     background:var(--card); overflow:hidden;
     animation:fadeUp .5s .25s ease both;
@@ -225,10 +225,17 @@ body { background:var(--paper); }
     .welcome-banner { grid-template-columns:1fr; gap:28px; }
     .welcome-art { max-width:280px; margin:0 auto; order:-1; }
 }
+@media(max-width:900px){
+    .stats-section { grid-template-columns:repeat(2,1fr); }
+    .stat-card:nth-child(2) { border-right:none; }
+    .stat-card:nth-child(3) { border-top:1px solid var(--paper-edge); grid-column:1/-1; border-right:none; }
+}
 @media(max-width:768px){
     .menu-grid { grid-template-columns:1fr; }
     .stats-section { grid-template-columns:1fr; }
     .stat-card { border-right:none; border-bottom:1px solid var(--paper-edge); }
+    .stat-card:nth-child(2) { border-right:none; }
+    .stat-card:nth-child(3) { border-top:none; grid-column:auto; }
     .stat-card:last-child { border-bottom:none; }
     .welcome-banner h1 { font-size:1.8rem; }
     .welcome-banner { padding:36px 24px; }
@@ -412,6 +419,10 @@ body { background:var(--paper); }
         <div class="stat-card">
             <div class="stat-label">Обработано сегодня</div>
             <div class="stat-value" id="measurementsToday">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Участников в коллаборации</div>
+            <div class="stat-value" id="onlineParticipants">0</div>
         </div>
     </div>
 </main>

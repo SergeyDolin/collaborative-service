@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="inputGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#1e40af"/>
+    </linearGradient>
+    <linearGradient id="prepGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#0d9488"/>
+    </linearGradient>
+    <linearGradient id="procGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="outGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b45309"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    
+    <filter id="cardShadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+
+    <marker id="arrowDown" markerWidth="10" markerHeight="10" refX="5" refY="10" orient="auto">
+      <polygon points="0,0 10,0 5,10" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="720" fill="url(#bg)"/>
+  
+  <!-- Decorative top bar -->
+  <rect x="0" y="0" width="1200" height="4" fill="#1d4ed8"/>
+
+  <!-- Title -->
+  <text x="600" y="38" text-anchor="middle" fill="#0f172a" font-size="24" font-weight="700" letter-spacing="1">
+    Конвейер апостериорной обработки
+  </text>
+  <line x1="80" y1="62" x2="1120" y2="62" stroke="#cbd5e1" stroke-width="1"/>
+
+  <!-- ─── COLUMN HEADERS ─── -->
+  <rect x="60" y="78" width="200" height="32" rx="6" fill="url(#inputGrad)"/>
+  <text x="160" y="99" text-anchor="middle" fill="#dbeafe" font-size="14" font-weight="600" letter-spacing="1">ВХОДНЫЕ ДАННЫЕ</text>
+
+  <rect x="348" y="78" width="224" height="32" rx="6" fill="url(#prepGrad)"/>
+  <text x="460" y="99" text-anchor="middle" fill="#ccfbf1" font-size="14" font-weight="600" letter-spacing="1">ПОДГОТОВКА</text>
+
+  <rect x="660" y="78" width="200" height="32" rx="6" fill="url(#procGrad)"/>
+  <text x="760" y="99" text-anchor="middle" fill="#ede9fe" font-size="14" font-weight="600" letter-spacing="1">ОБРАБОТКА</text>
+
+  <rect x="952" y="78" width="196" height="32" rx="6" fill="url(#outGrad)"/>
+  <text x="1050" y="99" text-anchor="middle" fill="#fef3c7" font-size="14" font-weight="600" letter-spacing="1">РЕЗУЛЬТАТ</text>
+
+  <!-- Arrows under headers -->
+  <line x1="160" y1="112" x2="160" y2="128" stroke="#475569" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <line x1="460" y1="112" x2="460" y2="128" stroke="#475569" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <line x1="760" y1="112" x2="760" y2="128" stroke="#475569" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <line x1="1050" y1="112" x2="1050" y2="128" stroke="#475569" stroke-width="2" marker-end="url(#arrowDown)"/>
+
+  <!-- Vertical dividers -->
+  <line x1="300" y1="82" x2="300" y2="690" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+  <line x1="600" y1="82" x2="600" y2="690" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+  <line x1="900" y1="82" x2="900" y2="690" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+
+  <!-- ═══════════════════════════════════════════════
+       COLUMN 1 — INPUT DATA
+  ═══════════════════════════════════════════════ -->
+
+  <!-- Block: RINEX Rover -->
+  <rect x="40" y="140" width="240" height="65" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="40" y="140" width="240" height="30" rx="10" fill="url(#inputGrad)"/>
+  <rect x="40" y="160" width="240" height="10" fill="url(#inputGrad)"/>
+  <text x="160" y="160" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Наблюдения</text>
+  <text x="55" y="188" fill="#334155" font-size="13">• Файл .rnx / .obs / .crx / .xxd / Архив .gz</text>
+
+  <!-- Block: User Config -->
+  <rect x="40" y="250" width="240" height="75" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="40" y="250" width="240" height="30" rx="10" fill="url(#inputGrad)"/>
+  <rect x="40" y="270" width="240" height="10" fill="url(#inputGrad)"/>
+  <text x="160" y="270" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Параметры пользователя</text>
+  <text x="55" y="298" fill="#334155" font-size="13">• Метод: Single / PPP-AR</text>
+  <text x="55" y="316" fill="#334155" font-size="13">• Режим: static / kinematic</text>
+
+  <!-- ═══════════════════════════════════════════════
+       COLUMN 2 — PREPARATION
+  ═══════════════════════════════════════════════ -->
+
+  <!-- Block: SNR Mask -->
+  <rect x="320" y="130" width="260" height="95" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="320" y="130" width="260" height="30" rx="10" fill="url(#prepGrad)"/>
+  <rect x="320" y="150" width="260" height="10" fill="url(#prepGrad)"/>
+  <text x="450" y="150" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">SNR Маска</text>
+  <text x="335" y="178" fill="#334155" font-size="13">• Читает комментарии заголовка RINEX</text>
+  <text x="335" y="196" fill="#334155" font-size="13">• Диапазоны dBHz → флаг 1–9</text>
+  <text x="335" y="214" fill="#334155" font-size="13">• Генерирует маски L1/L2/L5</text>
+
+  <!-- Block: Antenna -->
+  <rect x="320" y="260" width="260" height="120" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="320" y="260" width="260" height="30" rx="10" fill="url(#prepGrad)"/>
+  <rect x="320" y="280" width="260" height="10" fill="url(#prepGrad)"/>
+  <text x="450" y="280" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Антенна</text>
+  <text x="335" y="308" fill="#334155" font-size="13">• Парсинг "ANT # / TYPE" из RINEX</text>
+  <text x="335" y="326" fill="#334155" font-size="13">• Смещения ΔH / ΔE / ΔN из заголовка</text>
+  <text x="335" y="344" fill="#334155" font-size="13">• Мобильное устройство: ручной ввод</text>
+  <text x="335" y="362" fill="#334155" font-size="13">• Поиск PCV-коррекции в igs20.atx</text>
+
+  <!-- Block: File Downloads -->
+  <rect x="320" y="415" width="260" height="170" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="320" y="415" width="260" height="30" rx="10" fill="url(#prepGrad)"/>
+  <rect x="320" y="435" width="260" height="10" fill="url(#prepGrad)"/>
+  <text x="450" y="435" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Загрузка файлов</text>
+  <text x="335" y="463" fill="#334155" font-size="13" font-weight="600">Навигационное сообщение:</text>
+  <text x="335" y="481" fill="#334155" font-size="12">  BRDC</text>
+  <text x="335" y="499" fill="#334155" font-size="13" font-weight="600">Точные продукты IGS (GPS-неделя):</text>
+  <text x="335" y="517" fill="#334155" font-size="12">  SP3  — точные эфемериды спутников</text>
+  <text x="335" y="533" fill="#334155" font-size="12">  CLK  — точные поправки часов (30s/5s)</text>
+  <text x="335" y="549" fill="#334155" font-size="12">  DCB  — дифф. кодовые задержки</text>
+  <text x="335" y="565" fill="#334155" font-size="12">  ERP  — параметры вращения Земли</text>
+  <text x="335" y="581" fill="#334155" font-size="12">  BIA  — фазовые задержки (для PPP-AR)</text>
+
+  <!-- Block: BLQ -->
+  <rect x="320" y="620" width="260" height="70" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="320" y="620" width="260" height="30" rx="10" fill="url(#prepGrad)"/>
+  <rect x="320" y="640" width="260" height="10" fill="url(#prepGrad)"/>
+  <text x="450" y="640" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">BLQ — приливная нагрузка</text>
+  <text x="335" y="666" fill="#334155" font-size="13">• generate_blq.py → pyfes (FES2022)</text>
+  <text x="335" y="684" fill="#334155" font-size="13">• 11 приливных составляющих (M2,S2…) → BLQ-файл</text>
+
+  <!-- ═══════════════════════════════════════════════
+       COLUMN 3 — PROCESSING
+  ═══════════════════════════════════════════════ -->
+
+  <!-- Block: Config -->
+  <rect x="620" y="130" width="260" height="105" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="620" y="130" width="260" height="30" rx="10" fill="url(#procGrad)"/>
+  <rect x="620" y="150" width="260" height="10" fill="url(#procGrad)"/>
+  <text x="750" y="150" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Запуск обработки</text>
+  <text x="635" y="180" fill="#334155" font-size="13">• Генерация конфигурационного файла</text>
+  <text x="635" y="206" fill="#334155" font-size="13">• Запуск обработчика</text>
+
+  <!-- ═══════════════════════════════════════════════
+       COLUMN 4 — OUTPUT
+  ═══════════════════════════════════════════════ -->
+
+  <!-- Output POS -->
+  <rect x="920" y="130" width="250" height="120" rx="10" fill="#ffffff" filter="url(#cardShadow)"/>
+  <rect x="920" y="130" width="250" height="30" rx="10" fill="url(#outGrad)"/>
+  <rect x="920" y="150" width="250" height="10" fill="url(#outGrad)"/>
+  <text x="1045" y="150" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Решение</text>
+  <text x="935" y="178" fill="#334155" font-size="13">• Координаты в ITRF на эпоху наблюдения</text>
+  <text x="935" y="196" fill="#334155" font-size="13">• Файл решения (Кинематика)</text>
+  <text x="935" y="214" fill="#334155" font-size="13">• Возможность преобразования в ГСК-2011</text>
+  <text x="935" y="232" fill="#334155" font-size="13">• Процент FIX решения | Кол-во спутников</text>
+
+  <!-- Footer -->
+  <line x1="80" y1="700" x2="1120" y2="700" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="600" y="714" text-anchor="middle" fill="#94a3b8" font-size="11">Конвейер апостериорной обработки спутниковых данных</text>
+</svg>

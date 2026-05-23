@@ -313,6 +313,69 @@ func AddDeviceHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http
 	}
 }
 
+// GetDevicesHandler возвращает список устройств пользователя
+func GetDevicesHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		login, ok := GetUserFromContext(r)
+		if !ok {
+			SendJSONError(w, "Unauthorized", http.StatusUnauthorized, logger)
+			return
+		}
+		devices, err := dbStor.GetUserDevices(login)
+		if err != nil {
+			logger.Errorf("GetDevices %s: %v", login, err)
+			SendJSONError(w, "Failed to get devices", http.StatusInternalServerError, logger)
+			return
+		}
+		if devices == nil {
+			devices = []model.UserDevice{}
+		}
+		SendJSONResponse(w, http.StatusOK, devices, logger)
+	}
+}
+
+// UpdateDeviceHandler обновляет устройство
+func UpdateDeviceHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		login, ok := GetUserFromContext(r)
+		if !ok {
+			SendJSONError(w, "Unauthorized", http.StatusUnauthorized, logger)
+			return
+		}
+		idStr := r.URL.Query().Get("id")
+		if idStr == "" {
+			SendJSONError(w, "Device ID required", http.StatusBadRequest, logger)
+			return
+		}
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			SendJSONError(w, "Invalid device ID", http.StatusBadRequest, logger)
+			return
+		}
+		var d model.UserDevice
+		if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
+			SendJSONError(w, "Invalid request body", http.StatusBadRequest, logger)
+			return
+		}
+		if d.Name == "" {
+			SendJSONError(w, "Device name is required", http.StatusBadRequest, logger)
+			return
+		}
+		d.ID = id
+		d.UserLogin = login
+		if err := applyDeviceDefaults(&d); err != nil {
+			SendJSONError(w, err.Error(), http.StatusBadRequest, logger)
+			return
+		}
+		if err := dbStor.UpdateDevice(&d); err != nil {
+			logger.Warnf("UpdateDevice %d user %s: %v", id, login, err)
+			SendJSONError(w, err.Error(), http.StatusNotFound, logger)
+			return
+		}
+		SendJSONResponse(w, http.StatusOK, d, logger)
+	}
+}
+
 // DeleteDeviceHandler удаляет устройство
 func DeleteDeviceHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

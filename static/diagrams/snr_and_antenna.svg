@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 780" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#042f2e"/>
+      <stop offset="100%" stop-color="#0f1e1e"/>
+    </linearGradient>
+    <linearGradient id="hdr" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2dd4bf"/>
+    </marker>
+    <marker id="arrW" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="780" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" fill="#ccfbf1" font-size="21" font-weight="700">SNR-маска и коррекция антенны</text>
+  <text x="550" y="62" text-anchor="middle" fill="#5eead4" font-size="12">rinex_parser.go · config_generator.go · igs20.atx (PCV/PCO)</text>
+  <line x1="40" y1="72" x2="1060" y2="72" stroke="#134e4a" stroke-width="1"/>
+
+  <!-- ══════════════════════════════════════════
+       LEFT PANEL — SNR MASK
+  ══════════════════════════════════════════ -->
+
+  <rect x="30" y="85" width="500" height="660" rx="12" fill="#042f2e" stroke="#0d9488" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="30" y="85" width="500" height="38" rx="12" fill="url(#hdr)"/>
+  <rect x="30" y="110" width="500" height="13" fill="url(#hdr)"/>
+  <text x="280" y="110" text-anchor="middle" fill="#f0fdfa" font-size="15" font-weight="700">SNR Маска (Signal-to-Noise Ratio)</text>
+
+  <!-- Step 1 -->
+  <rect x="50" y="138" width="460" height="78" rx="8" fill="#083344" stroke="#0e7490" stroke-width="1"/>
+  <text x="70" y="158" fill="#67e8f9" font-size="12" font-weight="700">① Парсинг заголовка RINEX</text>
+  <text x="70" y="175" fill="#a5f3fc" font-size="11">Ищем строки комментариев в заголовке .rnx / .obs:</text>
+  <rect x="70" y="181" width="420" height="28" rx="4" fill="#0c1a1a"/>
+  <text x="80" y="193" fill="#4ade80" font-size="10" font-family="'Courier New', monospace">; SNR is mapped to RINEX snr flag value</text>
+  <text x="80" y="206" fill="#4ade80" font-size="10" font-family="'Courier New', monospace">; dBHz -&gt;  &lt;12-&gt;1, 12-17-&gt;2, ..., &gt;=54-&gt;9</text>
+
+  <!-- Step 2: mapping table -->
+  <rect x="50" y="228" width="460" height="230" rx="8" fill="#083344" stroke="#0e7490" stroke-width="1"/>
+  <text x="70" y="248" fill="#67e8f9" font-size="12" font-weight="700">② Таблица маппинга dBHz → RINEX-флаг (9 порогов)</text>
+
+  <!-- Table header -->
+  <rect x="70" y="256" width="420" height="22" rx="3" fill="#0f766e"/>
+  <text x="130" y="271" text-anchor="middle" fill="#f0fdfa" font-size="11" font-weight="700">SNR, dBHz</text>
+  <text x="290" y="271" text-anchor="middle" fill="#f0fdfa" font-size="11" font-weight="700">RINEX-флаг</text>
+  <text x="430" y="271" text-anchor="middle" fill="#f0fdfa" font-size="11" font-weight="700">Качество</text>
+
+  <!-- Rows -->
+  <!-- Row colors by quality -->
+  <rect x="70" y="278" width="420" height="18" rx="0" fill="#1a0a0a"/>
+  <text x="130" y="291" text-anchor="middle" fill="#f87171" font-size="11">&lt; 12</text>
+  <text x="290" y="291" text-anchor="middle" fill="#f87171" font-size="11">1</text>
+  <text x="430" y="291" text-anchor="middle" fill="#f87171" font-size="11">Отбрасывается (minimum)</text>
+
+  <rect x="70" y="296" width="420" height="18" rx="0" fill="#131a13"/>
+  <text x="130" y="309" text-anchor="middle" fill="#fb923c" font-size="11">12 – 17</text>
+  <text x="290" y="309" text-anchor="middle" fill="#fb923c" font-size="11">2</text>
+  <text x="430" y="309" text-anchor="middle" fill="#fb923c" font-size="11">Очень низкое</text>
+
+  <rect x="70" y="314" width="420" height="18" rx="0" fill="#131a13"/>
+  <text x="130" y="327" text-anchor="middle" fill="#fbbf24" font-size="11">18 – 23</text>
+  <text x="290" y="327" text-anchor="middle" fill="#fbbf24" font-size="11">3</text>
+  <text x="430" y="327" text-anchor="middle" fill="#fbbf24" font-size="11">Низкое</text>
+
+  <rect x="70" y="332" width="420" height="18" rx="0" fill="#131a13"/>
+  <text x="130" y="345" text-anchor="middle" fill="#a3e635" font-size="11">24 – 29</text>
+  <text x="290" y="345" text-anchor="middle" fill="#a3e635" font-size="11">4</text>
+  <text x="430" y="345" text-anchor="middle" fill="#a3e635" font-size="11">Приемлемое</text>
+
+  <rect x="70" y="350" width="420" height="18" rx="0" fill="#0c1f0c"/>
+  <text x="130" y="363" text-anchor="middle" fill="#34d399" font-size="11">30 – 35</text>
+  <text x="290" y="363" text-anchor="middle" fill="#34d399" font-size="11">5</text>
+  <text x="430" y="363" text-anchor="middle" fill="#34d399" font-size="11">Среднее</text>
+
+  <rect x="70" y="368" width="420" height="18" rx="0" fill="#0c1f0c"/>
+  <text x="130" y="381" text-anchor="middle" fill="#4ade80" font-size="11">36 – 41</text>
+  <text x="290" y="381" text-anchor="middle" fill="#4ade80" font-size="11">6</text>
+  <text x="430" y="381" text-anchor="middle" fill="#4ade80" font-size="11">Хорошее</text>
+
+  <rect x="70" y="386" width="420" height="18" rx="0" fill="#0c1f0c"/>
+  <text x="130" y="399" text-anchor="middle" fill="#86efac" font-size="11">42 – 47</text>
+  <text x="290" y="399" text-anchor="middle" fill="#86efac" font-size="11">7</text>
+  <text x="430" y="399" text-anchor="middle" fill="#86efac" font-size="11">Очень хорошее</text>
+
+  <rect x="70" y="404" width="420" height="18" rx="0" fill="#0c2810"/>
+  <text x="130" y="417" text-anchor="middle" fill="#bbf7d0" font-size="11">48 – 53</text>
+  <text x="290" y="417" text-anchor="middle" fill="#bbf7d0" font-size="11">8</text>
+  <text x="430" y="417" text-anchor="middle" fill="#bbf7d0" font-size="11">Отличное</text>
+
+  <rect x="70" y="422" width="420" height="18" rx="0" fill="#0c2810"/>
+  <text x="130" y="435" text-anchor="middle" fill="#d1fae5" font-size="11">≥ 54</text>
+  <text x="290" y="435" text-anchor="middle" fill="#d1fae5" font-size="11">9</text>
+  <text x="430" y="435" text-anchor="middle" fill="#d1fae5" font-size="11">Максимальное</text>
+
+  <text x="70" y="455" fill="#5eead4" font-size="10" font-style="italic">Стандартный маппинг Leica/Trimble геодезических приёмников</text>
+
+  <!-- Step 3: RTKLIB mask string -->
+  <rect x="50" y="470" width="460" height="80" rx="8" fill="#083344" stroke="#0e7490" stroke-width="1"/>
+  <text x="70" y="490" fill="#67e8f9" font-size="12" font-weight="700">③ Формирование строки маски для RTKLIB</text>
+  <text x="70" y="508" fill="#a5f3fc" font-size="11">Каждый из 9 флагов → пороговое значение в конфиге:</text>
+  <rect x="70" y="514" width="420" height="28" rx="4" fill="#0c1a1a"/>
+  <text x="80" y="526" fill="#4ade80" font-size="10" font-family="'Courier New', monospace">snrmask-r =on   snrmask-b =on</text>
+  <text x="80" y="539" fill="#4ade80" font-size="10" font-family="'Courier New', monospace">snrmask_L1 =0,0,0,0,25,30,35,40,45</text>
+
+  <!-- Step 4: fallback -->
+  <rect x="50" y="562" width="460" height="68" rx="8" fill="#1a1208" stroke="#92400e" stroke-width="1"/>
+  <text x="70" y="581" fill="#fcd34d" font-size="12" font-weight="700">④ Fallback: маппинг не найден</text>
+  <text x="70" y="598" fill="#fde68a" font-size="11">Если заголовок не содержит SNR-комментариев:</text>
+  <text x="70" y="614" fill="#fde68a" font-size="11">  snrmask-r=off   snrmask-b=off  (маска отключена)</text>
+  <text x="70" y="628" fill="#fbbf24" font-size="10" font-style="italic">Применяется только угол отсечки elevation mask</text>
+
+  <!-- Step 5: effect -->
+  <rect x="50" y="642" width="460" height="80" rx="8" fill="#083344" stroke="#0e7490" stroke-width="1"/>
+  <text x="70" y="662" fill="#67e8f9" font-size="12" font-weight="700">⑤ Эффект на решение</text>
+  <text x="70" y="680" fill="#a5f3fc" font-size="11">• Отбрасывает измерения с мультипасом и замираниями</text>
+  <text x="70" y="696" fill="#a5f3fc" font-size="11">• Критично для PPP-AR: зашумлённые фазы → срыв фиксации</text>
+  <text x="70" y="712" fill="#a5f3fc" font-size="11">• Применяется к ровер (R) и базе (B) независимо</text>
+
+  <!-- ══════════════════════════════════════════
+       RIGHT PANEL — ANTENNA
+  ══════════════════════════════════════════ -->
+
+  <rect x="565" y="85" width="500" height="660" rx="12" fill="#0f0a2e" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="565" y="85" width="500" height="38" rx="12" fill="#6d28d9"/>
+  <rect x="565" y="110" width="500" height="13" fill="#6d28d9"/>
+  <text x="815" y="110" text-anchor="middle" fill="#ede9fe" font-size="15" font-weight="700">Коррекция антенны (PCV / PCO)</text>
+
+  <!-- Ant Step 1 -->
+  <rect x="585" y="138" width="460" height="90" rx="8" fill="#1e1040" stroke="#7c3aed" stroke-width="1"/>
+  <text x="605" y="158" fill="#c4b5fd" font-size="12" font-weight="700">① Парсинг "ANT # / TYPE" из заголовка RINEX</text>
+  <text x="605" y="175" fill="#a5b4fc" font-size="11">Фиксированные колонки RINEX (строка 60 символов):</text>
+  <rect x="605" y="181" width="420" height="40" rx="4" fill="#0c0824"/>
+  <text x="615" y="194" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">col  0–19 : серийный номер антенны</text>
+  <text x="615" y="207" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">col 20–59 : тип + купол  ← ANT_TYPE</text>
+  <text x="615" y="218" fill="#a78bfa" font-size="10" font-family="'Courier New', monospace">Пример: "TRM57971.00     NONE"</text>
+
+  <!-- Ant Step 2 -->
+  <rect x="585" y="240" width="460" height="90" rx="8" fill="#1e1040" stroke="#7c3aed" stroke-width="1"/>
+  <text x="605" y="260" fill="#c4b5fd" font-size="12" font-weight="700">② Парсинг "ANTENNA: DELTA H/E/N"</text>
+  <text x="605" y="277" fill="#a5b4fc" font-size="11">Смещения ARP→ фазового центра (метры):</text>
+  <rect x="605" y="283" width="420" height="40" rx="4" fill="#0c0824"/>
+  <text x="615" y="296" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">col  0–13 : ΔH (вверх)  → ant1-antdelu</text>
+  <text x="615" y="309" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">col 14–27 : ΔE (восток) → ant1-antdele</text>
+  <text x="615" y="320" fill="#a78bfa" font-size="10" font-family="'Courier New', monospace">col 28–41 : ΔN (север)  → ant1-antdeln</text>
+
+  <!-- Ant Step 3: igs20.atx -->
+  <rect x="585" y="342" width="460" height="120" rx="8" fill="#1e1040" stroke="#7c3aed" stroke-width="1"/>
+  <text x="605" y="362" fill="#c4b5fd" font-size="12" font-weight="700">③ Поправки PCV из igs20.atx</text>
+  <text x="605" y="380" fill="#a5b4fc" font-size="11">RTKLIB ищет тип антенны в IGS Antenna Exchange File:</text>
+  <text x="605" y="396" fill="#a5b4fc" font-size="11">  • PCO — Phase Centre Offset (3D вектор)</text>
+  <text x="605" y="412" fill="#a5b4fc" font-size="11">  • PCV — Phase Centre Variation (f(азимут, зенит))</text>
+  <text x="605" y="428" fill="#a5b4fc" font-size="11">  • Отдельные таблицы для L1 / L2 / L5</text>
+  <text x="605" y="444" fill="#a5b4fc" font-size="11">  • Охватывает ≈ 2000 типов антенн + все ГНСС-спутники</text>
+  <text x="605" y="458" fill="#7c3aed" font-size="10" font-style="italic">Без ATX-файла PPP-точность деградирует на 1–5 см</text>
+
+  <!-- Ant Step 4: Mobile override -->
+  <rect x="585" y="474" width="460" height="100" rx="8" fill="#1a1208" stroke="#92400e" stroke-width="1"/>
+  <text x="605" y="494" fill="#fcd34d" font-size="12" font-weight="700">④ Мобильное устройство (DeviceType="mobile")</text>
+  <text x="605" y="512" fill="#fde68a" font-size="11">Встроенная антенна смартфона не в igs20.atx:</text>
+  <text x="605" y="528" fill="#fde68a" font-size="11">  • Пользователь вводит тип вручную (или "UNKNOWN")</text>
+  <text x="605" y="544" fill="#fde68a" font-size="11">  • ΔH/ΔE/ΔN берутся из формы пользователя</text>
+  <text x="605" y="560" fill="#fde68a" font-size="11">  • PCV-коррекция = 0 (нет данных в ATX)</text>
+  <text x="605" y="570" fill="#fbbf24" font-size="10" font-style="italic">Точность в этом случае ограничена: 0.3–1 м</text>
+
+  <!-- Ant Step 5: result -->
+  <rect x="585" y="586" width="460" height="140" rx="8" fill="#1e1040" stroke="#7c3aed" stroke-width="1"/>
+  <text x="605" y="606" fill="#c4b5fd" font-size="12" font-weight="700">⑤ Итоговые строки в конфиге RTKLIB</text>
+  <rect x="605" y="612" width="420" height="105" rx="4" fill="#0c0824"/>
+  <text x="615" y="627" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">ant1-postype  =0          ; ARP известны</text>
+  <text x="615" y="641" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">ant1-anttype  =TRM57971.00     NONE</text>
+  <text x="615" y="655" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">ant1-antdelu  =6.1661     ; ΔH (м)</text>
+  <text x="615" y="669" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">ant1-antdele  =0.0000     ; ΔE (м)</text>
+  <text x="615" y="683" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">ant1-antdeln  =0.0000     ; ΔN (м)</text>
+  <text x="615" y="697" fill="#818cf8" font-size="10" font-family="'Courier New', monospace">ant2-anttype  =...        ; база (Relative)</text>
+  <text x="615" y="711" fill="#a78bfa" font-size="10" font-family="'Courier New', monospace">atx-file     =/path/igs20.atx</text>
+
+  <!-- Arrow between panels -->
+  <line x1="530" y1="415" x2="563" y2="415" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrW)"/>
+  <text x="546" y="408" text-anchor="middle" fill="#64748b" font-size="9">→ конфиг</text>
+
+  <!-- Footer -->
+  <line x1="40" y1="758" x2="1060" y2="758" stroke="#134e4a" stroke-width="1"/>
+  <text x="550" y="775" text-anchor="middle" fill="#334155" font-size="11">
+    ParseSNRMapping() · GetSNRMaskValues() · extractAntennaInfo() · igs20.atx IGS Antenna Exchange Format
+  </text>
+</svg>

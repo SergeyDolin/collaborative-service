@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // DeviceType тип устройства
 type DeviceType string
@@ -37,6 +40,14 @@ type UserDevice struct {
 	AntennaN    float64 `json:"antennaN" db:"antenna_n"`
 	AntennaU    float64 `json:"antennaU" db:"antenna_u"`
 
+	// Подключение к приёмнику
+	ReceiverType  string `json:"receiverType" db:"receiver_type"`   // tcp / ntrip / serial
+	ReceiverHost  string `json:"receiverHost" db:"receiver_host"`
+	ReceiverPort  int    `json:"receiverPort" db:"receiver_port"`
+	ReceiverMount string `json:"receiverMount,omitempty" db:"receiver_mount"`
+	ReceiverUser  string `json:"receiverUser,omitempty" db:"receiver_user"`
+	ReceiverPass  string `json:"receiverPass,omitempty" db:"receiver_pass"`
+
 	// Фазовый центр для мобильных устройств
 	PhaseCenterMethod     string     `json:"phaseCenterMethod,omitempty" db:"phase_center_method"`
 	PhaseCenterValidUntil *time.Time `json:"phaseCenterValidUntil,omitempty" db:"phase_center_valid_until"`
@@ -55,6 +66,25 @@ func (d DeviceType) Label() string {
 		return "Планшет"
 	default:
 		return "Иное"
+	}
+}
+
+// ReceiverPath возвращает путь для rtkrcv/str2str в зависимости от типа подключения.
+func (d *UserDevice) ReceiverPath() string {
+	switch d.ReceiverType {
+	case "ntrip":
+		if d.ReceiverUser != "" {
+			return fmt.Sprintf("%s:%s@%s:%d/%s", d.ReceiverUser, d.ReceiverPass, d.ReceiverHost, d.ReceiverPort, d.ReceiverMount)
+		}
+		return fmt.Sprintf("%s:%d/%s", d.ReceiverHost, d.ReceiverPort, d.ReceiverMount)
+	case "serial":
+		baud := d.ReceiverPort
+		if baud == 0 {
+			baud = 115200
+		}
+		return fmt.Sprintf("%s:%d:8:n:1:off", d.ReceiverHost, baud)
+	default: // tcp
+		return fmt.Sprintf("%s:%d", d.ReceiverHost, d.ReceiverPort)
 	}
 }
 

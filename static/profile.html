@@ -107,11 +107,14 @@
 .dev-name { font-weight:600; font-size:0.92rem; margin-bottom:4px; color:var(--ink); }
 .dev-badges { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
 .dev-desc { font-size:0.75rem; color:var(--ink-3); margin-top:8px; line-height:1.5; font-family:var(--font-mono); }
-.dev-delete {
-    position:absolute; top:10px; right:10px; background:none; border:none;
+.dev-delete, .dev-edit {
+    position:absolute; background:none; border:none;
     cursor:pointer; color:var(--ink-faint); font-size:13px; transition:color var(--t); padding:4px;
 }
+.dev-delete { top:10px; right:10px; }
+.dev-edit   { top:10px; right:36px; }
 .dev-delete:hover { color:var(--err); }
+.dev-edit:hover   { color:var(--accent); }
 .add-device-card {
     border:1px dashed var(--paper-edge); border-radius:var(--r-sm); padding:16px; background:none;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -364,7 +367,7 @@
 <!-- Add Device Modal -->
 <div class="modal-overlay" id="addDeviceModal">
     <div class="modal modal-lg">
-        <h3>Добавить устройство</h3>
+        <h3 id="addDeviceModalTitle">Добавить устройство</h3>
         <div class="form-field">
             <label>Название / модель</label>
             <input type="text" id="newDevName" placeholder="Trimble R12i, Xiaomi 14…">
@@ -400,6 +403,37 @@
                 <div><label style="font-size:0.72rem;color:var(--ink-3);font-family:var(--font-mono);">N (Север)</label><input type="number" id="devAntennaN" value="0" step="0.001" placeholder="0.000"></div>
                 <div><label style="font-size:0.72rem;color:var(--ink-3);font-family:var(--font-mono);">U (Высота)</label><input type="number" id="devAntennaU" value="0" step="0.001" placeholder="0.000"></div>
             </div>
+        </div>
+        <div id="gnssReceiverSection" style="display:none">
+          <div class="form-field">
+            <label>Тип подключения</label>
+            <select id="devReceiverType" onchange="toggleReceiverFields()">
+              <option value="tcp">TCP/IP</option>
+              <option value="ntrip">NTRIP</option>
+              <option value="serial">Serial</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label id="devHostLabel">Хост / Порт устройства</label>
+            <div style="display:flex;gap:8px">
+              <input id="devReceiverHost" type="text" placeholder="192.168.1.100" style="flex:1">
+              <input id="devReceiverPort" type="number" placeholder="9001" style="width:80px">
+            </div>
+          </div>
+          <div id="ntripFields" style="display:none">
+            <div class="form-field">
+              <label>Mountpoint</label>
+              <input id="devReceiverMount" type="text" placeholder="MOUNT00XXX0">
+            </div>
+            <div class="form-field">
+              <label>Логин NTRIP</label>
+              <input id="devReceiverUser" type="text" placeholder="">
+            </div>
+            <div class="form-field">
+              <label>Пароль NTRIP</label>
+              <input id="devReceiverPass" type="password" placeholder="">
+            </div>
+          </div>
         </div>
         <div class="form-field" id="devPhaseCenterField" style="display:none">
             <label>Фазовый центр антенны <span style="color:var(--err);">*</span></label>
