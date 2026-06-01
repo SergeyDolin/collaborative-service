@@ -40,19 +40,6 @@ function setProgress(step) {
     document.getElementById(target).classList.add('active');
 }
 
-/* ── avatar preview ── */
-function previewAvatar(input) {
-    const file = input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-        const img = document.getElementById('avatarImg');
-        img.src = e.target.result;
-        img.style.display = 'block';
-        document.querySelector('#avatarPreview .av-icon').style.display = 'none';
-    };
-    reader.readAsDataURL(file);
-}
 
 /* ── device type / mount ── */
 function selectType(el) {
@@ -114,6 +101,10 @@ function goStep2() {
 
 function goStep3() {
     hideAlert();
+    if (!document.getElementById('termsCheckbox').checked) {
+        showAlert('Необходимо принять условия использования');
+        return;
+    }
     setProgress(3);
 }
 
@@ -130,11 +121,7 @@ async function submitRegistration(skipDevice = false) {
         formData.append('login',    document.getElementById('login').value.trim());
         formData.append('password', document.getElementById('password').value);
 
-        const fullName = document.getElementById('fullName').value.trim();
-        if (fullName) formData.append('fullName', fullName);
-
-        const avatarFile = document.getElementById('avatarFile').files[0];
-        if (avatarFile) formData.append('avatar', avatarFile);
+        formData.append('termsAccepted', 'true');
 
         if (!skipDevice) {
             const deviceName = document.getElementById('deviceName').value.trim();

@@ -61,7 +61,7 @@ async function loadProfile() {
 function renderProfile(p) {
     const login = p.login || getLogin();
     document.getElementById('heroLogin').textContent = '@' + login;
-    document.getElementById('heroName').textContent  = p.fullName || login;
+    document.getElementById('heroName').textContent  = login;
     document.getElementById('headerLogin').textContent = login;
 
     if (p.createdAt) {
@@ -69,15 +69,15 @@ function renderProfile(p) {
         document.getElementById('heroMeta').textContent = 'Участник с ' + d;
     }
 
-    if (p.avatar) {
-        document.getElementById('heroAvatarImg').src = p.avatar;
-        document.getElementById('heroAvatarImg').style.display = 'block';
-        document.getElementById('heroAvatarFallback').style.display = 'none';
-        document.getElementById('editAvatarPreview').src = p.avatar;
-        document.getElementById('editAvatarPreview').style.display = 'block';
-        document.getElementById('editAvatarFallback').style.display = 'none';
+    // Аватар генерируется сервером из логина — просто подставляем URL
+    const avatarUrl = `/api/avatar?login=${encodeURIComponent(login)}`;
+    const heroImg = document.getElementById('heroAvatarImg');
+    if (heroImg) {
+        heroImg.src = avatarUrl;
+        heroImg.style.display = 'block';
+        const fb = document.getElementById('heroAvatarFallback');
+        if (fb) fb.style.display = 'none';
     }
-    document.getElementById('editFullName').value = p.fullName || '';
 }
 
 /* ════════════════════════════════════════════
@@ -348,32 +348,9 @@ function deleteDevice(id) {
 }
 
 /* ════════════════════════════════════════════
-   EDIT PROFILE
+   EDIT PROFILE  (только смена пароля)
 ════════════════════════════════════════════ */
 function openEditProfile() { openModal('editProfileModal'); }
-function previewEditAvatar(input) {
-    const f = input.files[0]; if (!f) return;
-    const r = new FileReader();
-    r.onload = e => {
-        document.getElementById('editAvatarPreview').src = e.target.result;
-        document.getElementById('editAvatarPreview').style.display = 'block';
-        document.getElementById('editAvatarFallback').style.display = 'none';
-    };
-    r.readAsDataURL(f);
-}
-async function saveProfile() {
-    const fd = new FormData();
-    fd.append('fullName', document.getElementById('editFullName').value.trim());
-    const avatarFile = document.getElementById('editAvatarFile').files[0];
-    if (avatarFile) fd.append('avatar', avatarFile);
-    try {
-        const r = await fetch('/api/profile/update', { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` }, body: fd });
-        if (!r.ok) throw new Error();
-        closeModal('editProfileModal');
-        showToast('Профиль сохранён');
-        loadProfile();
-    } catch { showToast('Ошибка сохранения', 'err'); }
-}
 
 /* ════════════════════════════════════════════
    CONFIRM MODAL
