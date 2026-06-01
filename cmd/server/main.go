@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -38,15 +37,13 @@ const (
 
 // Application представляет приложение с управлением жизненным циклом
 type Application struct {
-	server        *http.Server
-	logger        *zap.SugaredLogger
-	dbStorage     *storage.DBStorage
-	taskStorage   *storage.TaskStorage
-	workerMgr     *workers.Manager
-	posWorker     *workers.PositioningWorker
-	streamWorker  *workers.StreamWorker
-	ctx           context.Context
-	cancel        context.CancelFunc
+	server      *http.Server
+	logger      *zap.SugaredLogger
+	dbStorage   *storage.DBStorage
+	taskStorage *storage.TaskStorage
+	workerMgr   *workers.Manager
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 func main() {
@@ -88,18 +85,6 @@ func NewApplication(cfg *config.Config, logger *zap.SugaredLogger) (*Application
 		app.taskStorage,
 		DefaultWorkDir,
 	)
-
-	if app.dbStorage != nil {
-		atxAbs, _ := filepath.Abs(ATXFile)
-		tmplAbs, _ := filepath.Abs(RTKConfTemplate)
-		rtkrcvAbs, _ := filepath.Abs(RTKRCVBinary)
-		app.posWorker = workers.NewPositioningWorker(
-			app.dbStorage, app.logger, DefaultWorkDir, tmplAbs, atxAbs, rtkrcvAbs,
-		)
-	}
-
-	str2strAbs, _ := filepath.Abs(filepath.Join(ConfigDir, "str2str"))
-	app.streamWorker = workers.NewStreamWorker(str2strAbs, app.logger)
 
 	router := app.setupRoutes(cfg)
 
@@ -237,20 +222,6 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Delete("/api/measurements/delete", measurementHandler.DeleteTaskHandler)
 			r.Delete("/api/measurements/delete-all", measurementHandler.DeleteAllTasksHandler)
 
-			// Collaborative positioning
-			if app.dbStorage != nil {
-				collabHandler := handlers.NewCollaborativeHandler(app.dbStorage, app.logger)
-				r.Post("/api/collaborative/sessions", collabHandler.CreateSession)
-				r.Get("/api/collaborative/sessions", collabHandler.ListSessions)
-				r.Delete("/api/collaborative/sessions/{id}", collabHandler.DeleteSession)
-				r.Post("/api/collaborative/sessions/{id}/positioning", collabHandler.SetPositioning)
-
-				// Online real-time positioning (client app)
-				onlineHandler := handlers.NewOnlineHandler(app.dbStorage, app.logger)
-				r.Post("/api/online/register", onlineHandler.Register)
-				r.Post("/api/online/status", onlineHandler.UpdateStatus)
-				r.Delete("/api/online/session", onlineHandler.Delete)
-			}
 		})
 	}
 
@@ -261,14 +232,6 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 func (app *Application) Run() error {
 	app.workerMgr.Start(app.ctx)
 	app.logger.Info("Background workers started")
-
-	if app.posWorker != nil {
-		app.posWorker.Start(app.ctx)
-		app.logger.Info("Positioning worker started")
-	}
-
-	app.streamWorker.Start(app.ctx)
-	app.logger.Info("EPH/SSR stream worker started")
 
 	go func() {
 		app.logger.Infof("Running server on %s", app.server.Addr)
