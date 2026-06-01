@@ -261,6 +261,7 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 
 	task, err := h.taskStorage.GetTaskByID(taskID)
 	if err != nil {
+		h.logger.Errorf("DownloadResult: GetTaskByID(%s) error: %v", taskID, err)
 		SendJSONError(w, "Failed to get task", http.StatusInternalServerError, h.logger)
 		return
 	}
@@ -275,7 +276,13 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 	}
 
 	result, err := h.taskStorage.GetResultByTaskID(taskID)
-	if err != nil || result == nil {
+	if err != nil {
+		h.logger.Errorf("DownloadResult: GetResultByTaskID(%s) error: %v", taskID, err)
+		SendJSONError(w, "Result not found", http.StatusNotFound, h.logger)
+		return
+	}
+	if result == nil {
+		h.logger.Warnf("DownloadResult: result is nil for task %s", taskID)
 		SendJSONError(w, "Result not found", http.StatusNotFound, h.logger)
 		return
 	}

@@ -121,17 +121,91 @@ a:hover { border-bottom-color:var(--graphite); }
 ::-webkit-scrollbar-thumb { background:var(--paper-3); border-radius:4px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--ink-faint); }
 
-/* ── Coordinate-grid background motif ── */
-.bg-grid::before {
-  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
-  background-image:
-    linear-gradient(to right,  var(--line-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--line-grid) 1px, transparent 1px),
-    linear-gradient(to right,  var(--line-grid-strong) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--line-grid-strong) 1px, transparent 1px);
-  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 30%, transparent 80%);
-  opacity:.55;
+/* ── Topographic background motif ──
+   The old coordinate grid is replaced by map-style isolines + schematic
+   satellites, injected as `.cps-topo` by js/topo-bg.js. The `.bg-grid`
+   hook is kept (legacy class on <body>) but no longer paints a grid. ── */
+.bg-grid::before { content:none; }
+
+:root {
+  --topo-line:0.11;         /* contour opacity */
+  --topo-line-strong:0.19;  /* index contour */
+  --topo-sig:0.6;           /* highlighted ridge / accent */
+  --topo-sat:0.5;           /* satellite line-art */
+  --topo-node:0.5;
+}
+[data-theme="dark"] {
+  --topo-line:0.07;
+  --topo-line-strong:0.13;
+  --topo-sig:0.42;
+  --topo-sat:0.42;
+  --topo-node:0.45;
+}
+
+.cps-topo {
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  color:var(--ink); overflow:hidden;
+  /* keep the motif even across the width, fading gently toward the bottom
+     so footer / dense lower content stays calm */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.35) 100%);
+          mask-image: linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.35) 100%);
+}
+.cps-topo svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+/* contour isolines */
+.cps-topo .contour {
+  fill:none; stroke:currentColor; stroke-width:1.1;
+  stroke-linecap:round; stroke-linejoin:round;
+  opacity:var(--topo-line); vector-effect:non-scaling-stroke;
+}
+.cps-topo .contour.index { opacity:var(--topo-line-strong); stroke-width:1.4; }
+.cps-topo .contour.sig   { stroke:var(--signal-dk); opacity:var(--topo-sig); stroke-width:1.4; }
+[data-theme="dark"] .cps-topo .contour.sig { stroke:var(--signal); }
+
+/* satellites */
+.cps-topo .topo-sats { opacity:var(--topo-sat); }
+.cps-topo .strut { fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+.cps-topo .hair  { fill:none; stroke:currentColor; stroke-width:0.8; opacity:0.7; }
+.cps-topo .sig-fill { fill:var(--signal-dk); stroke:none; }
+[data-theme="dark"] .cps-topo .sig-fill { fill:var(--signal); }
+.cps-topo .sat-float {
+  transform-box:fill-box; transform-origin:center;
+  animation:topoFloat 9s ease-in-out infinite;
+}
+@keyframes topoFloat {
+  0%,100% { transform:translateY(0); }
+  50%     { transform:translateY(-7px); }
+}
+
+/* ground nodes */
+.cps-topo .topo-nodes { opacity:var(--topo-node); }
+.cps-topo .node-dot { fill:currentColor; stroke:none; }
+.cps-topo .pulse {
+  fill:none; stroke:currentColor; stroke-width:1.2; opacity:0.6;
+  transform-box:fill-box; transform-origin:center;
+  animation:topoPulse 3.4s ease-out infinite;
+}
+.cps-topo .pulse.sig-ring { stroke:var(--signal-dk); }
+[data-theme="dark"] .cps-topo .pulse.sig-ring { stroke:var(--signal); }
+@keyframes topoPulse {
+  0%   { transform:scale(0.5); opacity:0.7; }
+  100% { transform:scale(2.2); opacity:0; }
+}
+
+/* signal beams */
+.cps-topo .beam-cone { fill:currentColor; opacity:0.05; stroke:none; }
+.cps-topo .beam-ray {
+  stroke:currentColor; stroke-width:1; opacity:0.35;
+  stroke-dasharray:3 5; animation:topoBeam 1.6s linear infinite;
+}
+.cps-topo .beam.accent .beam-cone { fill:var(--signal-dk); opacity:0.08; }
+.cps-topo .beam.accent .beam-ray  { stroke:var(--signal-dk); opacity:0.55; }
+[data-theme="dark"] .cps-topo .beam.accent .beam-cone { fill:var(--signal); }
+[data-theme="dark"] .cps-topo .beam.accent .beam-ray  { stroke:var(--signal); }
+@keyframes topoBeam { to { stroke-dashoffset:-16; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cps-topo .sat-float, .cps-topo .pulse, .cps-topo .beam-ray { animation:none; }
 }
 
 /* ── Header ── */

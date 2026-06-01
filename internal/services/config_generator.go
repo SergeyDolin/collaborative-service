@@ -37,14 +37,22 @@ type AntennaInfo struct {
 type ConfigGenerator struct {
 	templateDir string
 	workDir     string
+	atxFile     string
 	logger      *zap.SugaredLogger
 	rinexParser *parsers.RINEXParser
 }
 
 func NewConfigGenerator(templateDir, workDir string, logger *zap.SugaredLogger) *ConfigGenerator {
+	// ATX-файл лежит рядом с templateDir: .../configs/../src/igs20.atx
+	atxRel := filepath.Join(templateDir, "..", "src", "igs20.atx")
+	atxAbs, err := filepath.Abs(atxRel)
+	if err != nil {
+		atxAbs = atxRel
+	}
 	return &ConfigGenerator{
 		templateDir: templateDir,
 		workDir:     workDir,
+		atxFile:     atxAbs,
 		logger:      logger,
 		rinexParser: parsers.NewRINEXParser(),
 	}
@@ -383,6 +391,8 @@ func (g *ConfigGenerator) replaceParameters(
 	for placeholder, value := range snrReplacements {
 		replacements[placeholder] = value
 	}
+
+	replacements["{{ATX_FILE}}"] = g.atxFile
 
 	if files.NavigationFile != "" {
 		replacements["{{NAV_FILE}}"] = files.NavigationFile

@@ -88,6 +88,25 @@
   // Pre-render: set theme attribute ASAP to avoid FOUC
   document.documentElement.setAttribute('data-theme', currentTheme());
 
+  // ── Topographic background (isolines + satellites) ───────────────────────
+  // Injected globally so every page replaces the legacy grid backdrop.
+  // Resolve the URL relative to this script so it works under any base path.
+  (function loadTopoBg() {
+    if (document.querySelector('script[data-topo-bg]')) return;
+    var cur = document.currentScript;
+    if (!cur) {
+      var all = document.getElementsByTagName('script');
+      for (var i = 0; i < all.length; i++) {
+        if (/chrome\.js/.test(all[i].src)) { cur = all[i]; break; }
+      }
+    }
+    var base = cur ? cur.src.replace(/chrome\.js(\?.*)?$/, '') : '/js/';
+    var s = document.createElement('script');
+    s.src = base + 'topo-bg.js';
+    s.setAttribute('data-topo-bg', '1');
+    (document.head || document.documentElement).appendChild(s);
+  })();
+
   // Expose legacy API
   window._applyTheme = applyTheme;
   window._toggleTheme = toggleTheme;
