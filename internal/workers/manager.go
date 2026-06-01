@@ -82,6 +82,11 @@ func (m *Manager) cleanExpiredResults() {
 	} else {
 		m.logger.Debug("Expired results cleaned")
 	}
+	if err := m.taskStorage.CleanExpiredTasks(); err != nil {
+		m.logger.Warnf("Failed to clean expired tasks: %v", err)
+	} else {
+		m.logger.Debug("Expired tasks cleaned")
+	}
 }
 
 func (m *Manager) recoverStalledTasks() {

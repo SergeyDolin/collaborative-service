@@ -201,10 +201,14 @@ func (s *MeasurementService) ProcessMeasurement(
 	}
 
 	result := s.parseResult(outputData, taskID, login, config)
-	// Статические результаты храним дольше — они ценнее и дольше считаются
-	if config.Mode == model.ModeStatic {
+	// Статика хранится дольше (результат фиксированной точки, не траектория).
+	// Кинематика — траектория движения, минимальный TTL.
+	switch config.Mode {
+	case model.ModeStatic:
 		result.ExpiresAt = time.Now().Add(7 * 24 * time.Hour)
-	} else {
+	case model.ModeKinematic:
+		result.ExpiresAt = time.Now().Add(1 * time.Hour)
+	default:
 		result.ExpiresAt = time.Now().Add(24 * time.Hour)
 	}
 
