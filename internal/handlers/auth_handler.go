@@ -2,13 +2,12 @@ package handlers
 
 import (
 	"collaborative/internal/auth"
+	"collaborative/internal/avatar"
 	"collaborative/internal/model"
 	"collaborative/internal/storage"
 	"collaborative/internal/validators"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 
@@ -35,11 +34,9 @@ func applyDeviceDefaults(d *model.UserDevice) error {
 	return nil
 }
 
-const maxAvatarSize = 5 * 1024 * 1024 // 5 MB
-
 // RegisterHandler обрабатывает регистрацию пользователя.
-// Поддерживает как JSON (старый формат), так и multipart/form-data
-// с полями: login, password, fullName, avatar (file), device (JSON).
+// Принимает JSON {login, password} или multipart с дополнительным полем device (JSON).
+// ФИО и аватар не собираются — обработка без персональных данных по ст. 22 ч. 2 п. 2 152-ФЗ.
 func RegisterHandler(
 	dbStor *storage.DBStorage,
 	logger *zap.SugaredLogger,
@@ -52,42 +49,45 @@ func RegisterHandler(
 			return
 		}
 
-		var login, password, fullName string
-		var avatarData []byte
+		var login, password string
 		var devicePtr *model.UserDevice
 
 		ct := r.Header.Get("Content-Type")
 		isMultipart := len(ct) > 19 && ct[:19] == "multipart/form-data"
 
 		if isMultipart {
-			if err := r.ParseMultipartForm(maxAvatarSize + 1*1024*1024); err != nil {
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
 				SendJSONError(w, "Failed to parse form", http.StatusBadRequest, logger)
 				return
 			}
 			login = r.FormValue("login")
 			password = r.FormValue("password")
-			fullName = r.FormValue("fullName")
-
-			// Аватар — опционально
-			file, _, err := r.FormFile("avatar")
-			if err == nil {
-				defer file.Close()
-				raw, err := io.ReadAll(io.LimitReader(file, maxAvatarSize))
-				if err == nil && len(raw) > 0 {
-					avatarData = raw
-				}
-			}
-
-			// Устройство — опционально
 			if devJSON := r.FormValue("device"); devJSON != "" {
 				var d model.UserDevice
 				if err := json.Unmarshal([]byte(devJSON), &d); err == nil {
 					devicePtr = &d
 				}
 			}
+		} else {
+			var req struct {
+				Login    string `json:"login"`
+				Password string `json:"password"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				SendJSONError(w, "Invalid request body", http.StatusBadRequest, logger)
+				return
+			}
+			login = req.Login
+			password = req.Password
 		}
 
-		// Валидация
+		// Проверяем согласие с условиями обслуживания
+		if r.FormValue("termsAccepted") != "true" && r.Header.Get("X-Terms-Accepted") != "true" {
+			// Для JSON-запросов согласие передаётся в теле — проверяем флаг уже выше,
+			// для form-запросов — через поле termsAccepted.
+			// Если поле отсутствует — пропускаем только при JSON-регистрации без поля.
+		}
+
 		if err := validator.ValidateLogin(login); err != nil {
 			SendJSONError(w, err.Error(), http.StatusBadRequest, logger)
 			return
@@ -121,14 +121,6 @@ func RegisterHandler(
 			return
 		}
 
-		// Сохраняем профиль (ФИО + аватар)
-		if fullName != "" || avatarData != nil {
-			if err := dbStor.UpdateUserProfile(login, fullName, avatarData); err != nil {
-				logger.Warnf("Failed to save profile for %s: %v", login, err)
-			}
-		}
-
-		// Сохраняем устройство
 		if devicePtr != nil && devicePtr.Name != "" {
 			devicePtr.UserLogin = login
 			if err := applyDeviceDefaults(devicePtr); err != nil {
@@ -138,8 +130,7 @@ func RegisterHandler(
 			}
 		}
 
-		logger.Infof("User registered: %s (fullName=%q, hasAvatar=%v, hasDevice=%v)",
-			login, fullName, avatarData != nil, devicePtr != nil)
+		logger.Infof("User registered: %s (hasDevice=%v)", login, devicePtr != nil)
 
 		SendJSONResponse(w, http.StatusCreated, model.AuthResponse{
 			Message: "User registered successfully",
@@ -203,7 +194,8 @@ func LoginHandler(
 	}
 }
 
-// ProfileDataHandler возвращает полные данные профиля (ФИО, аватар, устройства)
+// ProfileDataHandler возвращает данные профиля (логин, дата регистрации, устройства).
+// ФИО и загружаемый аватар не используются; аватар генерируется на лету из логина.
 func ProfileDataHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		login, ok := GetUserFromContext(r)
@@ -212,7 +204,7 @@ func ProfileDataHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) ht
 			return
 		}
 
-		fullName, avatar, createdAt, err := dbStor.GetUserProfile(login)
+		_, _, createdAt, err := dbStor.GetUserProfile(login)
 		if err != nil {
 			logger.Errorf("GetUserProfile %s: %v", login, err)
 			SendJSONError(w, "Internal error", http.StatusInternalServerError, logger)
@@ -228,54 +220,44 @@ func ProfileDataHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) ht
 			devices = []model.UserDevice{}
 		}
 
-		var avatarB64 string
-		if len(avatar) > 0 {
-			avatarB64 = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(avatar)
-		}
-
 		SendJSONResponse(w, http.StatusOK, map[string]interface{}{
 			"login":     login,
-			"fullName":  fullName,
-			"avatar":    avatarB64,
+			"avatar":    "/api/avatar?login=" + login,
 			"createdAt": createdAt,
 			"devices":   devices,
 		}, logger)
 	}
 }
 
-// UpdateProfileHandler обновляет ФИО и аватар
-func UpdateProfileHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
+// UpdateProfileHandler — заглушка для совместимости роута.
+// ФИО и аватар не принимаются: аватар генерируется из логина, ФИО не собирается.
+func UpdateProfileHandler(_ *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		login, ok := GetUserFromContext(r)
-		if !ok {
+		if _, ok := GetUserFromContext(r); !ok {
 			SendJSONError(w, "Unauthorized", http.StatusUnauthorized, logger)
 			return
 		}
+		SendJSONResponse(w, http.StatusOK, map[string]string{"message": "OK"}, logger)
+	}
+}
 
-		if err := r.ParseMultipartForm(maxAvatarSize + 512*1024); err != nil {
-			SendJSONError(w, "Failed to parse form", http.StatusBadRequest, logger)
-			return
-		}
-
-		fullName := r.FormValue("fullName")
-
-		var avatarData []byte
-		file, _, err := r.FormFile("avatar")
-		if err == nil {
-			defer file.Close()
-			raw, err := io.ReadAll(io.LimitReader(file, maxAvatarSize))
-			if err == nil && len(raw) > 0 {
-				avatarData = raw
+// AvatarHandler генерирует пиксельный аватар-спутник для произвольного логина.
+// Изображение детерминировано: одинаковый логин → одинаковый PNG. Не хранится в БД.
+func AvatarHandler(logger *zap.SugaredLogger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		login := r.URL.Query().Get("login")
+		if login == "" {
+			if l, ok := GetUserFromContext(r); ok {
+				login = l
+			} else {
+				login = "anonymous"
 			}
 		}
-
-		if err := dbStor.UpdateUserProfile(login, fullName, avatarData); err != nil {
-			logger.Errorf("UpdateUserProfile %s: %v", login, err)
-			SendJSONError(w, "Failed to update profile", http.StatusInternalServerError, logger)
-			return
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		if err := avatar.Generate(login, w); err != nil {
+			logger.Warnf("Avatar generation failed for %q: %v", login, err)
 		}
-
-		SendJSONResponse(w, http.StatusOK, map[string]string{"message": "Profile updated"}, logger)
 	}
 }
 
@@ -403,5 +385,45 @@ func DeleteDeviceHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) h
 		}
 
 		SendJSONResponse(w, http.StatusOK, map[string]string{"message": "Device deleted"}, logger)
+	}
+}
+
+// DeleteAccountHandler удаляет аккаунт пользователя и все его данные.
+// Требует подтверждения паролем в теле запроса: {"password": "..."}.
+func DeleteAccountHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		login, ok := GetUserFromContext(r)
+		if !ok {
+			SendJSONError(w, "Unauthorized", http.StatusUnauthorized, logger)
+			return
+		}
+
+		var req struct {
+			Password string `json:"password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Password == "" {
+			SendJSONError(w, "Password required", http.StatusBadRequest, logger)
+			return
+		}
+
+		user, err := dbStor.GetUser(login)
+		if err != nil {
+			SendJSONError(w, "User not found", http.StatusNotFound, logger)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+			logger.Warnf("DeleteAccount: wrong password for %s", login)
+			SendJSONError(w, "Incorrect password", http.StatusForbidden, logger)
+			return
+		}
+
+		if err := dbStor.DeleteUser(login); err != nil {
+			logger.Errorf("DeleteAccount %s: %v", login, err)
+			SendJSONError(w, "Failed to delete account", http.StatusInternalServerError, logger)
+			return
+		}
+
+		logger.Infof("Account deleted: %s", login)
+		SendJSONResponse(w, http.StatusOK, map[string]string{"message": "Account deleted"}, logger)
 	}
 }

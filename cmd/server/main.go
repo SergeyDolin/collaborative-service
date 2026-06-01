@@ -193,10 +193,12 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	router.Get("/measurements", handlers.MeasurementsPageHandler(app.logger))
 	router.Get("/collaborative", handlers.CollaborativePageHandler(app.logger))
 	router.Get("/positioning", handlers.PositioningPageHandler(app.logger))
+	router.Get("/terms", handlers.TermsPageHandler(app.logger))
 
 	// Public API
 	router.Post("/api/register", handlers.RegisterHandler(app.dbStorage, app.logger))
 	router.Post("/api/login", handlers.LoginHandler(app.dbStorage, jwtService, app.logger))
+	router.Get("/api/avatar", handlers.AvatarHandler(app.logger))
 
 	if app.taskStorage != nil {
 		measurementHandler := handlers.NewMeasurementHandler(
@@ -216,6 +218,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Get("/api/profile", handlers.ProfileHandler(app.logger))
 			r.Get("/api/profile/data", handlers.ProfileDataHandler(app.dbStorage, app.logger))
 			r.Post("/api/profile/update", handlers.UpdateProfileHandler(app.dbStorage, app.logger))
+			r.Delete("/api/account", handlers.DeleteAccountHandler(app.dbStorage, app.logger))
 
 			// Devices
 			r.Get("/api/devices", handlers.GetDevicesHandler(app.dbStorage, app.logger))

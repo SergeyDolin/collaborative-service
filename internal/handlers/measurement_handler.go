@@ -295,6 +295,11 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(result.FullResultFile)))
 	h.logger.Infof("Downloaded result for task %s (user: %s, file: %s, size: %d bytes)", taskID, login, downloadName, len(result.FullResultFile))
 	w.Write(result.FullResultFile)
+
+	// Удаляем бинарный blob после выдачи — хранить его дальше нет смысла
+	if err := h.taskStorage.ClearResultFile(taskID); err != nil {
+		h.logger.Warnf("Failed to clear result file for task %s: %v", taskID, err)
+	}
 }
 
 // GetSystemStatsHandler возвращает системную статистику

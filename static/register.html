@@ -240,25 +240,25 @@ input[type="number"] { font-family:var(--font-mono); }
                 <div class="footer-link" style="margin-top:16px;">Уже есть аккаунт? <a href="/login">Войти</a></div>
             </div>
 
-            <!-- Step 2 — Profile -->
+            <!-- Step 2 — Terms -->
             <div class="step" id="step2">
-                <div class="step-eyebrow">02 / Profile</div>
-                <div class="step-title">Расскажите о себе</div>
-                <div class="step-subtitle">Имя и фото помогут другим участникам вас узнать <span style="color:var(--ink-faint);">(необязательно)</span></div>
-                <div class="avatar-zone">
-                    <div class="avatar-preview" id="avatarPreview" onclick="document.getElementById('avatarFile').click()">
-                        <span class="av-icon" data-icon="user" data-icon-size="36"></span>
-                        <img id="avatarImg" alt="avatar">
-                    </div>
-                    <div class="avatar-hint">
-                        <strong>Фото профиля</strong>
-                        JPG, PNG до 5 МБ<br>
-                        <button class="btn-sm btn-sm-ghost" style="margin-top:8px;" onclick="document.getElementById('avatarFile').click()">Выбрать фото</button>
-                    </div>
-                    <input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="previewAvatar(this)">
+                <div class="step-eyebrow">02 / Terms</div>
+                <div class="step-title">Условия использования</div>
+                <div class="step-subtitle">Прочитайте и примите условия перед созданием аккаунта</div>
+                <div style="background:var(--paper-2);border:1px solid var(--paper-edge);border-radius:var(--r-md);padding:18px 20px;margin-bottom:20px;font-size:0.82rem;line-height:1.65;color:var(--ink-2);max-height:220px;overflow-y:auto;">
+                    <strong style="display:block;margin-bottom:10px;font-size:0.9rem;color:var(--ink);">Публичная оферта на оказание услуг по обработке ГНСС-измерений</strong>
+                    <p>Настоящий сервис предоставляет услуги постобработки и онлайн-позиционирования данных ГНСС-приёмников. Регистрация означает заключение договора-оферты (ст. 435–436 ГК РФ) между вами и оператором сервиса.</p>
+                    <p><strong>Обрабатываемые данные:</strong> псевдоним (логин), хэш пароля, данные о зарегистрированном ГНСС-оборудовании (тип, модель антенны, параметры подключения), загружаемые RINEX-файлы наблюдений и результаты их обработки.</p>
+                    <p><strong>Цель обработки:</strong> исключительно исполнение договора на оказание услуг по обработке ГНСС-данных (п. 2 ч. 2 ст. 22 Федерального закона № 152-ФЗ «О персональных данных»). Персональные данные в объёме, требующем уведомления Роскомнадзора, не собираются.</p>
+                    <p><strong>Сроки хранения:</strong> результаты статических измерений — 7 суток, кинематических — 1 час, история задач — 90 суток. По истечении срока данные удаляются автоматически.</p>
+                    <p><strong>Права пользователя:</strong> вы вправе в любой момент удалить свои данные через личный кабинет или направив запрос оператору. Аватар профиля генерируется алгоритмически из вашего логина и не хранится на сервере.</p>
+                    <p style="margin-bottom:0;">Полный текст оферты доступен по адресу <a href="/terms" target="_blank" style="color:var(--graphite);">/terms</a>.</p>
                 </div>
-                <div class="field"><label for="fullName">ФИО <span style="color:var(--ink-faint);font-weight:400;">(необязательно)</span></label><input type="text" id="fullName" placeholder="Иванов Иван Иванович"></div>
-                <div class="actions"><button class="btn-back" onclick="goBack(1)">← Назад</button><button class="btn-next" onclick="goStep3()">Далее →</button></div>
+                <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:12px 14px;background:var(--paper-2);border:1px solid var(--paper-edge);border-radius:var(--r-md);">
+                    <input type="checkbox" id="termsCheckbox" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:var(--graphite);">
+                    <span style="font-size:0.83rem;line-height:1.5;color:var(--ink-2);">Я прочитал(а) условия оферты и принимаю их. Я понимаю, что сервис собирает только технические данные, необходимые для исполнения договора, и не собирает ФИО, фотографии или иные персональные данные.</span>
+                </label>
+                <div class="actions" style="margin-top:20px;"><button class="btn-back" onclick="goBack(1)">← Назад</button><button class="btn-next" onclick="goStep3()">Далее →</button></div>
             </div>
 
             <!-- Step 3 — Device -->
@@ -371,6 +371,6 @@ input[type="number"] { font-family:var(--font-mono); }
 </div>
 <script src="/js/icons.js"></script>
 <script src="/js/chrome.js"></script>
-<script src="/js/register.js?v=2"></script>
+<script src="/js/register.js?v=3"></script>
 </body>
 </html>

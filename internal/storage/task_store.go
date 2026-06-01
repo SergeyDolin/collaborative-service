@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"collaborative/internal/model"
@@ -54,7 +55,8 @@ func (s *TaskStorage) InitTaskSchema() error {
 			started_at TIMESTAMP,
 			completed_at TIMESTAMP,
 			processing_sec FLOAT,
-			observation_date TIMESTAMP
+			observation_date TIMESTAMP,
+			expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '90 days')
 		);
 	`)
 	if err != nil {
@@ -111,7 +113,7 @@ func (s *TaskStorage) InitTaskSchema() error {
 			RETURN NULL;
 		END;
 		$$ LANGUAGE plpgsql;
-		
+
 		DROP TRIGGER IF EXISTS trigger_delete_expired ON processing_results;
 		CREATE TRIGGER trigger_delete_expired
 		AFTER INSERT ON processing_results
@@ -120,11 +122,22 @@ func (s *TaskStorage) InitTaskSchema() error {
 	if err != nil {
 		fmt.Printf("Trigger creation warning: %v\n", err)
 	}
+
+	// Миграции для существующих таблиц — добавляем колонки если их ещё нет
 	_, err = s.pool.Exec(context.Background(), `
-    ALTER TABLE processing_tasks 
-    ADD COLUMN IF NOT EXISTS observation_date TIMESTAMP;`)
+		ALTER TABLE processing_tasks ADD COLUMN IF NOT EXISTS observation_date TIMESTAMP;
+		ALTER TABLE processing_tasks ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '90 days');
+	`)
 	if err != nil {
-		fmt.Printf("Warning: Failed to add observation_date column: %v\n", err)
+		fmt.Printf("Warning: Failed to add task columns: %v\n", err)
+	}
+
+	// Индекс на expires_at создаём после миграции колонки
+	_, err = s.pool.Exec(context.Background(), `
+		CREATE INDEX IF NOT EXISTS idx_tasks_expires ON processing_tasks(expires_at);
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create tasks expires index: %v\n", err)
 	}
 
 	_, err = s.pool.Exec(context.Background(), `
@@ -145,10 +158,15 @@ func (s *TaskStorage) CreateTask(task *model.ProcessingTask) error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
+	// Хранить только базовое имя файла без пути — путь может содержать ПДн
+	task.Filename = filepath.Base(task.Filename)
+	// original_path не сохраняем — временный артефакт, не нужен после обработки
+	task.OriginalPath = ""
+
 	query := `
 		INSERT INTO processing_tasks (
-			id, user_login, config, filename, original_path, 
-			rinex_path, output_path, status, error_message, 
+			id, user_login, config, filename, original_path,
+			rinex_path, output_path, status, error_message,
 			created_at, started_at, completed_at, processing_sec
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
@@ -169,16 +187,20 @@ func (s *TaskStorage) CreateTask(task *model.ProcessingTask) error {
 
 // UpdateTask обновляет задачу
 func (s *TaskStorage) UpdateTask(task *model.ProcessingTask) error {
+	// При завершении (успех или ошибка) зачищаем серверные пути
+	clearPaths := task.Status == model.StatusCompleted || task.Status == model.StatusFailed
 	query := `
-		UPDATE processing_tasks 
-		SET status = $1, error_message = $2, started_at = $3, 
-		    completed_at = $4, processing_sec = $5, output_path = $6
-		WHERE id = $7
+		UPDATE processing_tasks
+		SET status = $1, error_message = $2, started_at = $3,
+		    completed_at = $4, processing_sec = $5, output_path = $6,
+		    original_path = CASE WHEN $7 THEN NULL ELSE original_path END,
+		    rinex_path    = CASE WHEN $7 THEN NULL ELSE rinex_path    END
+		WHERE id = $8
 	`
 
 	_, err := s.pool.Exec(context.Background(), query,
 		task.Status, task.ErrorMessage, task.StartedAt,
-		task.CompletedAt, task.ProcessingSec, task.OutputPath, task.ID,
+		task.CompletedAt, task.ProcessingSec, task.OutputPath, clearPaths, task.ID,
 	)
 
 	if err != nil {
@@ -457,6 +479,27 @@ func (s *TaskStorage) CleanExpiredResults() error {
 	_, err := s.pool.Exec(context.Background(), `
 		DELETE FROM processing_results WHERE expires_at < NOW()
 	`)
+	return err
+}
+
+// CleanExpiredTasks удаляет задачи с истёкшим сроком хранения вместе с их результатами
+func (s *TaskStorage) CleanExpiredTasks() error {
+	_, err := s.pool.Exec(context.Background(), `
+		DELETE FROM processing_results
+		WHERE task_id IN (SELECT id FROM processing_tasks WHERE expires_at < NOW());
+		DELETE FROM processing_tasks WHERE expires_at < NOW();
+	`)
+	return err
+}
+
+// ClearResultFile удаляет бинарный файл результата после скачивания пользователем
+func (s *TaskStorage) ClearResultFile(taskID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := s.pool.Exec(ctx,
+		`UPDATE processing_results SET full_result_file = NULL WHERE task_id = $1`,
+		taskID,
+	)
 	return err
 }
 

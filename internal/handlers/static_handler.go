@@ -54,3 +54,8 @@ func CollaborativePageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 func PositioningPageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 	return ServeStaticFile("positioning.html", logger)
 }
+
+// TermsPageHandler обслуживает страницу публичной оферты
+func TermsPageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
+	return ServeStaticFile("terms.html", logger)
+}

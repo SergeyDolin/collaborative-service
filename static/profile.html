@@ -281,10 +281,9 @@
 </header>
 <main class="main-content">
     <div class="profile-hero" id="profileHero">
-        <div class="hero-avatar" id="heroAvatar" onclick="openEditProfile()">
-            <span id="heroAvatarFallback" data-icon="user" data-icon-size="36"></span>
+        <div class="hero-avatar" id="heroAvatar">
+            <span id="heroAvatarFallback" data-icon="user" data-icon-size="36" style="display:none"></span>
             <img id="heroAvatarImg" alt="avatar" style="display:none">
-            <div class="av-edit" data-icon="edit" data-icon-size="12"></div>
         </div>
         <div class="hero-info">
             <div class="hero-eyebrow">Личный кабинет · Профиль</div>
@@ -293,7 +292,6 @@
             <div class="hero-meta" id="heroMeta"></div>
         </div>
         <div class="hero-actions">
-            <button class="btn-edit-profile" onclick="openEditProfile()">Редактировать</button>
             <button class="btn-new-meas" onclick="window.location.href='/measurements'">Новое измерение <span data-icon="arrow_right" data-icon-size="14"></span></button>
         </div>
     </div>
@@ -335,31 +333,38 @@
             <div class="empty-history">Нажмите «Обновить» для загрузки истории</div>
         </div>
     </div>
+
+    <!-- Danger zone -->
+    <div class="card" style="border-color:var(--err);opacity:0.85;">
+        <div class="card-header">
+            <div class="card-title" style="color:var(--err);">Опасная зона</div>
+        </div>
+        <div style="padding:0 20px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <div>
+                <div style="font-size:0.85rem;font-weight:600;color:var(--ink);margin-bottom:3px;">Удалить аккаунт</div>
+                <div style="font-size:0.78rem;color:var(--ink-3);line-height:1.5;">Удалятся все измерения, устройства и история. Действие необратимо.</div>
+            </div>
+            <button class="btn btn-danger" onclick="openDeleteAccount()">Удалить аккаунт</button>
+        </div>
+    </div>
 </main>
 
-<!-- Edit Profile Modal -->
-<div class="modal-overlay" id="editProfileModal">
+<!-- Delete Account Modal -->
+<div class="modal-overlay" id="deleteAccountModal">
     <div class="modal">
-        <h3>Редактировать профиль</h3>
+        <h3 style="color:var(--err);">Удалить аккаунт</h3>
+        <p style="font-size:0.85rem;color:var(--ink-2);line-height:1.6;margin-bottom:18px;">
+            Будут безвозвратно удалены: история обработок, результаты, зарегистрированные устройства и сам аккаунт.<br>
+            Введите пароль для подтверждения.
+        </p>
         <div class="form-field">
-            <label>ФИО</label>
-            <input type="text" id="editFullName" placeholder="Иванов Иван Иванович">
-        </div>
-        <div class="form-field" style="display:flex;gap:14px;align-items:center;">
-            <div class="hero-avatar" style="width:60px;height:60px;cursor:pointer;flex-shrink:0;" onclick="document.getElementById('editAvatarFile').click()">
-                <span id="editAvatarFallback" data-icon="user" data-icon-size="28"></span>
-                <img id="editAvatarPreview" style="display:none;width:100%;height:100%;object-fit:cover;" alt="">
-                <div class="av-edit" style="font-size:11px;width:22px;height:22px;" data-icon="edit" data-icon-size="11"></div>
-            </div>
-            <div>
-                <div style="font-size:0.82rem;font-weight:600;color:var(--ink);margin-bottom:6px;">Фото профиля</div>
-                <button class="btn-sm btn-sm-ghost" onclick="document.getElementById('editAvatarFile').click()">Изменить</button>
-                <input type="file" id="editAvatarFile" accept="image/*" style="display:none" onchange="previewEditAvatar(this)">
-            </div>
+            <label>Пароль</label>
+            <input type="password" id="deleteAccountPassword" placeholder="Введите пароль">
+            <div class="field-err" id="deleteAccountErr"></div>
         </div>
         <div class="modal-actions">
-            <button class="btn-cancel" onclick="closeModal('editProfileModal')">Отмена</button>
-            <button class="btn btn-primary" onclick="saveProfile()">Сохранить</button>
+            <button class="btn-cancel" onclick="closeModal('deleteAccountModal')">Отмена</button>
+            <button class="btn btn-danger" id="btnDeleteAccount" onclick="confirmDeleteAccount()">Удалить навсегда</button>
         </div>
     </div>
 </div>
