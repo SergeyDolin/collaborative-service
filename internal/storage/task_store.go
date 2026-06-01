@@ -97,7 +97,6 @@ func (s *TaskStorage) InitTaskSchema() error {
 		CREATE INDEX IF NOT EXISTS idx_tasks_user ON processing_tasks(user_login);
 		CREATE INDEX IF NOT EXISTS idx_tasks_status ON processing_tasks(status);
 		CREATE INDEX IF NOT EXISTS idx_tasks_created ON processing_tasks(created_at DESC);
-		CREATE INDEX IF NOT EXISTS idx_tasks_expires ON processing_tasks(expires_at);
 		CREATE INDEX IF NOT EXISTS idx_results_task ON processing_results(task_id);
 		CREATE INDEX IF NOT EXISTS idx_results_user ON processing_results(user_login);
 		CREATE INDEX IF NOT EXISTS idx_results_expires ON processing_results(expires_at);
@@ -114,7 +113,7 @@ func (s *TaskStorage) InitTaskSchema() error {
 			RETURN NULL;
 		END;
 		$$ LANGUAGE plpgsql;
-		
+
 		DROP TRIGGER IF EXISTS trigger_delete_expired ON processing_results;
 		CREATE TRIGGER trigger_delete_expired
 		AFTER INSERT ON processing_results
@@ -123,13 +122,22 @@ func (s *TaskStorage) InitTaskSchema() error {
 	if err != nil {
 		fmt.Printf("Trigger creation warning: %v\n", err)
 	}
+
+	// Миграции для существующих таблиц — добавляем колонки если их ещё нет
 	_, err = s.pool.Exec(context.Background(), `
-    ALTER TABLE processing_tasks
-    ADD COLUMN IF NOT EXISTS observation_date TIMESTAMP;
-    ALTER TABLE processing_tasks
-    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '90 days');`)
+		ALTER TABLE processing_tasks ADD COLUMN IF NOT EXISTS observation_date TIMESTAMP;
+		ALTER TABLE processing_tasks ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '90 days');
+	`)
 	if err != nil {
-		fmt.Printf("Warning: Failed to add observation_date column: %v\n", err)
+		fmt.Printf("Warning: Failed to add task columns: %v\n", err)
+	}
+
+	// Индекс на expires_at создаём после миграции колонки
+	_, err = s.pool.Exec(context.Background(), `
+		CREATE INDEX IF NOT EXISTS idx_tasks_expires ON processing_tasks(expires_at);
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create tasks expires index: %v\n", err)
 	}
 
 	_, err = s.pool.Exec(context.Background(), `
