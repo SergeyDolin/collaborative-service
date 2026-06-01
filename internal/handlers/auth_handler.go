@@ -387,3 +387,43 @@ func DeleteDeviceHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) h
 		SendJSONResponse(w, http.StatusOK, map[string]string{"message": "Device deleted"}, logger)
 	}
 }
+
+// DeleteAccountHandler удаляет аккаунт пользователя и все его данные.
+// Требует подтверждения паролем в теле запроса: {"password": "..."}.
+func DeleteAccountHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		login, ok := GetUserFromContext(r)
+		if !ok {
+			SendJSONError(w, "Unauthorized", http.StatusUnauthorized, logger)
+			return
+		}
+
+		var req struct {
+			Password string `json:"password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Password == "" {
+			SendJSONError(w, "Password required", http.StatusBadRequest, logger)
+			return
+		}
+
+		user, err := dbStor.GetUser(login)
+		if err != nil {
+			SendJSONError(w, "User not found", http.StatusNotFound, logger)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+			logger.Warnf("DeleteAccount: wrong password for %s", login)
+			SendJSONError(w, "Incorrect password", http.StatusForbidden, logger)
+			return
+		}
+
+		if err := dbStor.DeleteUser(login); err != nil {
+			logger.Errorf("DeleteAccount %s: %v", login, err)
+			SendJSONError(w, "Failed to delete account", http.StatusInternalServerError, logger)
+			return
+		}
+
+		logger.Infof("Account deleted: %s", login)
+		SendJSONResponse(w, http.StatusOK, map[string]string{"message": "Account deleted"}, logger)
+	}
+}

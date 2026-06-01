@@ -670,3 +670,46 @@ if (checkAuth()) {
     loadProfile();
     loadHistory();
 }
+/* ════════════════════════════════════════════
+   DELETE ACCOUNT
+════════════════════════════════════════════ */
+function openDeleteAccount() {
+    document.getElementById('deleteAccountPassword').value = '';
+    document.getElementById('deleteAccountErr').textContent = '';
+    openModal('deleteAccountModal');
+    setTimeout(() => document.getElementById('deleteAccountPassword').focus(), 100);
+}
+
+async function confirmDeleteAccount() {
+    const password = document.getElementById('deleteAccountPassword').value;
+    const errEl    = document.getElementById('deleteAccountErr');
+    const btn      = document.getElementById('btnDeleteAccount');
+
+    errEl.textContent = '';
+    if (!password) { errEl.textContent = 'Введите пароль'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Удаление…';
+
+    try {
+        const r = await fetch('/api/account', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            errEl.textContent = data.error || 'Неверный пароль';
+            btn.disabled = false;
+            btn.textContent = 'Удалить навсегда';
+            return;
+        }
+        localStorage.removeItem('token');
+        localStorage.removeItem('userLogin');
+        window.location.href = '/?deleted=1';
+    } catch {
+        errEl.textContent = 'Ошибка сети';
+        btn.disabled = false;
+        btn.textContent = 'Удалить навсегда';
+    }
+}

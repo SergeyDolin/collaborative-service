@@ -103,3 +103,21 @@ func (stor *DBStorage) UpdateUserPassword(login, newPassword string) error {
 	}
 	return nil
 }
+
+// DeleteUser удаляет аккаунт и все связанные данные.
+// processing_tasks / processing_results не имеют FK CASCADE, удаляются явно.
+// user_devices, collaborative_sessions, online_sessions — CASCADE от users.
+func (stor *DBStorage) DeleteUser(login string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	_, err := stor.pool.Exec(ctx, `
+		DELETE FROM processing_results WHERE user_login = $1;
+		DELETE FROM processing_tasks   WHERE user_login = $1;
+		DELETE FROM users              WHERE login      = $1;
+	`, login)
+	if err != nil {
+		return fmt.Errorf("delete user %s: %w", login, err)
+	}
+	return nil
+}

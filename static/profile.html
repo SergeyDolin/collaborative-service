@@ -333,8 +333,41 @@
             <div class="empty-history">Нажмите «Обновить» для загрузки истории</div>
         </div>
     </div>
+
+    <!-- Danger zone -->
+    <div class="card" style="border-color:var(--err);opacity:0.85;">
+        <div class="card-header">
+            <div class="card-title" style="color:var(--err);">Опасная зона</div>
+        </div>
+        <div style="padding:0 20px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <div>
+                <div style="font-size:0.85rem;font-weight:600;color:var(--ink);margin-bottom:3px;">Удалить аккаунт</div>
+                <div style="font-size:0.78rem;color:var(--ink-3);line-height:1.5;">Удалятся все измерения, устройства и история. Действие необратимо.</div>
+            </div>
+            <button class="btn btn-danger" onclick="openDeleteAccount()">Удалить аккаунт</button>
+        </div>
+    </div>
 </main>
 
+<!-- Delete Account Modal -->
+<div class="modal-overlay" id="deleteAccountModal">
+    <div class="modal">
+        <h3 style="color:var(--err);">Удалить аккаунт</h3>
+        <p style="font-size:0.85rem;color:var(--ink-2);line-height:1.6;margin-bottom:18px;">
+            Будут безвозвратно удалены: история обработок, результаты, зарегистрированные устройства и сам аккаунт.<br>
+            Введите пароль для подтверждения.
+        </p>
+        <div class="form-field">
+            <label>Пароль</label>
+            <input type="password" id="deleteAccountPassword" placeholder="Введите пароль">
+            <div class="field-err" id="deleteAccountErr"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal('deleteAccountModal')">Отмена</button>
+            <button class="btn btn-danger" id="btnDeleteAccount" onclick="confirmDeleteAccount()">Удалить навсегда</button>
+        </div>
+    </div>
+</div>
 
 <!-- Add Device Modal -->
 <div class="modal-overlay" id="addDeviceModal">
