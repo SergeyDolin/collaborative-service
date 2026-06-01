@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Сервис коллаборативного позиционирования</title>
-<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="css/theme.css">
 <style>
 /* ── Index page specific ── */
 body { background:var(--paper); }
@@ -225,10 +225,17 @@ body { background:var(--paper); }
     .welcome-banner { grid-template-columns:1fr; gap:28px; }
     .welcome-art { max-width:280px; margin:0 auto; order:-1; }
 }
+@media(max-width:900px){
+    .stats-section { grid-template-columns:repeat(2,1fr); }
+    .stat-card:nth-child(2) { border-right:none; }
+    .stat-card:nth-child(3) { border-top:1px solid var(--paper-edge); grid-column:1/-1; border-right:none; }
+}
 @media(max-width:768px){
     .menu-grid { grid-template-columns:1fr; }
     .stats-section { grid-template-columns:1fr; }
     .stat-card { border-right:none; border-bottom:1px solid var(--paper-edge); }
+    .stat-card:nth-child(2) { border-right:none; }
+    .stat-card:nth-child(3) { border-top:none; grid-column:auto; }
     .stat-card:last-child { border-bottom:none; }
     .welcome-banner h1 { font-size:1.8rem; }
     .welcome-banner { padding:36px 24px; }
@@ -419,8 +426,8 @@ body { background:var(--paper); }
 <footer class="footer">
     <div class="footer-content">© 2026 · CPS — Collaborative Positioning Service</div>
 </footer>
-<script src="/js/icons.js"></script>
-<script src="/js/chrome.js"></script>
-<script src="/js/main.js?v=2"></script>
+<script src="js/icons.js"></script>
+<script src="js/chrome.js"></script>
+<script src="js/main.js?v=2"></script>
 </body>
 </html>
