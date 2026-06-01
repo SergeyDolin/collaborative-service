@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>ФАГС PPP-AR Отчёт</title>
+<style>
+body{font-family:sans-serif;margin:2em;color:#222}
+h1{border-bottom:2px solid #336;padding-bottom:.3em}
+h2{color:#336;margin-top:2em}
+table{border-collapse:collapse;width:100%;margin-bottom:1.5em}
+th,td{border:1px solid #ccc;padding:5px 10px;text-align:right;font-size:.88em}
+th{background:#e8eaf0;text-align:center}
+td.label{text-align:left;font-family:monospace;font-weight:bold}
+tr.total{font-weight:bold;background:#d8e8ff}
+tr.good{background:#f0fff4}
+tr.warn{background:#fffde7}
+tr.bad{background:#fff0f0}
+.summary{background:#f5f5ff;border:1px solid #aac;padding:1em 1.5em;
+  border-radius:6px;margin-bottom:1.5em;display:flex;flex-wrap:wrap;gap:1.2em}
+.kv{display:flex;flex-direction:column;align-items:center}
+.kv .val{font-size:1.4em;font-weight:bold;color:#336}
+.kv .key{font-size:.75em;color:#666}
+.note{font-size:.82em;color:#888;font-style:italic}
+</style></head><body>
+<h1>ФАГС PPP-AR Batch Report</h1>
+<p style="color:#666">Сгенерирован: 2026-05-28 21:12:28</p>
+<p class="note">PPP-результат (ITRF2020) преобразован в ГСК-2011 через geocentric.xyz и сравнён с каталогом ГСК-2011.
+Продукты CODE (SP3/CLK). Сравнение в единой системе ГСК-2011.</p>
+
+<div class="summary">
+  <div class="kv"><span class="val">75</span><span class="key">Решений (ok)</span></div>
+  <div class="kv"><span class="val">96.0%</span><span class="key">Fix (Q=1)</span></div>
+  <div class="kv"><span class="val">3.74</span><span class="key">RMS N (cm)</span></div>
+  <div class="kv"><span class="val">11.76</span><span class="key">RMS E (cm)</span></div>
+  <div class="kv"><span class="val">22.52</span><span class="key">RMS U (cm)</span></div>
+  <div class="kv"><span class="val">25.68</span><span class="key">RMS 3D (cm)</span></div>
+</div>
+
+<h2>Точность по дням</h2>
+<table>
+<tr><th>Дата</th><th>N</th><th>Fix%</th><th>RMS N (cm)</th><th>RMS E (cm)</th><th>RMS U (cm)</th><th>RMS 3D (cm)</th></tr>
+<tr class="bad">
+  <td class="label">2025-01-01</td><td>75</td><td>96.0</td>
+  <td>3.74</td><td>11.76</td>
+  <td>22.52</td><td>25.68</td>
+</tr>
+<tr class="total">
+  <td class="label">Итого</td><td>75</td><td>96.0</td>
+  <td>3.74</td><td>11.76</td>
+  <td>22.52</td><td>25.68</td>
+</tr></table>
+
+
+
+<h2>Точность по пунктам ФАГС (сортировка по RMS 3D ↑)</h2>
+<table>
+<tr><th>Пункт / Город</th><th>N дней</th><th>Fix%</th><th>RMS N (cm)</th><th>RMS E (cm)</th><th>RMS U (cm)</th><th>RMS 3D (cm)</th></tr>
+<tr class="good">
+  <td class="label">BARE Баренцбург</td><td>1</td><td>100.0</td>
+  <td>0.00</td><td>0.00</td>
+  <td>0.00</td><td>0.00</td>
+</tr><tr class="good">
+  <td class="label">MHCH Махачкала</td><td>1</td><td>100.0</td>
+  <td>0.34</td><td>0.52</td>
+  <td>0.70</td><td>0.94</td>
+</tr><tr class="good">
+  <td class="label">KAGP Красноярск</td><td>1</td><td>100.0</td>
+  <td>0.82</td><td>0.83</td>
+  <td>0.26</td><td>1.19</td>
+</tr><tr class="good">
+  <td class="label">MKR1 Новая Земля</td><td>1</td><td>100.0</td>
+  <td>0.77</td><td>0.93</td>
+  <td>0.35</td><td>1.25</td>
+</tr><tr class="good">
+  <td class="label">BORO Бор</td><td>1</td><td>100.0</td>
+  <td>0.01</td><td>1.24</td>
+  <td>0.64</td><td>1.39</td>
+</tr><tr class="good">
+  <td class="label">ARKH Архангельск</td><td>1</td><td>100.0</td>
+  <td>0.38</td><td>1.15</td>
+  <td>0.77</td><td>1.44</td>
+</tr><tr class="good">
+  <td class="label">EKTG Екатеринбург</td><td>1</td><td>100.0</td>
+  <td>1.17</td><td>0.02</td>
+  <td>0.85</td><td>1.45</td>
+</tr><tr class="good">
+  <td class="label">NNOV Н.Новгород</td><td>1</td><td>100.0</td>
+  <td>0.36</td><td>0.46</td>
+  <td>1.32</td><td>1.45</td>
+</tr><tr class="good">
+  <td class="label">KIZ1 Кызыл</td><td>1</td><td>100.0</td>
+  <td>0.33</td><td>1.28</td>
+  <td>0.59</td><td>1.45</td>
+</tr><tr class="good">
+  <td class="label">NARY Нарьян-Мар</td><td>1</td><td>100.0</td>
+  <td>0.92</td><td>1.00</td>
+  <td>0.76</td><td>1.56</td>
+</tr><tr class="good">
+  <td class="label">IZVK Ижевск</td><td>1</td><td>100.0</td>
+  <td>0.05</td><td>1.03</td>
+  <td>1.55</td><td>1.86</td>
+</tr><tr class="good">
+  <td class="label">VNOV В.Новгород(2)</td><td>1</td><td>100.0</td>
+  <td>0.53</td><td>0.39</td>
+  <td>1.77</td><td>1.89</td>
+</tr><tr class="good">
+  <td class="label">KOTL Котлас</td><td>1</td><td>100.0</td>
+  <td>0.45</td><td>0.47</td>
+  <td>1.80</td><td>1.91</td>
+</tr><tr class="good">
+  <td class="label">NSK1 Новосибирск</td><td>2</td><td>100.0</td>
+  <td>0.50</td><td>0.26</td>
+  <td>1.86</td><td>1.94</td>
+</tr><tr class="warn">
+  <td class="label">CNG1 Москва</td><td>1</td><td>100.0</td>
+  <td>0.39</td><td>0.95</td>
+  <td>1.73</td><td>2.01</td>
+</tr><tr class="warn">
+  <td class="label">OHA1 Оха</td><td>1</td><td>100.0</td>
+  <td>0.36</td><td>0.99</td>
+  <td>1.71</td><td>2.01</td>
+</tr><tr class="warn">
+  <td class="label">OMSR Омск</td><td>1</td><td>100.0</td>
+  <td>0.97</td><td>0.61</td>
+  <td>1.65</td><td>2.01</td>
+</tr><tr class="warn">
+  <td class="label">SLH1 Салехард</td><td>1</td><td>100.0</td>
+  <td>0.17</td><td>0.52</td>
+  <td>1.95</td><td>2.02</td>
+</tr><tr class="warn">
+  <td class="label">VLS1 Вилюйск</td><td>1</td><td>100.0</td>
+  <td>0.20</td><td>2.07</td>
+  <td>0.47</td><td>2.13</td>
+</tr><tr class="warn">
+  <td class="label">SPB2 С-Петербург</td><td>1</td><td>100.0</td>
+  <td>0.63</td><td>0.13</td>
+  <td>2.12</td><td>2.22</td>
+</tr><tr class="warn">
+  <td class="label">KIRV Киров</td><td>1</td><td>100.0</td>
+  <td>1.36</td><td>1.02</td>
+  <td>1.48</td><td>2.25</td>
+</tr><tr class="warn">
+  <td class="label">BELG Белгород</td><td>1</td><td>100.0</td>
+  <td>1.32</td><td>0.17</td>
+  <td>2.16</td><td>2.54</td>
+</tr><tr class="warn">
+  <td class="label">KLN1 Калининград</td><td>1</td><td>100.0</td>
+  <td>0.17</td><td>0.43</td>
+  <td>2.53</td><td>2.57</td>
+</tr><tr class="warn">
+  <td class="label">KNDL Кондоль</td><td>1</td><td>100.0</td>
+  <td>2.38</td><td>0.95</td>
+  <td>0.39</td><td>2.59</td>
+</tr><tr class="warn">
+  <td class="label">ANTP Антипаюта</td><td>1</td><td>100.0</td>
+  <td>0.07</td><td>2.34</td>
+  <td>1.29</td><td>2.67</td>
+</tr><tr class="warn">
+  <td class="label">KZDV Кузедеево</td><td>1</td><td>100.0</td>
+  <td>0.39</td><td>1.19</td>
+  <td>2.38</td><td>2.69</td>
+</tr><tr class="warn">
+  <td class="label">ONGY Онгудай</td><td>1</td><td>100.0</td>
+  <td>0.10</td><td>1.44</td>
+  <td>2.30</td><td>2.71</td>
+</tr><tr class="warn">
+  <td class="label">PNGD Пангоды</td><td>1</td><td>100.0</td>
+  <td>0.08</td><td>1.08</td>
+  <td>2.49</td><td>2.71</td>
+</tr><tr class="warn">
+  <td class="label">AYN1 Аян</td><td>1</td><td>100.0</td>
+  <td>0.91</td><td>1.60</td>
+  <td>2.05</td><td>2.76</td>
+</tr><tr class="warn">
+  <td class="label">OLGA Ольга</td><td>1</td><td>100.0</td>
+  <td>1.37</td><td>0.27</td>
+  <td>2.49</td><td>2.86</td>
+</tr><tr class="warn">
+  <td class="label">OKTB Казань</td><td>1</td><td>100.0</td>
+  <td>0.29</td><td>1.24</td>
+  <td>2.91</td><td>3.18</td>
+</tr><tr class="warn">
+  <td class="label">KLCH Ключи</td><td>1</td><td>100.0</td>
+  <td>0.27</td><td>0.85</td>
+  <td>3.12</td><td>3.24</td>
+</tr><tr class="warn">
+  <td class="label">FSVO Свободный</td><td>1</td><td>100.0</td>
+  <td>0.47</td><td>3.45</td>
+  <td>0.20</td><td>3.49</td>
+</tr><tr class="warn">
+  <td class="label">NIRO Ныроб</td><td>1</td><td>100.0</td>
+  <td>1.92</td><td>0.92</td>
+  <td>3.11</td><td>3.77</td>
+</tr><tr class="warn">
+  <td class="label">OXTK Охотск</td><td>1</td><td>100.0</td>
+  <td>2.55</td><td>2.54</td>
+  <td>1.43</td><td>3.88</td>
+</tr><tr class="warn">
+  <td class="label">SEMH Сеймчан</td><td>1</td><td>100.0</td>
+  <td>2.90</td><td>0.38</td>
+  <td>3.01</td><td>4.20</td>
+</tr><tr class="warn">
+  <td class="label">CHIT Чита</td><td>1</td><td>100.0</td>
+  <td>2.65</td><td>3.31</td>
+  <td>0.35</td><td>4.25</td>
+</tr><tr class="warn">
+  <td class="label">OREN Оренбург</td><td>1</td><td>100.0</td>
+  <td>2.38</td><td>1.23</td>
+  <td>3.38</td><td>4.31</td>
+</tr><tr class="warn">
+  <td class="label">NERY Нерюнгри</td><td>1</td><td>100.0</td>
+  <td>2.21</td><td>2.23</td>
+  <td>2.97</td><td>4.32</td>
+</tr><tr class="warn">
+  <td class="label">ZVRG Звериноголовское</td><td>1</td><td>100.0</td>
+  <td>2.29</td><td>1.38</td>
+  <td>3.50</td><td>4.40</td>
+</tr><tr class="warn">
+  <td class="label">UNGN Уньюган</td><td>1</td><td>100.0</td>
+  <td>1.95</td><td>1.00</td>
+  <td>3.89</td><td>4.47</td>
+</tr><tr class="warn">
+  <td class="label">VRH2 Верхоянск</td><td>1</td><td>100.0</td>
+  <td>0.59</td><td>1.22</td>
+  <td>4.35</td><td>4.56</td>
+</tr><tr class="warn">
+  <td class="label">CHRD Чокурдах</td><td>1</td><td>100.0</td>
+  <td>0.90</td><td>4.52</td>
+  <td>0.50</td><td>4.64</td>
+</tr><tr class="warn">
+  <td class="label">NOYA Ноябрьск</td><td>1</td><td>100.0</td>
+  <td>3.54</td><td>0.68</td>
+  <td>3.19</td><td>4.81</td>
+</tr><tr class="warn">
+  <td class="label">TILK Тиличики</td><td>1</td><td>100.0</td>
+  <td>2.26</td><td>3.73</td>
+  <td>2.05</td><td>4.82</td>
+</tr><tr class="bad">
+  <td class="label">VRH1 Верхоянск</td><td>1</td><td>100.0</td>
+  <td>4.32</td><td>2.26</td>
+  <td>1.80</td><td>5.20</td>
+</tr><tr class="bad">
+  <td class="label">NOVG В.Новгород</td><td>1</td><td>100.0</td>
+  <td>1.22</td><td>3.00</td>
+  <td>4.10</td><td>5.22</td>
+</tr><tr class="bad">
+  <td class="label">IRKO Иркутск</td><td>1</td><td>0.0</td>
+  <td>0.64</td><td>0.44</td>
+  <td>5.21</td><td>5.27</td>
+</tr><tr class="bad">
+  <td class="label">MURM Мурманск</td><td>1</td><td>100.0</td>
+  <td>1.44</td><td>2.21</td>
+  <td>4.58</td><td>5.28</td>
+</tr><tr class="bad">
+  <td class="label">ANDR Анадырь</td><td>1</td><td>100.0</td>
+  <td>2.43</td><td>4.91</td>
+  <td>2.18</td><td>5.90</td>
+</tr><tr class="bad">
+  <td class="label">RBCS Рубцовск</td><td>1</td><td>100.0</td>
+  <td>1.92</td><td>3.20</td>
+  <td>4.76</td><td>6.05</td>
+</tr><tr class="bad">
+  <td class="label">PEVK Певек</td><td>1</td><td>100.0</td>
+  <td>4.83</td><td>2.90</td>
+  <td>2.48</td><td>6.15</td>
+</tr><tr class="bad">
+  <td class="label">AMDR Амдерма</td><td>1</td><td>100.0</td>
+  <td>5.24</td><td>3.58</td>
+  <td>0.00</td><td>6.34</td>
+</tr><tr class="bad">
+  <td class="label">KLPS Колпашево</td><td>1</td><td>100.0</td>
+  <td>1.84</td><td>3.33</td>
+  <td>5.18</td><td>6.43</td>
+</tr><tr class="bad">
+  <td class="label">ZHEL Железногорск</td><td>1</td><td>100.0</td>
+  <td>1.23</td><td>0.77</td>
+  <td>6.48</td><td>6.64</td>
+</tr><tr class="bad">
+  <td class="label">VLDV Владивосток</td><td>1</td><td>100.0</td>
+  <td>5.38</td><td>4.78</td>
+  <td>1.07</td><td>7.28</td>
+</tr><tr class="bad">
+  <td class="label">TIXG Тикси</td><td>1</td><td>100.0</td>
+  <td>0.35</td><td>0.59</td>
+  <td>7.27</td><td>7.30</td>
+</tr><tr class="bad">
+  <td class="label">MAG1 Магадан</td><td>1</td><td>100.0</td>
+  <td>1.41</td><td>5.43</td>
+  <td>4.82</td><td>7.39</td>
+</tr><tr class="bad">
+  <td class="label">KHAZ Хабаровск</td><td>1</td><td>100.0</td>
+  <td>3.00</td><td>6.51</td>
+  <td>2.13</td><td>7.48</td>
+</tr><tr class="bad">
+  <td class="label">RGSK Ряжск</td><td>1</td><td>100.0</td>
+  <td>0.92</td><td>0.42</td>
+  <td>7.91</td><td>7.97</td>
+</tr><tr class="bad">
+  <td class="label">ELIS Элиста</td><td>1</td><td>100.0</td>
+  <td>0.98</td><td>0.85</td>
+  <td>9.30</td><td>9.39</td>
+</tr><tr class="bad">
+  <td class="label">UFGS Уварово</td><td>1</td><td>100.0</td>
+  <td>1.20</td><td>1.09</td>
+  <td>9.35</td><td>9.49</td>
+</tr><tr class="bad">
+  <td class="label">SEGE Сегежа</td><td>1</td><td>100.0</td>
+  <td>1.59</td><td>1.19</td>
+  <td>10.31</td><td>10.50</td>
+</tr><tr class="bad">
+  <td class="label">MBR2 Северная Земля</td><td>1</td><td>100.0</td>
+  <td>5.53</td><td>1.19</td>
+  <td>9.36</td><td>10.94</td>
+</tr><tr class="bad">
+  <td class="label">LVR2 Лаврентия</td><td>1</td><td>100.0</td>
+  <td>3.08</td><td>1.49</td>
+  <td>11.12</td><td>11.63</td>
+</tr><tr class="bad">
+  <td class="label">MBR1 Северная Земля</td><td>1</td><td>100.0</td>
+  <td>0.29</td><td>0.86</td>
+  <td>12.74</td><td>12.77</td>
+</tr><tr class="bad">
+  <td class="label">ITRP Курильск</td><td>1</td><td>100.0</td>
+  <td>1.91</td><td>1.56</td>
+  <td>13.00</td><td>13.23</td>
+</tr><tr class="bad">
+  <td class="label">SVK1 Северо-Курильск</td><td>1</td><td>100.0</td>
+  <td>1.55</td><td>2.60</td>
+  <td>13.19</td><td>13.53</td>
+</tr><tr class="bad">
+  <td class="label">TULN Тулун</td><td>1</td><td>100.0</td>
+  <td>2.06</td><td>0.84</td>
+  <td>13.49</td><td>13.67</td>
+</tr><tr class="bad">
+  <td class="label">TURR Тура</td><td>1</td><td>100.0</td>
+  <td>1.73</td><td>1.79</td>
+  <td>13.54</td><td>13.77</td>
+</tr><tr class="bad">
+  <td class="label">LVR1 Лаврентия</td><td>1</td><td>100.0</td>
+  <td>2.73</td><td>0.20</td>
+  <td>15.95</td><td>16.18</td>
+</tr><tr class="bad">
+  <td class="label">MGNS Магнитогорск</td><td>1</td><td>100.0</td>
+  <td>1.92</td><td>2.60</td>
+  <td>16.38</td><td>16.70</td>
+</tr><tr class="bad">
+  <td class="label">TUAP Туапсе</td><td>1</td><td>0.0</td>
+  <td>22.01</td><td>88.39</td>
+  <td>16.91</td><td>92.65</td>
+</tr><tr class="bad">
+  <td class="label">AST3 Астрахань</td><td>1</td><td>0.0</td>
+  <td>16.75</td><td>47.36</td>
+  <td>188.02</td><td>194.61</td>
+</tr>
+</table>
+</body></html>

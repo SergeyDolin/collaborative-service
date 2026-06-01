@@ -1,0 +1,2 @@
+station,n_meas,n_days,skp_N_mm,skp_E_mm,skp_U_mm,skp_3D_mm,bias_N_mm,bias_E_mm,bias_U_mm,bias_3D_mm,max_error_mm,min_error_mm,mean_nsat,std_nsat,category
+NSK1,2,1,0.0,0.0,0.0,0.0,5.0,-2.6,-18.599999999999998,19.400000000000002,19.400000000000002,19.400000000000002,23.0,0.0,Экстра-прецизионные (<5 мм)
