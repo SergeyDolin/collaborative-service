@@ -375,38 +375,41 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 // в папке /root_ftp/IGS/products/{week}/ — без авторизации.
 // Старый формат (до ~2020): COM{WWWW}{D}.DCB.Z на AIUB — по GPS-неделе и DOW.
 func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, error) {
-	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
 	gzFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx.gz", taskID))
 	outFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx", taskID))
 
+	ftpDir := fmt.Sprintf("/gnss/products/bias/%d", year)
+
 	type candidate struct {
 		label   string
+		ftpPath string
 		httpURL string
 	}
 
 	candidates := []candidate{
-		// ── AIUB CODE MGEX FINAL: надёжный HTTP, суточные по DOY ─────────────
-		{"AIUB_COD_MGEX_OSB",
-			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_01D_OSB.BIA.gz",
+		{"CDDIS_CAS",
+			ftpDir + fmt.Sprintf("/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz", year, doy),
+			""},
+		{"CDDIS_CODE",
+			ftpDir + fmt.Sprintf("/COD0OPSFIN_%d%03d0000_01D_01D_DCB.BIA.gz", year, doy),
+			""},
+		{"CAS_HTTP",
+			"",
+			fmt.Sprintf("https://ftp.gipp.org.cn/product/dcb/mgex/%d/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz",
 				year, year, doy)},
-		// ── BKG: CAS DCB, папка products/{week}/ ─────────────────────────────
-		{"BKG_CAS_FINAL",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/CAS0OPSFIN_%d%03d0000_01D_01D_DCB.BIA.gz",
-				week, year, doy)},
-		{"BKG_CAS_RAPID",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/CAS0OPSRAP_%d%03d0000_01D_01D_DCB.BIA.gz",
-				week, year, doy)},
-		// ── Старый формат: AIUB CODE MGEX, COM{WWWW}{D}.DCB.Z ──────────────
-		{"AIUB_COM_OLD",
-			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COM%d%d.DCB.Z",
-				date.Year(), week, dow)},
 	}
 
 	var lastErr error
 	for _, c := range candidates {
-		if err := d.downloadFile(c.httpURL, gzFile); err != nil {
+		var err error
+		if c.ftpPath != "" {
+			err = d.downloadFTP(c.ftpPath, gzFile)
+		} else {
+			err = d.downloadFile(c.httpURL, gzFile)
+		}
+		if err != nil {
 			d.logger.Warnf("Failed to download %s DCB: %v", c.label, err)
 			lastErr = err
 			continue
@@ -418,8 +421,7 @@ func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, err
 		return "", fmt.Errorf("failed to download DCB: %w", lastErr)
 	}
 
-	// Автодетект формата по магическим байтам (gzip или Unix .Z compress).
-	if err := d.decompressFile(gzFile, outFile); err != nil {
+	if err := d.gunzipFile(gzFile, outFile); err != nil {
 		return "", fmt.Errorf("failed to unpack DCB: %w", err)
 	}
 
@@ -427,6 +429,7 @@ func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, err
 	d.logger.Infof("Downloaded DCB: %s", outFile)
 	return outFile, nil
 }
+
 
 // DownloadBIA скачивает файл фазовых смещений (BIA/OSB) для PPP-AR.
 // Источник: CDDIS FTP (gdc.cddis.eosdis.nasa.gov:21, anonymous).

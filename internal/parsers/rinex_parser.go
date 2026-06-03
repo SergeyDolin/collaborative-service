@@ -344,13 +344,19 @@ func (p *RINEXParser) ParseApproxPosition(filePath string) (lat, lon float64, fo
 			break
 		}
 		if strings.Contains(line, "APPROX POSITION XYZ") {
-			// RINEX фиксированные колонки: X[0:14], Y[14:28], Z[28:42]
-			if len(line) < 42 {
+			// Обрезаем метку (последние 20 символов — лейбл), берём числовую часть.
+			// Поддерживаем как RINEX 2 (фиксированные колонки), так и RINEX 3 (свободный формат).
+			numPart := line
+			if idx := strings.Index(line, "APPROX POSITION XYZ"); idx >= 0 {
+				numPart = line[:idx]
+			}
+			fields := strings.Fields(numPart)
+			if len(fields) < 3 {
 				continue
 			}
-			x, err1 := strconv.ParseFloat(strings.TrimSpace(line[0:14]), 64)
-			y, err2 := strconv.ParseFloat(strings.TrimSpace(line[14:28]), 64)
-			z, err3 := strconv.ParseFloat(strings.TrimSpace(line[28:42]), 64)
+			x, err1 := strconv.ParseFloat(fields[0], 64)
+			y, err2 := strconv.ParseFloat(fields[1], 64)
+			z, err3 := strconv.ParseFloat(fields[2], 64)
 			if err1 != nil || err2 != nil || err3 != nil {
 				continue
 			}

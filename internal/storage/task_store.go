@@ -132,6 +132,22 @@ func (s *TaskStorage) InitTaskSchema() error {
 		fmt.Printf("Warning: Failed to add task columns: %v\n", err)
 	}
 
+	// Мигрируем TIMESTAMP → TIMESTAMPTZ чтобы timezone корректно сохранялся
+	_, err = s.pool.Exec(context.Background(), `
+		ALTER TABLE processing_tasks
+			ALTER COLUMN created_at    TYPE TIMESTAMPTZ USING created_at    AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN started_at    TYPE TIMESTAMPTZ USING started_at    AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN completed_at  TYPE TIMESTAMPTZ USING completed_at  AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN expires_at    TYPE TIMESTAMPTZ USING expires_at    AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN observation_date TYPE TIMESTAMPTZ USING observation_date AT TIME ZONE current_setting('TimeZone');
+		ALTER TABLE processing_results
+			ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN expires_at TYPE TIMESTAMPTZ USING expires_at AT TIME ZONE current_setting('TimeZone');
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to add task columns: %v\n", err)
+	}
+
 	// Индекс на expires_at создаём после миграции колонки
 	_, err = s.pool.Exec(context.Background(), `
 		CREATE INDEX IF NOT EXISTS idx_tasks_expires ON processing_tasks(expires_at);
@@ -212,7 +228,7 @@ func (s *TaskStorage) UpdateTask(task *model.ProcessingTask) error {
 
 func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 	if result.ExpiresAt.IsZero() {
-		result.ExpiresAt = time.Now().Add(24 * time.Hour)
+		result.ExpiresAt = time.Now().UTC().Add(24 * time.Hour)
 	}
 
 	query := `
@@ -368,7 +384,12 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		       COALESCE(r.expires_at, NOW()) AS result_expires_at
 		FROM processing_tasks t
 		LEFT JOIN processing_results r ON t.id = r.task_id
-		WHERE t.user_login = $1 AND (r.expires_at IS NULL OR r.expires_at > NOW())
+		WHERE t.user_login = $1
+		  AND t.expires_at > NOW()
+		  AND (
+		    t.status IN ('pending', 'processing')
+		    OR (r.task_id IS NOT NULL AND r.expires_at > NOW())
+		  )
 		ORDER BY t.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -505,7 +526,7 @@ func (s *TaskStorage) ClearResultFile(taskID string) error {
 
 // FailStalledTasks marks tasks stuck in "processing" for longer than timeout as failed.
 func (s *TaskStorage) FailStalledTasks(timeout time.Duration) error {
-	cutoff := time.Now().Add(-timeout)
+	cutoff := time.Now().UTC().Add(-timeout)
 	_, err := s.pool.Exec(context.Background(), `
 		UPDATE processing_tasks
 		SET status = 'failed',
@@ -569,4 +590,41 @@ func (s *TaskStorage) DeleteAllUserTasks(userLogin string) (int64, error) {
 	}
 
 	return res.RowsAffected(), nil
+}
+// GetObservationDateForUser возвращает дату наблюдения с проверкой владельца.
+func (s *TaskStorage) GetObservationDateForUser(taskID, userLogin string) (obsDate *time.Time, createdAt time.Time, found bool, err error) {
+	row := s.pool.QueryRow(context.Background(), `
+		SELECT observation_date, created_at, user_login
+		FROM processing_tasks
+		WHERE id = $1
+	`, taskID)
+	var owner string
+	scanErr := row.Scan(&obsDate, &createdAt, &owner)
+	if scanErr != nil {
+		if scanErr == pgx.ErrNoRows {
+			return nil, time.Time{}, false, nil
+		}
+		return nil, time.Time{}, false, fmt.Errorf("get obs date: %w", scanErr)
+	}
+	if owner != userLogin {
+		return nil, time.Time{}, false, nil
+	}
+	return obsDate, createdAt, true, nil
+}
+
+// GetRawOutput возвращает raw_output результата с проверкой владельца.
+func (s *TaskStorage) GetRawOutput(taskID, userLogin string) (raw string, found bool, err error) {
+	queryErr := s.pool.QueryRow(context.Background(), `
+		SELECT COALESCE(r.raw_output, '')
+		FROM processing_results r
+		JOIN processing_tasks t ON t.id = r.task_id
+		WHERE r.task_id = $1 AND t.user_login = $2
+	`, taskID, userLogin).Scan(&raw)
+	if queryErr != nil {
+		if queryErr == pgx.ErrNoRows {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("get raw output: %w", queryErr)
+	}
+	return raw, true, nil
 }
