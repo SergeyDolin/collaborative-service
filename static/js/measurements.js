@@ -1,4 +1,3 @@
-
 let selectedMethod = null;
 let selectedFile = null;
 let selectedDeviceType = null;
@@ -136,24 +135,38 @@ function checkMobileWarning() {
     document.getElementById('mobileAccuracyWarning').style.display = (e === 0 && n === 0 && u === 0) ? 'block' : 'none';
 }
 
+function setBtnText(text) {
+    const btn = document.getElementById('processBtn');
+    if (!btn) return;
+    const el = document.getElementById('processBtnText');
+    if (el) el.textContent = text;
+    else btn.textContent = text;
+}
+
+function setBtnProgress(pct) {
+    const btn = document.getElementById('processBtn');
+    if (!btn) return;
+    btn.style.setProperty('--up', pct + '%');
+}
+
 function updateButtonState() {
     const btn = document.getElementById('processBtn');
     const ready = selectedMethod && selectedFile && selectedDeviceType;
     if (ready) {
         btn.disabled = false;
-        btn.textContent = 'Запустить обработку';
+        setBtnText('Запустить обработку');
     } else if (!selectedMethod) {
         btn.disabled = true;
-        btn.textContent = 'Выберите метод и файл';
+        setBtnText('Выберите метод и файл');
     } else if (!selectedDeviceType) {
         btn.disabled = true;
-        btn.textContent = 'Выберите тип устройства';
+        setBtnText('Выберите тип устройства');
     } else if (!selectedFile) {
         btn.disabled = true;
-        btn.textContent = 'Выберите файл наблюдений';
+        setBtnText('Выберите файл наблюдений');
     } else {
         btn.disabled = true;
-        btn.textContent = 'Выберите метод и файл';
+        setBtnText('Выберите метод и файл');
     }
 }
 
@@ -217,12 +230,25 @@ async function startProcessing() {
     
     const btn = document.getElementById('processBtn');
     const statusDiv = document.getElementById('status');
-    
+
     btn.disabled = true;
-    btn.textContent = '⏳ Обработка...';
-    
+    btn.classList.add('uploading');
     statusDiv.style.display = 'none';
-    
+
+    setBtnProgress(0);
+    setBtnText('Загрузка 0%');
+
+    // Fallback-анимация если onprogress не стреляет (быстрые соединения / малые файлы)
+    let realProgress = false;
+    let fallbackProg = 0;
+    const fallback = setInterval(() => {
+        if (realProgress) { clearInterval(fallback); return; }
+        const step = fallbackProg < 30 ? 3 : fallbackProg < 60 ? 1.5 : 0.4;
+        fallbackProg = Math.min(fallbackProg + step, 75);
+        setBtnProgress(fallbackProg);
+        setBtnText(`Загрузка ${Math.round(fallbackProg)}%`);
+    }, 120);
+
     const config = { ...methodDetails[selectedMethod].config, deviceType: selectedDeviceType };
     if (selectedDeviceType === 'mobile') {
         config.antennaType = document.getElementById('mobileAntennaType').value.trim();
@@ -233,58 +259,78 @@ async function startProcessing() {
     const formData = new FormData();
     formData.append('config', JSON.stringify(config));
     formData.append('file', selectedFile);
-    
-    try {
-        const response = await fetch('/api/measurements/process', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            statusDiv.className = 'status-message status-success';
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = `
-                ✅ Обработка запущена!<br>
-                ID задачи: <strong>${data.taskId}</strong><br>
-                Результат появится в истории личного кабинета.
-            `;
-            
-            selectedFile = null;
-            selectedMethod = null;
-            selectedDeviceType = null;
-            document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYd), сжатые (.gz)';
-            document.getElementById('fileInfo').style.color = '#718096';
-            document.querySelectorAll('.method-option[data-method]').forEach(opt => opt.classList.remove('selected'));
-            document.querySelectorAll('.device-option').forEach(el => el.classList.remove('selected'));
-            document.getElementById('methodDetail').innerHTML = `
-                <h4>👆 Выберите метод обработки</h4>
-                <p>Нажмите на один из методов выше, чтобы увидеть подробное описание</p>
-            `;
-            document.getElementById('deviceSection').style.display = 'none';
-            document.getElementById('mobileAntennaSection').style.display = 'none';
-            updateButtonState();
-            
-            setTimeout(() => { 
-                window.location.href = '/profile'; 
-            }, 3000);
-        } else {
+
+    // XHR нужен для upload.onprogress — fetch его не поддерживает
+    await new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            realProgress = true;
+            clearInterval(fallback);
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setBtnProgress(pct);
+            setBtnText(`Загрузка ${pct}%`);
+        };
+
+        xhr.onload = () => {
+            clearInterval(fallback);
+            setBtnProgress(100);
+            btn.classList.remove('uploading');
+            let data = {};
+            try { data = JSON.parse(xhr.responseText); } catch {}
+
+            if (xhr.status >= 200 && xhr.status < 300) {
+                setBtnText('✅ Отправлено');
+                statusDiv.className = 'status-message status-success';
+                statusDiv.style.display = 'block';
+                statusDiv.innerHTML = `
+                    ✅ Обработка запущена!<br>
+                    ID задачи: <strong>${data.taskId}</strong><br>
+                    Результат появится в истории личного кабинета.
+                `;
+                selectedFile = null;
+                selectedMethod = null;
+                selectedDeviceType = null;
+                document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYd), сжатые (.gz)';
+                document.getElementById('fileInfo').style.color = '#718096';
+                document.querySelectorAll('.method-option[data-method]').forEach(opt => opt.classList.remove('selected'));
+                document.querySelectorAll('.device-option').forEach(el => el.classList.remove('selected'));
+                document.getElementById('methodDetail').innerHTML = `
+                    <h4>👆 Выберите метод обработки</h4>
+                    <p>Нажмите на один из методов выше, чтобы увидеть подробное описание</p>
+                `;
+                document.getElementById('deviceSection').style.display = 'none';
+                document.getElementById('mobileAntennaSection').style.display = 'none';
+                updateButtonState();
+                setTimeout(() => { window.location.href = '/profile'; }, 3000);
+            } else {
+                setBtnProgress(0);
+                statusDiv.className = 'status-message status-error';
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = data.error || '❌ Ошибка запуска обработки';
+                btn.disabled = false;
+                updateButtonState();
+            }
+            resolve();
+        };
+
+        xhr.onerror = () => {
+            clearInterval(fallback);
+            btn.classList.remove('uploading');
+            setBtnProgress(0);
             statusDiv.className = 'status-message status-error';
             statusDiv.style.display = 'block';
-            statusDiv.textContent = data.error || '❌ Ошибка запуска обработки';
+            statusDiv.textContent = '❌ Ошибка соединения с сервером';
             btn.disabled = false;
             updateButtonState();
-        }
-    } catch (error) {
-        console.error('Processing error:', error);
-        statusDiv.className = 'status-message status-error';
-        statusDiv.style.display = 'block';
-        statusDiv.textContent = '❌ Ошибка соединения с сервером';
-        btn.disabled = false;
-        updateButtonState();
-    }
+            resolve();
+        };
+
+        xhr.open('POST', '/api/measurements/process');
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(formData);
+    });
 }
 
 // Инициализация
