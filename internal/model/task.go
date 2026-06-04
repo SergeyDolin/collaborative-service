@@ -53,6 +53,7 @@ type ProcessingResult struct {
 	FullResultFile   []byte    `json:"-" db:"full_result_file"`
 	FileType         string    `json:"fileType,omitempty" db:"file_type"`
 	RawOutput        string    `json:"rawOutput,omitempty" db:"raw_output"`
+	StatOutput       string    `json:"statOutput,omitempty" db:"stat_output"`
 	CreatedAt        time.Time `json:"createdAt" db:"created_at"`
 	ExpiresAt        time.Time `json:"expiresAt" db:"expires_at"`
 }

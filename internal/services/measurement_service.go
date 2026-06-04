@@ -66,7 +66,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	s.logger.Infof("Processing measurement: task=%s, method=%s, mode=%s, size=%.2f MB",
 		taskID, config.Method, config.Mode, float64(len(fileData))/(1024*1024))
 
-	now := time.Now()
+	now := time.Now().UTC()
 	task := &model.ProcessingTask{
 		ID:        taskID,
 		UserLogin: login,
@@ -121,7 +121,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	date, err := s.rinexParser.ParseObservationDate(rinexPath)
 	if err != nil {
 		s.logger.Warnf("Failed to parse RINEX date: %v, using current time", err)
-		date = time.Now()
+		date = time.Now().UTC()
 	}
 
 	if err := s.taskStorage.UpdateTaskObservationDate(taskID, date); err != nil {
@@ -135,7 +135,7 @@ func (s *MeasurementService) ProcessMeasurement(
 
 	s.generateBLQIfAvailable(obsPath, taskID, files)
 
-	var outputPath string
+	var outputPath, statOutput string
 	var procErr error
 
 	switch config.Method {
@@ -148,14 +148,13 @@ func (s *MeasurementService) ProcessMeasurement(
 		files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
 		files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
 
-		// ← obsPath передаётся как источник для чтения антенны
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
 		}
 
-		outputPath, procErr = s.rtk.ProcessPPP(
+		outputPath, statOutput, procErr = s.rtk.ProcessPPP(
 			rinexPath, files.NavigationFile,
 			files.EphemerisFile, files.ClockFile,
 			configPath, taskID)
@@ -163,28 +162,26 @@ func (s *MeasurementService) ProcessMeasurement(
 	case model.MethodRelative:
 		s.logger.Infof("Using Relative method for task: %s", taskID)
 
-		// ← obsPath передаётся как источник для чтения антенны
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
 		}
 
-		outputPath, procErr = s.rtk.ProcessRelative(
+		outputPath, statOutput, procErr = s.rtk.ProcessRelative(
 			rinexPath, "", files.NavigationFile, configPath, taskID,
 		)
 
 	default: // MethodSingle
 		s.logger.Infof("Using Single Point Positioning for task: %s", taskID)
 
-		// ← obsPath передаётся как источник для чтения антенны
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
 		}
 
-		outputPath, procErr = s.rtk.ProcessAbsolute(
+		outputPath, statOutput, procErr = s.rtk.ProcessAbsolute(
 			rinexPath, files.NavigationFile, configPath, taskID,
 		)
 	}
@@ -201,15 +198,19 @@ func (s *MeasurementService) ProcessMeasurement(
 	}
 
 	result := s.parseResult(outputData, taskID, login, config)
+	result.StatOutput = statOutput
+	if statOutput != "" {
+		s.logger.Infof("Saved .stat output for task %s (%d bytes)", taskID, len(statOutput))
+	}
 	// Статика хранится дольше (результат фиксированной точки, не траектория).
 	// Кинематика — траектория движения, минимальный TTL.
 	switch config.Mode {
 	case model.ModeStatic:
-		result.ExpiresAt = time.Now().Add(7 * 24 * time.Hour)
+		result.ExpiresAt = time.Now().UTC().Add(7 * 24 * time.Hour)
 	case model.ModeKinematic:
-		result.ExpiresAt = time.Now().Add(1 * time.Hour)
+		result.ExpiresAt = time.Now().UTC().Add(1 * time.Hour)
 	default:
-		result.ExpiresAt = time.Now().Add(24 * time.Hour)
+		result.ExpiresAt = time.Now().UTC().Add(24 * time.Hour)
 	}
 
 	if err := s.taskStorage.SaveResult(result); err != nil {
@@ -221,7 +222,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		s.logger.Warnf("Failed to remove work directory %s: %v", workDir, err)
 	}
 
-	completedAt := time.Now()
+	completedAt := time.Now().UTC()
 	task = &model.ProcessingTask{
 		ID:            taskID,
 		Status:        model.StatusCompleted,
@@ -270,7 +271,7 @@ func (s *MeasurementService) parseResult(
 		UserLogin:      login,
 		RawOutput:      string(outputData),
 		FullResultFile: outputData,
-		CreatedAt:      time.Now(),
+		CreatedAt:      time.Now().UTC(),
 	}
 
 	lines := strings.Split(string(outputData), "\n")
@@ -396,9 +397,30 @@ func (s *MeasurementService) parseResult(
 		result.Height = bestSolution.Height
 		result.Q = bestSolution.Q
 		result.NSat = maxNSat // максимум за всю сессию, не последнее значение
-		result.SDX = bestSolution.SDX
-		result.SDY = bestSolution.SDY
-		result.SDZ = bestSolution.SDZ
+
+		// Для кинематики и абсолютного метода — среднее σ по всем эпохам.
+		// Для статики PPP — σ лучшей эпохи.
+		if (config.Mode == model.ModeKinematic || config.Method == model.MethodSingle) && len(solutions) > 0 {
+			var sumN, sumE, sumU float64
+			var cnt int
+			for _, sol := range solutions {
+				if sol.SDX > 0 && sol.SDY > 0 && sol.SDZ > 0 {
+					sumN += float64(sol.SDX)
+					sumE += float64(sol.SDY)
+					sumU += float64(sol.SDZ)
+					cnt++
+				}
+			}
+			if cnt > 0 {
+				result.SDX = float32(sumN / float64(cnt))
+				result.SDY = float32(sumE / float64(cnt))
+				result.SDZ = float32(sumU / float64(cnt))
+			}
+		} else {
+			result.SDX = bestSolution.SDX
+			result.SDY = bestSolution.SDY
+			result.SDZ = bestSolution.SDZ
+		}
 	}
 
 	// ВСЕГДА сохраняем последнюю строку решения (последнюю эпоху)

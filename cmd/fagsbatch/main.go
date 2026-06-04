@@ -1003,7 +1003,7 @@ func processStation(
 		return res
 	}
 
-	posFile, err := rtk.ProcessPPP(obsPath, prods.BRDC, prods.SP3, prods.CLK, configPath, taskID)
+	posFile, _, err := rtk.ProcessPPP(obsPath, prods.BRDC, prods.SP3, prods.CLK, configPath, taskID)
 	if err != nil {
 		logger.Warnf("[%s] PPP ошибка: %v", taskID, err)
 		res.Status = "ppp_failed"

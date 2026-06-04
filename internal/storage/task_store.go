@@ -85,6 +85,7 @@ func (s *TaskStorage) InitTaskSchema() error {
 			full_result_file BYTEA,
 			file_type VARCHAR(20),
 			raw_output TEXT,
+			stat_output TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
 		);
@@ -132,6 +133,22 @@ func (s *TaskStorage) InitTaskSchema() error {
 		fmt.Printf("Warning: Failed to add task columns: %v\n", err)
 	}
 
+	// Мигрируем TIMESTAMP → TIMESTAMPTZ чтобы timezone корректно сохранялся
+	_, err = s.pool.Exec(context.Background(), `
+		ALTER TABLE processing_tasks
+			ALTER COLUMN created_at    TYPE TIMESTAMPTZ USING created_at    AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN started_at    TYPE TIMESTAMPTZ USING started_at    AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN completed_at  TYPE TIMESTAMPTZ USING completed_at  AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN expires_at    TYPE TIMESTAMPTZ USING expires_at    AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN observation_date TYPE TIMESTAMPTZ USING observation_date AT TIME ZONE current_setting('TimeZone');
+		ALTER TABLE processing_results
+			ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE current_setting('TimeZone'),
+			ALTER COLUMN expires_at TYPE TIMESTAMPTZ USING expires_at AT TIME ZONE current_setting('TimeZone');
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to add task columns: %v\n", err)
+	}
+
 	// Индекс на expires_at создаём после миграции колонки
 	_, err = s.pool.Exec(context.Background(), `
 		CREATE INDEX IF NOT EXISTS idx_tasks_expires ON processing_tasks(expires_at);
@@ -141,11 +158,19 @@ func (s *TaskStorage) InitTaskSchema() error {
 	}
 
 	_, err = s.pool.Exec(context.Background(), `
-		ALTER TABLE processing_results 
+		ALTER TABLE processing_results
 		ADD COLUMN IF NOT EXISTS fix_rate REAL;
 	`)
 	if err != nil {
 		fmt.Printf("Warning: Failed to add fix_rate column: %v\n", err)
+	}
+
+	_, err = s.pool.Exec(context.Background(), `
+		ALTER TABLE processing_results
+		ADD COLUMN IF NOT EXISTS stat_output TEXT;
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to add stat_output column: %v\n", err)
 	}
 
 	return nil
@@ -212,15 +237,15 @@ func (s *TaskStorage) UpdateTask(task *model.ProcessingTask) error {
 
 func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 	if result.ExpiresAt.IsZero() {
-		result.ExpiresAt = time.Now().Add(24 * time.Hour)
+		result.ExpiresAt = time.Now().UTC().Add(24 * time.Hour)
 	}
 
 	query := `
 		INSERT INTO processing_results (
 			task_id, user_login, x, y, z, latitude, longitude, height,
-			q, n_sat, sdx, sdy, sdz, fix_rate, last_solution_line, 
-			full_result_file, file_type, raw_output, created_at, expires_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+			q, n_sat, sdx, sdy, sdz, fix_rate, last_solution_line,
+			full_result_file, file_type, raw_output, stat_output, created_at, expires_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
 		ON CONFLICT (task_id) DO UPDATE SET
 			x = EXCLUDED.x, y = EXCLUDED.y, z = EXCLUDED.z,
 			latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude,
@@ -229,7 +254,8 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 			fix_rate = EXCLUDED.fix_rate,
 			last_solution_line = EXCLUDED.last_solution_line,
 			full_result_file = EXCLUDED.full_result_file, file_type = EXCLUDED.file_type,
-			raw_output = EXCLUDED.raw_output, expires_at = EXCLUDED.expires_at
+			raw_output = EXCLUDED.raw_output, stat_output = EXCLUDED.stat_output,
+			expires_at = EXCLUDED.expires_at
 	`
 
 	_, err := s.pool.Exec(context.Background(), query,
@@ -237,7 +263,7 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 		result.Latitude, result.Longitude, result.Height, result.Q,
 		result.NSat, result.SDX, result.SDY, result.SDZ, result.FixRate,
 		result.LastSolutionLine, result.FullResultFile, result.FileType,
-		result.RawOutput, result.CreatedAt, result.ExpiresAt,
+		result.RawOutput, result.StatOutput, result.CreatedAt, result.ExpiresAt,
 	)
 
 	if err != nil {
@@ -325,6 +351,64 @@ func (s *TaskStorage) GetTaskByID(taskID string) (*model.ProcessingTask, error) 
 	return &task, nil
 }
 
+// GetObservationDateForUser возвращает дату наблюдения и дату создания задачи
+// с проверкой владельца. Не использует nullable-поля которые ломают GetTaskByID.
+func (s *TaskStorage) GetObservationDateForUser(taskID, userLogin string) (obsDate *time.Time, createdAt time.Time, found bool, err error) {
+	row := s.pool.QueryRow(context.Background(), `
+		SELECT observation_date, created_at, user_login
+		FROM processing_tasks
+		WHERE id = $1
+	`, taskID)
+	var owner string
+	scanErr := row.Scan(&obsDate, &createdAt, &owner)
+	if scanErr != nil {
+		if scanErr == pgx.ErrNoRows {
+			return nil, time.Time{}, false, nil
+		}
+		return nil, time.Time{}, false, fmt.Errorf("get obs date: %w", scanErr)
+	}
+	if owner != userLogin {
+		return nil, time.Time{}, false, nil
+	}
+	return obsDate, createdAt, true, nil
+}
+
+// GetStatOutput возвращает stat_output результата с проверкой владельца.
+func (s *TaskStorage) GetStatOutput(taskID, userLogin string) (stat string, found bool, err error) {
+	queryErr := s.pool.QueryRow(context.Background(), `
+		SELECT COALESCE(r.stat_output, '')
+		FROM processing_results r
+		JOIN processing_tasks t ON t.id = r.task_id
+		WHERE r.task_id = $1 AND t.user_login = $2
+	`, taskID, userLogin).Scan(&stat)
+	if queryErr != nil {
+		if queryErr == pgx.ErrNoRows {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("get stat output: %w", queryErr)
+	}
+	return stat, true, nil
+}
+
+// GetRawOutput возвращает raw_output результата с проверкой владельца.
+// Использует лёгкий запрос без full_result_file (BYTEA).
+// Возвращает ("", false, nil) если задача не найдена или не принадлежит пользователю.
+func (s *TaskStorage) GetRawOutput(taskID, userLogin string) (raw string, found bool, err error) {
+	queryErr := s.pool.QueryRow(context.Background(), `
+		SELECT COALESCE(r.raw_output, '')
+		FROM processing_results r
+		JOIN processing_tasks t ON t.id = r.task_id
+		WHERE r.task_id = $1 AND t.user_login = $2
+	`, taskID, userLogin).Scan(&raw)
+	if queryErr != nil {
+		if queryErr == pgx.ErrNoRows {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("get raw output: %w", queryErr)
+	}
+	return raw, true, nil
+}
+
 // GetResultByTaskID возвращает результат по ID задачи
 func (s *TaskStorage) GetResultByTaskID(taskID string) (*model.ProcessingResult, error) {
 	query := `
@@ -368,7 +452,12 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		       COALESCE(r.expires_at, NOW()) AS result_expires_at
 		FROM processing_tasks t
 		LEFT JOIN processing_results r ON t.id = r.task_id
-		WHERE t.user_login = $1 AND (r.expires_at IS NULL OR r.expires_at > NOW())
+		WHERE t.user_login = $1
+		  AND t.expires_at > NOW()
+		  AND (
+		    t.status IN ('pending', 'processing')
+		    OR (r.task_id IS NOT NULL AND r.expires_at > NOW())
+		  )
 		ORDER BY t.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -505,7 +594,7 @@ func (s *TaskStorage) ClearResultFile(taskID string) error {
 
 // FailStalledTasks marks tasks stuck in "processing" for longer than timeout as failed.
 func (s *TaskStorage) FailStalledTasks(timeout time.Duration) error {
-	cutoff := time.Now().Add(-timeout)
+	cutoff := time.Now().UTC().Add(-timeout)
 	_, err := s.pool.Exec(context.Background(), `
 		UPDATE processing_tasks
 		SET status = 'failed',

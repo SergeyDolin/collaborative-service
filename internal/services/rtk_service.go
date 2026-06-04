@@ -38,8 +38,18 @@ func absPath(p string) string {
 	return abs
 }
 
+// readStatFile читает .stat файл рядом с .pos (output.pos → output.pos.stat)
+func readStatFile(posFile string) string {
+	statPath := posFile + ".stat"
+	data, err := os.ReadFile(statPath)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
 // ProcessPPP запускает PPP обработку с использованием точных файлов
-func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath, taskID string) (string, error) {
+func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath, taskID string) (string, string, error) {
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
 	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
@@ -72,17 +82,17 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath,
 
 	if err != nil {
 		r.logger.Errorf("rnx2rtkp failed: %v, stderr: %s", err, stderr.String())
-		return "", fmt.Errorf("PPP processing failed: %w", err)
+		return "", "", fmt.Errorf("PPP processing failed: %w", err)
 	}
 
 	r.logger.Infof("PPP completed in %.2f seconds, output: %s", duration, outputFile)
 	r.logger.Debugf("stdout: %s", stdout.String())
 
-	return outputFile, nil
+	return outputFile, readStatFile(outputFile), nil
 }
 
 // ProcessRelative запускает относительную обработку (DGPS/RTK)
-func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, taskID string) (string, error) {
+func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, taskID string) (string, string, error) {
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
 	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
@@ -117,16 +127,16 @@ func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, tas
 
 	if err != nil {
 		r.logger.Errorf("rnx2rtkp failed: %v, stderr: %s", err, stderr.String())
-		return "", fmt.Errorf("Relative processing failed: %w", err)
+		return "", "", fmt.Errorf("Relative processing failed: %w", err)
 	}
 
 	r.logger.Infof("Relative positioning completed in %.2f seconds, output: %s", duration, outputFile)
 
-	return outputFile, nil
+	return outputFile, readStatFile(outputFile), nil
 }
 
 // ProcessAbsolute запускает абсолютное позиционирование (SPP)
-func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID string) (string, error) {
+func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID string) (string, string, error) {
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
 	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
@@ -157,12 +167,12 @@ func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID strin
 
 	if err != nil {
 		r.logger.Errorf("rnx2rtkp failed: %v, stderr: %s", err, stderr.String())
-		return "", fmt.Errorf("Absolute processing failed: %w", err)
+		return "", "", fmt.Errorf("Absolute processing failed: %w", err)
 	}
 
 	r.logger.Infof("Absolute positioning completed in %.2f seconds, output: %s", duration, outputFile)
 
-	return outputFile, nil
+	return outputFile, readStatFile(outputFile), nil
 }
 
 // ProcessWithConfig общий метод для запуска с любым конфигом

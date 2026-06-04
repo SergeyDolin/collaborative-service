@@ -119,7 +119,7 @@ func (h *MeasurementHandler) ProcessMeasurementHandler(w http.ResponseWriter, r 
 		Config:    config,
 		Filename:  header.Filename,
 		Status:    model.StatusPending,
-		CreatedAt: time.Now(),
+		CreatedAt: time.Now().UTC(),
 	}
 
 	if err := h.taskStorage.CreateTask(task); err != nil {

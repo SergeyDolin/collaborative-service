@@ -165,12 +165,15 @@
 #processBtn {
     width:100%; padding:14px; font-size:0.95rem; font-weight:600;
     margin-top:24px;
-    background:var(--graphite); color:var(--paper); border:1px solid var(--graphite);
-    border-radius:var(--r-sm); cursor:pointer; transition:all var(--t);
+    background-color: var(--graphite);
+    background-image: linear-gradient(to right, rgba(255,255,255,0.22) var(--up,0%), transparent var(--up,0%));
+    color:var(--paper); border:1px solid var(--graphite);
+    border-radius:var(--r-sm); cursor:pointer; transition:opacity var(--t);
     font-family:var(--font-sans);
 }
-#processBtn:hover:not(:disabled) { background:var(--ink); border-color:var(--ink); }
+#processBtn:hover:not(:disabled) { background-color:var(--ink); border-color:var(--ink); }
 #processBtn:disabled { opacity:.45; cursor:not-allowed; }
+#processBtn.uploading { opacity:1 !important; cursor:default; }
 
 .status-message {
     margin-top:20px; padding:13px 16px; border-radius:var(--r-sm);
@@ -289,7 +292,10 @@
             <div class="file-info" id="fileInfo">RINEX (.obs, .rnx, .crx, .YYd), сжатые (.gz)</div>
             <input type="file" id="fileInput" style="display:none" accept=".obs,.rnx,.crx,.26d,.23d,.99D,.24d,.25d,.20d,.21d,.22d,.gz,.o">
         </div>
-        <button id="processBtn" onclick="startProcessing()" disabled>Выберите метод и файл</button>
+        <button id="processBtn" onclick="startProcessing()" disabled>
+            <span class="upload-progress" id="uploadProgress"></span>
+            <span id="processBtnText">Выберите метод и файл</span>
+        </button>
         <div id="status" class="status-message"></div>
     </div>
 </main>
