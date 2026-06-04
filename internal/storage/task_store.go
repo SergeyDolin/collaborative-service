@@ -266,8 +266,8 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 // GetUserTasks возвращает задачи пользователя
 func (s *TaskStorage) GetUserTasks(userLogin string, limit, offset int) ([]model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, original_path, 
-		       rinex_path, output_path, status, error_message,
+		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
+		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
 		       created_at, started_at, completed_at, processing_sec
 		FROM processing_tasks
 		WHERE user_login = $1
@@ -309,8 +309,8 @@ func (s *TaskStorage) GetUserTasks(userLogin string, limit, offset int) ([]model
 // GetTaskByID возвращает задачу по ID
 func (s *TaskStorage) GetTaskByID(taskID string) (*model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, original_path,
-		       rinex_path, output_path, status, error_message,
+		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
+		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
 		       created_at, started_at, completed_at, processing_sec,
 		       observation_date
 		FROM processing_tasks
