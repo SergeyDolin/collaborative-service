@@ -87,8 +87,8 @@ func (r *TaskRepositoryImpl) GetUserTasks(userLogin string, limit, offset int) (
 	}
 
 	query := `
-		SELECT id, user_login, config, filename, original_path, 
-		       rinex_path, output_path, status, error_message,
+		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
+		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
 		       created_at, started_at, completed_at, processing_sec
 		FROM processing_tasks
 		WHERE user_login = $1
@@ -133,8 +133,8 @@ func (r *TaskRepositoryImpl) GetUserTasks(userLogin string, limit, offset int) (
 // GetTaskByID получает задачу по ID
 func (r *TaskRepositoryImpl) GetTaskByID(taskID string) (*model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, original_path, 
-		       rinex_path, output_path, status, error_message,
+		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
+		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
 		       created_at, started_at, completed_at, processing_sec
 		FROM processing_tasks
 		WHERE id = $1
