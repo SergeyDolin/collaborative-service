@@ -384,26 +384,22 @@ func (g *ConfigGenerator) replaceParameters(
 		replacements[placeholder] = value
 	}
 
-	if files.NavigationFile != "" {
-		replacements["{{NAV_FILE}}"] = files.NavigationFile
-	}
-	if files.EphemerisFile != "" {
-		replacements["{{EPH_FILE}}"] = files.EphemerisFile
-	}
-	if files.ClockFile != "" {
-		replacements["{{CLK_FILE}}"] = files.ClockFile
-	}
-	if files.DCBFile != "" {
-		replacements["{{DCB_FILE}}"] = files.DCBFile
-	}
-	if files.ERPFile != "" {
-		replacements["{{ERP_FILE}}"] = files.ERPFile
-	}
-	if files.BIAFile != "" {
-		replacements["{{BIA_FILE}}"] = files.BIAFile
-	}
-	if files.BLQFile != "" {
-		replacements["{{BLQ_FILE}}"] = files.BLQFile
+	// Always replace file placeholders — leave empty if file unavailable.
+	// Unreplaced placeholders like {{BIA_FILE}} cause rnx2rtkp to try opening
+	// a file literally named "{{BIA_FILE}}" and abort without producing output.
+	replacements["{{NAV_FILE}}"] = files.NavigationFile
+	replacements["{{EPH_FILE}}"] = files.EphemerisFile
+	replacements["{{CLK_FILE}}"] = files.ClockFile
+	replacements["{{DCB_FILE}}"] = files.DCBFile
+	replacements["{{ERP_FILE}}"] = files.ERPFile
+	replacements["{{BIA_FILE}}"] = files.BIAFile
+	replacements["{{BLQ_FILE}}"] = files.BLQFile
+
+	// If OSB/BIA file is unavailable, disable AR product to prevent RTKLIB abort.
+	if files.BIAFile == "" {
+		replacements["{{AR_PROD}}"] = "off"
+	} else {
+		replacements["{{AR_PROD}}"] = "osb_cod"
 	}
 
 	for placeholder, value := range replacements {
