@@ -85,6 +85,7 @@ func (s *TaskStorage) InitTaskSchema() error {
 			full_result_file BYTEA,
 			file_type VARCHAR(20),
 			raw_output TEXT,
+			stat_output TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
 		);
@@ -157,11 +158,19 @@ func (s *TaskStorage) InitTaskSchema() error {
 	}
 
 	_, err = s.pool.Exec(context.Background(), `
-		ALTER TABLE processing_results 
+		ALTER TABLE processing_results
 		ADD COLUMN IF NOT EXISTS fix_rate REAL;
 	`)
 	if err != nil {
 		fmt.Printf("Warning: Failed to add fix_rate column: %v\n", err)
+	}
+
+	_, err = s.pool.Exec(context.Background(), `
+		ALTER TABLE processing_results
+		ADD COLUMN IF NOT EXISTS stat_output TEXT;
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to add stat_output column: %v\n", err)
 	}
 
 	return nil
@@ -234,9 +243,9 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 	query := `
 		INSERT INTO processing_results (
 			task_id, user_login, x, y, z, latitude, longitude, height,
-			q, n_sat, sdx, sdy, sdz, fix_rate, last_solution_line, 
-			full_result_file, file_type, raw_output, created_at, expires_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+			q, n_sat, sdx, sdy, sdz, fix_rate, last_solution_line,
+			full_result_file, file_type, raw_output, stat_output, created_at, expires_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 		ON CONFLICT (task_id) DO UPDATE SET
 			x = EXCLUDED.x, y = EXCLUDED.y, z = EXCLUDED.z,
 			latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude,
@@ -266,8 +275,8 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 // GetUserTasks возвращает задачи пользователя
 func (s *TaskStorage) GetUserTasks(userLogin string, limit, offset int) ([]model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
-		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
+		SELECT id, user_login, config, filename, original_path, 
+		       rinex_path, output_path, status, error_message,
 		       created_at, started_at, completed_at, processing_sec
 		FROM processing_tasks
 		WHERE user_login = $1
@@ -309,8 +318,8 @@ func (s *TaskStorage) GetUserTasks(userLogin string, limit, offset int) ([]model
 // GetTaskByID возвращает задачу по ID
 func (s *TaskStorage) GetTaskByID(taskID string) (*model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
-		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
+		SELECT id, user_login, config, filename, original_path,
+		       rinex_path, output_path, status, error_message,
 		       created_at, started_at, completed_at, processing_sec,
 		       observation_date
 		FROM processing_tasks
@@ -339,6 +348,47 @@ func (s *TaskStorage) GetTaskByID(taskID string) (*model.ProcessingTask, error) 
 	}
 
 	return &task, nil
+}
+
+// GetObservationDateForUser возвращает дату наблюдения и дату создания задачи
+// с проверкой владельца. Не использует nullable-поля которые ломают GetTaskByID.
+func (s *TaskStorage) GetObservationDateForUser(taskID, userLogin string) (obsDate *time.Time, createdAt time.Time, found bool, err error) {
+	row := s.pool.QueryRow(context.Background(), `
+		SELECT observation_date, created_at, user_login
+		FROM processing_tasks
+		WHERE id = $1
+	`, taskID)
+	var owner string
+	scanErr := row.Scan(&obsDate, &createdAt, &owner)
+	if scanErr != nil {
+		if scanErr == pgx.ErrNoRows {
+			return nil, time.Time{}, false, nil
+		}
+		return nil, time.Time{}, false, fmt.Errorf("get obs date: %w", scanErr)
+	}
+	if owner != userLogin {
+		return nil, time.Time{}, false, nil
+	}
+	return obsDate, createdAt, true, nil
+}
+
+// GetRawOutput возвращает raw_output результата с проверкой владельца.
+// Использует лёгкий запрос без full_result_file (BYTEA).
+// Возвращает ("", false, nil) если задача не найдена или не принадлежит пользователю.
+func (s *TaskStorage) GetRawOutput(taskID, userLogin string) (raw string, found bool, err error) {
+	queryErr := s.pool.QueryRow(context.Background(), `
+		SELECT COALESCE(r.raw_output, '')
+		FROM processing_results r
+		JOIN processing_tasks t ON t.id = r.task_id
+		WHERE r.task_id = $1 AND t.user_login = $2
+	`, taskID, userLogin).Scan(&raw)
+	if queryErr != nil {
+		if queryErr == pgx.ErrNoRows {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("get raw output: %w", queryErr)
+	}
+	return raw, true, nil
 }
 
 // GetResultByTaskID возвращает результат по ID задачи
@@ -590,41 +640,4 @@ func (s *TaskStorage) DeleteAllUserTasks(userLogin string) (int64, error) {
 	}
 
 	return res.RowsAffected(), nil
-}
-// GetObservationDateForUser возвращает дату наблюдения с проверкой владельца.
-func (s *TaskStorage) GetObservationDateForUser(taskID, userLogin string) (obsDate *time.Time, createdAt time.Time, found bool, err error) {
-	row := s.pool.QueryRow(context.Background(), `
-		SELECT observation_date, created_at, user_login
-		FROM processing_tasks
-		WHERE id = $1
-	`, taskID)
-	var owner string
-	scanErr := row.Scan(&obsDate, &createdAt, &owner)
-	if scanErr != nil {
-		if scanErr == pgx.ErrNoRows {
-			return nil, time.Time{}, false, nil
-		}
-		return nil, time.Time{}, false, fmt.Errorf("get obs date: %w", scanErr)
-	}
-	if owner != userLogin {
-		return nil, time.Time{}, false, nil
-	}
-	return obsDate, createdAt, true, nil
-}
-
-// GetRawOutput возвращает raw_output результата с проверкой владельца.
-func (s *TaskStorage) GetRawOutput(taskID, userLogin string) (raw string, found bool, err error) {
-	queryErr := s.pool.QueryRow(context.Background(), `
-		SELECT COALESCE(r.raw_output, '')
-		FROM processing_results r
-		JOIN processing_tasks t ON t.id = r.task_id
-		WHERE r.task_id = $1 AND t.user_login = $2
-	`, taskID, userLogin).Scan(&raw)
-	if queryErr != nil {
-		if queryErr == pgx.ErrNoRows {
-			return "", false, nil
-		}
-		return "", false, fmt.Errorf("get raw output: %w", queryErr)
-	}
-	return raw, true, nil
 }

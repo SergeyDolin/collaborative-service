@@ -396,29 +396,9 @@ func (s *MeasurementService) parseResult(
 		result.Height = bestSolution.Height
 		result.Q = bestSolution.Q
 		result.NSat = maxNSat // максимум за всю сессию, не последнее значение
-		// Для кинематики и абсолютного метода — среднее σ по всем эпохам.
-		// Для статики PPP — σ лучшей эпохи.
-		if (config.Mode == model.ModeKinematic || config.Method == model.MethodSingle) && len(solutions) > 0 {
-			var sumN, sumE, sumU float64
-			var cnt int
-			for _, sol := range solutions {
-				if sol.SDX > 0 && sol.SDY > 0 && sol.SDZ > 0 {
-					sumN += float64(sol.SDX)
-					sumE += float64(sol.SDY)
-					sumU += float64(sol.SDZ)
-					cnt++
-				}
-			}
-			if cnt > 0 {
-				result.SDX = float32(sumN / float64(cnt))
-				result.SDY = float32(sumE / float64(cnt))
-				result.SDZ = float32(sumU / float64(cnt))
-			}
-		} else {
-			result.SDX = bestSolution.SDX
-			result.SDY = bestSolution.SDY
-			result.SDZ = bestSolution.SDZ
-		}
+		result.SDX = bestSolution.SDX
+		result.SDY = bestSolution.SDY
+		result.SDZ = bestSolution.SDZ
 	}
 
 	// ВСЕГДА сохраняем последнюю строку решения (последнюю эпоху)

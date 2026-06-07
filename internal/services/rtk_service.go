@@ -52,13 +52,7 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath,
 	}
 
 	if navFile != "" {
-		args = append(args, absPath(navFile))
-	}
-	if sp3File != "" {
-		args = append(args, absPath(sp3File))
-	}
-	if clkFile != "" {
-		args = append(args, absPath(clkFile))
+		args = append(args, absPath(navFile), absPath(sp3File), absPath(clkFile))
 	}
 
 	r.logger.Infof("Running PPP with command: %s", strings.Join(args, " "))
@@ -83,9 +77,6 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath,
 
 	r.logger.Infof("PPP completed in %.2f seconds, output: %s", duration, outputFile)
 	r.logger.Debugf("stdout: %s", stdout.String())
-	if stderr.Len() > 0 {
-		r.logger.Debugf("stderr: %s", stderr.String())
-	}
 
 	return outputFile, nil
 }

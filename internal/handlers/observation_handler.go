@@ -42,46 +42,69 @@ func (h *ObservationHandler) GetObservationDate(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Получаем дату наблюдения и проверяем владельца без использования GetTaskByID
-	storedObs, createdAt, found, err := h.taskStorage.GetObservationDateForUser(taskID, login)
+	// Получаем задачу
+	task, err := h.taskStorage.GetTaskByID(taskID)
 	if err != nil {
-		h.logger.Errorf("Failed to get obs date for task %s: %v", taskID, err)
+		h.logger.Errorf("Failed to get task %s: %v", taskID, err)
 		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
 		return
 	}
-	if !found {
+	if task == nil {
 		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
+		return
+	}
+
+	// Проверяем права доступа
+	if task.UserLogin != login {
+		h.logger.Warnf("Access denied: task %s belongs to %s, requested by %s", taskID, task.UserLogin, login)
+		SendJSONError(w, "Access denied", http.StatusForbidden, h.logger)
 		return
 	}
 
 	var obsDate string
 	var source string
 
-	// Сначала проверяем сохраненную дату в БД
-	if storedObs != nil {
-		obsDate = storedObs.Format("2006-01-02")
+	// Сначала проверяем сохраненную дату
+	if task.ObservationDate != nil {
+		obsDate = task.ObservationDate.Format("2006-01-02")
 		source = "database"
 		h.logger.Debugf("Using cached observation date for task %s: %s", taskID, obsDate)
 	} else {
-		// Пробуем найти файл в рабочей директории
-		workDir := filepath.Join("./tmp", taskID)
-		rinexPath := h.findRINEXFile(workDir)
+		// Пытаемся получить результат для определения пути к файлу
+		result, _ := h.taskStorage.GetResultByTaskID(taskID)
+
+		// Определяем путь к RINEX-файлу
+		var rinexPath string
+		if task.RinexPath != "" {
+			rinexPath = task.RinexPath
+		} else if result != nil && result.FileType != "" {
+			// Для статики файл может быть уже удален, используем дату создания
+			obsDate = task.CreatedAt.Format("2006-01-02")
+			source = "task_created"
+			h.logger.Debugf("Using task creation date for static file: %s", obsDate)
+		} else {
+			// Пробуем найти файл в рабочей директории
+			workDir := filepath.Join("./tmp", taskID)
+			rinexPath = h.findRINEXFile(workDir)
+		}
 
 		// Парсим дату из файла
 		if rinexPath != "" {
-			parsedDate, parseErr := h.parser.ParseObservationDate(rinexPath)
-			if parseErr == nil {
+			parsedDate, err := h.parser.ParseObservationDate(rinexPath)
+			if err == nil {
 				obsDate = parsedDate.Format("2006-01-02")
 				source = "rinex_header"
 				h.logger.Infof("Parsed observation date from RINEX: %s", obsDate)
+
+				// Сохраняем дату в БД для будущих запросов
 				go h.saveObservationDate(taskID, parsedDate)
 			} else {
-				h.logger.Warnf("Failed to parse observation date from %s: %v", rinexPath, parseErr)
-				obsDate = createdAt.Format("2006-01-02")
+				h.logger.Warnf("Failed to parse observation date from %s: %v", rinexPath, err)
+				obsDate = task.CreatedAt.Format("2006-01-02")
 				source = "task_created"
 			}
 		} else {
-			obsDate = createdAt.Format("2006-01-02")
+			obsDate = task.CreatedAt.Format("2006-01-02")
 			source = "task_created"
 			h.logger.Debugf("No RINEX file found, using task creation date: %s", obsDate)
 		}
