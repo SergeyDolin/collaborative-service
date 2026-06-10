@@ -244,7 +244,7 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 		INSERT INTO processing_results (
 			task_id, user_login, x, y, z, latitude, longitude, height,
 			q, n_sat, sdx, sdy, sdz, fix_rate, last_solution_line,
-			full_result_file, file_type, raw_output, stat_output, created_at, expires_at
+			full_result_file, file_type, raw_output, created_at, expires_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 		ON CONFLICT (task_id) DO UPDATE SET
 			x = EXCLUDED.x, y = EXCLUDED.y, z = EXCLUDED.z,
@@ -275,8 +275,8 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 // GetUserTasks возвращает задачи пользователя
 func (s *TaskStorage) GetUserTasks(userLogin string, limit, offset int) ([]model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, original_path, 
-		       rinex_path, output_path, status, error_message,
+		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
+		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
 		       created_at, started_at, completed_at, processing_sec
 		FROM processing_tasks
 		WHERE user_login = $1
@@ -318,8 +318,8 @@ func (s *TaskStorage) GetUserTasks(userLogin string, limit, offset int) ([]model
 // GetTaskByID возвращает задачу по ID
 func (s *TaskStorage) GetTaskByID(taskID string) (*model.ProcessingTask, error) {
 	query := `
-		SELECT id, user_login, config, filename, original_path,
-		       rinex_path, output_path, status, error_message,
+		SELECT id, user_login, config, filename, COALESCE(original_path, ''),
+		       COALESCE(rinex_path, ''), COALESCE(output_path, ''), status, COALESCE(error_message, ''),
 		       created_at, started_at, completed_at, processing_sec,
 		       observation_date
 		FROM processing_tasks

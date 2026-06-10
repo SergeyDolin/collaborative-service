@@ -156,8 +156,18 @@ func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID strin
 	duration := time.Since(startTime).Seconds()
 
 	if err != nil {
-		r.logger.Errorf("rnx2rtkp failed: %v, stderr: %s", err, stderr.String())
+		r.logger.Errorf("rnx2rtkp failed: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
 		return "", fmt.Errorf("Absolute processing failed: %w", err)
+	}
+
+	if out := stdout.String() + stderr.String(); out != "" {
+		r.logger.Debugf("rnx2rtkp output: %s", out)
+	}
+
+	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+		r.logger.Warnf("rnx2rtkp exited 0 but produced no output file (no solutions). stdout: %s stderr: %s",
+			stdout.String(), stderr.String())
+		return "", nil
 	}
 
 	r.logger.Infof("Absolute positioning completed in %.2f seconds, output: %s", duration, outputFile)
@@ -189,8 +199,18 @@ func (r *RTKService) ProcessWithConfig(configPath, rinexPath, taskID string) (st
 
 	err := cmd.Run()
 	if err != nil {
-		r.logger.Errorf("rnx2rtkp failed: %v, stderr: %s", err, stderr.String())
+		r.logger.Errorf("rnx2rtkp failed: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
 		return "", fmt.Errorf("processing failed: %w", err)
+	}
+
+	if out := stdout.String() + stderr.String(); out != "" {
+		r.logger.Debugf("rnx2rtkp output: %s", out)
+	}
+
+	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+		r.logger.Warnf("rnx2rtkp exited 0 but produced no output file (no solutions). stdout: %s stderr: %s",
+			stdout.String(), stderr.String())
+		return "", nil
 	}
 
 	return outputFile, nil

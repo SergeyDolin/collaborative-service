@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -74,28 +75,26 @@ func (c *ConverterService) ConvertCRX2RNX(inputPath, outputPath string) error {
 		c.logger.Warnf("Failed to chmod crx2rnx: %v", err)
 	}
 
-	// Попытка 1: crx2rnx <input> <output>
-	cmd := exec.Command(crx2rnxPath, inputPath, outputPath)
-	output, err := cmd.CombinedOutput()
+	// crx2rnx принимает только stdin/stdout
+	cmd := exec.Command(crx2rnxPath)
+	inFile, err := os.Open(inputPath)
 	if err != nil {
-		c.logger.Warnf("crx2rnx with args failed: %v\noutput: %s", err, string(output))
+		return fmt.Errorf("open input: %w", err)
+	}
+	defer inFile.Close()
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("create output: %w", err)
+	}
+	defer outFile.Close()
+	cmd.Stdin = inFile
+	cmd.Stdout = outFile
+	var crxStderr bytes.Buffer
+	cmd.Stderr = &crxStderr
 
-		// Попытка 2: crx2rnx < input > output
-		cmd2 := exec.Command(crx2rnxPath)
-		if inFile, e := os.Open(inputPath); e == nil {
-			defer inFile.Close()
-			cmd2.Stdin = inFile
-		}
-		if outFile, e := os.Create(outputPath); e == nil {
-			defer outFile.Close()
-			cmd2.Stdout = outFile
-		}
-		cmd2.Stderr = os.Stderr
-
-		if err2 := cmd2.Run(); err2 != nil {
-			c.logger.Errorf("crx2rnx stdin/stdout also failed: %v", err2)
-			return fmt.Errorf("crx2rnx conversion failed: %w", err2)
-		}
+	if err = cmd.Run(); err != nil {
+		c.logger.Errorf("crx2rnx failed: %v\nstderr: %s", err, crxStderr.String())
+		return fmt.Errorf("crx2rnx conversion failed: %w", err)
 	}
 
 	if _, err := os.Stat(outputPath); os.IsNotExist(err) {

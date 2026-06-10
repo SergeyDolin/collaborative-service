@@ -107,26 +107,42 @@ func (d *FileDownloader) DownloadBroadcastEphemeris(date time.Time, taskID strin
 	year, doy := getYearDay(date)
 
 	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_brdc.rnx.gz", taskID))
-	url := fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/BRDC/%d/%03d/BRDC00WRD_R_%d%03d0000_01D_MN.rnx.gz",
-		year, doy, year, doy)
 
-	if err := d.downloadFile(url, localFile); err != nil {
-		d.logger.Warnf("Failed to download BRDC from BKG: %v, trying CDDIS...", err)
-		url = fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/brdc/brdc%03d0.%02dn.gz",
-			year, doy, year%100)
+	// RINEX 3 mixed nav (multi-constellation) — несколько зеркал.
+	// BKG недоступен с сервера с 04.06.2026 — оставлен последним как запасной.
+	brdcURLs := []string{
+		fmt.Sprintf("https://igs.ign.fr/pub/igs/data/%d/%03d/BRDC00IGN_R_%d%03d0000_01D_MN.rnx.gz",
+			year, doy, year, doy),
+		fmt.Sprintf("https://geodesy.noaa.gov/corsdata/rinex/%d/%03d/brdc%03d0.%02dn.gz",
+			year, doy, doy, year%100),
+		fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/brdc/brdc%03d0.%02dn.gz",
+			year, doy, year%100),
+		fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/BRDC/%d/%03d/BRDC00WRD_R_%d%03d0000_01D_MN.rnx.gz",
+			year, doy, year, doy),
+	}
+
+	var lastErr error
+	for _, url := range brdcURLs {
 		if err := d.downloadFile(url, localFile); err != nil {
-			return "", fmt.Errorf("failed to download broadcast ephemeris: %w", err)
+			d.logger.Warnf("BRDC download failed (%s): %v", url, err)
+			lastErr = err
+			continue
 		}
+		// Проверяем что скачали валидный gz
+		unpacked := localFile[:len(localFile)-3]
+		if err := d.gunzipFile(localFile, unpacked); err != nil {
+			d.logger.Warnf("BRDC unpack failed (%s): %v", url, err)
+			os.Remove(localFile)
+			os.Remove(unpacked)
+			lastErr = err
+			continue
+		}
+		d.logger.Infof("Downloaded broadcast ephemeris: %s", unpacked)
+		os.Remove(localFile)
+		return unpacked, nil
 	}
 
-	unpacked := localFile[:len(localFile)-3]
-	if err := d.gunzipFile(localFile, unpacked); err != nil {
-		return "", fmt.Errorf("failed to unpack broadcast ephemeris: %w", err)
-	}
-
-	d.logger.Infof("Downloaded broadcast ephemeris: %s", unpacked)
-	os.Remove(localFile)
-	return unpacked, nil
+	return "", fmt.Errorf("failed to download broadcast ephemeris from all sources: %w", lastErr)
 }
 
 // DownloadPreciseEphemeris скачивает точные эфемериды SP3 для PPP.
@@ -147,8 +163,14 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 
 	ftpWeekDir := fmt.Sprintf("/gnss/products/%d", week)
 
+	// BKG недоступен с сервера с 04.06.2026 — оставлен последним.
+	// AIUB RAPID (COD0MGXRAP) отдаёт 404 для текущих дат — не включён.
 	candidates := []candidate{
-		// ── Новый формат (после ~2022) ──────────────────────────────────────
+		// ── CODE MGEX (AIUB Bern) FINAL — HTTP, без авторизации ─────────────
+		{"AIUB_CODE_MGEX_FINAL", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_05M_ORB.SP3.gz",
+				year, year, doy)},
+		// ── CDDIS FTP anonymous — новый формат ──────────────────────────────
 		{"CDDIS_COD_FINAL", ftpWeekDir,
 			fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy)},
 		{"CDDIS_COD_RAPID", ftpWeekDir,
@@ -159,28 +181,16 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy)},
 		{"CDDIS_IGS_ULTRA", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_15M_ORB.SP3.gz", year, doy)},
-		{"BKG_IGS_FINAL", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
-		{"BKG_IGS_RAPID", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
-		// ── CODE MGEX (AIUB Bern) — организованы по году, охватывают 2012–наст. ──
-		// Используются для данных до ~2022, когда IGS ещё не перешёл на новый формат.
-		{"AIUB_CODE_MGEX_FINAL", "",
-			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_05M_ORB.SP3.gz",
-				year, year, doy)},
-		{"AIUB_CODE_MGEX_RAPID", "",
-			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXRAP_%d%03d0000_01D_05M_ORB.SP3.gz",
-				year, year, doy)},
-		// ── Старый формат (до ~2022, например неделя 2086) ──────────────────
-		// igs = final (~2 нед. задержка), igr = rapid (~17 ч задержка)
+		// ── Старый формат (до ~2022) ─────────────────────────────────────────
 		{"CDDIS_OLD_FINAL", ftpWeekDir,
 			fmt.Sprintf("igs%d%d.sp3.Z", week, dow)},
 		{"CDDIS_OLD_RAPID", ftpWeekDir,
 			fmt.Sprintf("igr%d%d.sp3.Z", week, dow)},
-		{"BKG_OLD_FINAL", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.sp3.gz", week, week, dow)},
-		{"BKG_OLD_RAPID", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.sp3.gz", week, week, dow)},
+		// ── BKG — последний резерв (недоступен с сервера с 04.06.2026) ──────
+		{"BKG_IGS_FINAL", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
+		{"BKG_IGS_RAPID", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
 	}
 
 	var lastErr error
@@ -233,8 +243,14 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 
 	ftpWeekDir := fmt.Sprintf("/gnss/products/%d", week)
 
+	// BKG недоступен с сервера с 04.06.2026 — оставлен последним.
+	// AIUB RAPID (COD0MGXRAP) отдаёт 404 для текущих дат — не включён.
 	candidates := []candidate{
-		// ── Новый формат (после ~2022) ──────────────────────────────────────
+		// ── CODE MGEX (AIUB Bern) FINAL — HTTP, без авторизации ─────────────
+		{"AIUB_CODE_MGEX_FINAL", "",
+			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_30S_CLK.CLK.gz",
+				year, year, doy)},
+		// ── CDDIS FTP anonymous — новый формат ──────────────────────────────
 		{"CDDIS_COD_FINAL", ftpWeekDir,
 			fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy)},
 		{"CDDIS_COD_RAPID", ftpWeekDir,
@@ -245,26 +261,16 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy)},
 		{"CDDIS_IGS_ULTRA", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_05M_CLK.CLK.gz", year, doy)},
-		{"BKG_IGS_FINAL", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", week, year, doy)},
-		{"BKG_IGS_RAPID", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", week, year, doy)},
-		// ── CODE MGEX (AIUB Bern) — организованы по году, охватывают 2012–наст. ──
-		{"AIUB_CODE_MGEX_FINAL", "",
-			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_30S_CLK.CLK.gz",
-				year, year, doy)},
-		{"AIUB_CODE_MGEX_RAPID", "",
-			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXRAP_%d%03d0000_01D_30S_CLK.CLK.gz",
-				year, year, doy)},
-		// ── Старый формат (до ~2022, например неделя 2086) ──────────────────
+		// ── Старый формат (до ~2022) ─────────────────────────────────────────
 		{"CDDIS_OLD_FINAL", ftpWeekDir,
 			fmt.Sprintf("igs%d%d.clk_30s.Z", week, dow)},
 		{"CDDIS_OLD_RAPID", ftpWeekDir,
 			fmt.Sprintf("igr%d%d.clk.Z", week, dow)},
-		{"BKG_OLD_FINAL", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.clk.gz", week, week, dow)},
-		{"BKG_OLD_RAPID", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.clk.gz", week, week, dow)},
+		// ── BKG — последний резерв (недоступен с сервера с 04.06.2026) ──────
+		{"BKG_IGS_FINAL", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", week, year, doy)},
+		{"BKG_IGS_RAPID", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", week, year, doy)},
 	}
 
 	var lastErr error
@@ -317,27 +323,28 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 
 	year, doy := getYearDay(date)
 
+	// BKG недоступен с сервера с 04.06.2026 — перенесён в конец.
 	candidates := []erpCandidate{
 		// ── AIUB CODE MGEX FINAL: суточные, DOY наблюдения — самый надёжный ──
 		{"AIUB_COD_MGEX_FINAL", "",
 			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_12H_ERP.ERP.gz",
 				year, year, doy)},
-		// ── BKG IGS FINAL: недельный, DOY воскресенья ────────────────────────
-		{"BKG_IGS_FINAL", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_07D_01D_ERP.ERP.gz",
-				week, sunYear, sunDOY)},
+		// ── CDDIS FTP — новый формат IGS ────────────────────────────────────
 		{"CDDIS_IGS_FINAL", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_07D_01D_ERP.ERP.gz", sunYear, sunDOY)},
-		// ── BKG IGS RAPID: суточные, DOY наблюдения ──────────────────────────
-		{"BKG_IGS_RAPID", "",
-			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_01D_ERP.ERP.gz",
-				week, year, doy)},
 		{"CDDIS_IGS_RAPID", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_01D_ERP.ERP.gz", year, doy)},
 		// ── Старый формат (до ~2022): COD{WWWW}{D}.ERP.Z на AIUB ─────────────
 		{"AIUB_COD_OLD", "",
 			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE/%d/COD%d%d.ERP.Z",
 				date.Year(), week, dow)},
+		// ── BKG — последний резерв (недоступен с сервера с 04.06.2026) ──────
+		{"BKG_IGS_FINAL", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_07D_01D_ERP.ERP.gz",
+				week, sunYear, sunDOY)},
+		{"BKG_IGS_RAPID", "",
+			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_01D_ERP.ERP.gz",
+				week, year, doy)},
 	}
 
 	var lastErr error
@@ -429,7 +436,6 @@ func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, err
 	d.logger.Infof("Downloaded DCB: %s", outFile)
 	return outFile, nil
 }
-
 
 // DownloadBIA скачивает файл фазовых смещений (BIA/OSB) для PPP-AR.
 // Источник: CDDIS FTP (gdc.cddis.eosdis.nasa.gov:21, anonymous).
