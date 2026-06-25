@@ -133,7 +133,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	files := &ProcessingFiles{}
 	files.NavigationFile, _ = s.downloader.DownloadBroadcastEphemeris(date, taskID)
 
-	s.generateBLQIfAvailable(obsPath, taskID, files)
+	s.generateBLQIfAvailable(rinexPath, taskID, files)
 
 	var outputPath string
 	var procErr error
@@ -243,7 +243,7 @@ func (s *MeasurementService) generateBLQIfAvailable(obsPath, taskID string, file
 	}
 	lat, lon, found := s.rinexParser.ParseApproxPosition(obsPath)
 	if !found {
-		s.logger.Warnf("[%s] APPROX POSITION XYZ отсутствует или нулевая — BLQ пропущен", taskID)
+		s.logger.Warnf("[%s] APPROX POSITION XYZ отсутствует или нулевая в %s — BLQ пропущен", taskID, obsPath)
 		return
 	}
 	marker := s.rinexParser.ParseMarkerName(obsPath)
