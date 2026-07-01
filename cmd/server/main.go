@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -37,13 +38,15 @@ const (
 
 // Application представляет приложение с управлением жизненным циклом
 type Application struct {
-	server      *http.Server
-	logger      *zap.SugaredLogger
-	dbStorage   *storage.DBStorage
-	taskStorage *storage.TaskStorage
-	workerMgr   *workers.Manager
-	ctx         context.Context
-	cancel      context.CancelFunc
+	server       *http.Server
+	logger       *zap.SugaredLogger
+	dbStorage    *storage.DBStorage
+	taskStorage  *storage.TaskStorage
+	workerMgr    *workers.Manager
+	posWorker    *workers.PositioningWorker
+	streamWorker *workers.StreamWorker
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 func main() {
@@ -86,6 +89,18 @@ func NewApplication(cfg *config.Config, logger *zap.SugaredLogger) (*Application
 		DefaultWorkDir,
 	)
 
+	if app.dbStorage != nil {
+		atxAbs, _ := filepath.Abs(ATXFile)
+		tmplAbs, _ := filepath.Abs(RTKConfTemplate)
+		rtkrcvAbs, _ := filepath.Abs(RTKRCVBinary)
+		app.posWorker = workers.NewPositioningWorker(
+			app.dbStorage, app.logger, DefaultWorkDir, tmplAbs, atxAbs, rtkrcvAbs,
+		)
+	}
+
+	str2strAbs, _ := filepath.Abs(filepath.Join(ConfigDir, "str2str"))
+	app.streamWorker = workers.NewStreamWorker(str2strAbs, app.logger)
+
 	router := app.setupRoutes(cfg)
 
 	app.server = &http.Server{
@@ -119,6 +134,11 @@ func (app *Application) initStorage(cfg *config.Config) error {
 		return err
 	}
 	app.logger.Info("Task schema initialized")
+
+	if err := app.taskStorage.InitCalibrationSchema(); err != nil {
+		return err
+	}
+	app.logger.Info("Calibration schema initialized")
 
 	// Инициализируем схему профилей и устройств
 	if err := app.dbStorage.InitProfileSchema(); err != nil {
@@ -179,6 +199,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 	router.Get("/collaborative", handlers.CollaborativePageHandler(app.logger))
 	router.Get("/positioning", handlers.PositioningPageHandler(app.logger))
 	router.Get("/terms", handlers.TermsPageHandler(app.logger))
+	router.Get("/calibration", handlers.CalibrationPageHandler(app.logger))
 
 	// Public API
 	router.Post("/api/register", handlers.RegisterHandler(app.dbStorage, app.logger))
@@ -194,6 +215,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 		transformHandler := handlers.NewTransformHandler(app.logger)
 		observationHandler := handlers.NewObservationHandler(app.taskStorage, app.logger)
 		trajectoryHandler := handlers.NewTrajectoryHandler(app.taskStorage, app.logger)
+		calibrationHandler := handlers.NewCalibrationHandler(app.taskStorage, app.logger, measurementHandler)
 		router.Get("/api/stats", measurementHandler.GetSystemStatsHandler)
 
 		// Protected routes
@@ -224,6 +246,28 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			r.Delete("/api/measurements/delete", measurementHandler.DeleteTaskHandler)
 			r.Delete("/api/measurements/delete-all", measurementHandler.DeleteAllTasksHandler)
 
+			// Calibration
+			r.Post("/api/calibration/start", calibrationHandler.StartCalibration)
+			r.Get("/api/calibration/list", calibrationHandler.ListTasks)
+			r.Post("/api/calibration/{taskId}/receiver", calibrationHandler.UploadReceiverFile)
+			r.Post("/api/calibration/{taskId}/session", calibrationHandler.UploadSession)
+			r.Post("/api/calibration/{taskId}/submit", calibrationHandler.Submit)
+			r.Get("/api/calibration/{taskId}/status", calibrationHandler.GetStatus)
+
+			// Collaborative positioning
+			if app.dbStorage != nil {
+				collabHandler := handlers.NewCollaborativeHandler(app.dbStorage, app.logger)
+				r.Post("/api/collaborative/sessions", collabHandler.CreateSession)
+				r.Get("/api/collaborative/sessions", collabHandler.ListSessions)
+				r.Delete("/api/collaborative/sessions/{id}", collabHandler.DeleteSession)
+				r.Post("/api/collaborative/sessions/{id}/positioning", collabHandler.SetPositioning)
+
+				// Online real-time positioning (client app)
+				onlineHandler := handlers.NewOnlineHandler(app.dbStorage, app.logger)
+				r.Post("/api/online/register", onlineHandler.Register)
+				r.Post("/api/online/status", onlineHandler.UpdateStatus)
+				r.Delete("/api/online/session", onlineHandler.Delete)
+			}
 		})
 	}
 
@@ -234,6 +278,14 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 func (app *Application) Run() error {
 	app.workerMgr.Start(app.ctx)
 	app.logger.Info("Background workers started")
+
+	// if app.posWorker != nil {
+	// 	app.posWorker.Start(app.ctx)
+	// 	app.logger.Info("Positioning worker started")
+	// }
+
+	// app.streamWorker.Start(app.ctx)
+	// app.logger.Info("EPH/SSR stream worker started")
 
 	go func() {
 		app.logger.Infof("Running server on %s", app.server.Addr)

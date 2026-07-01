@@ -59,3 +59,8 @@ func PositioningPageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 func TermsPageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
 	return ServeStaticFile("terms.html", logger)
 }
+
+// CalibrationPageHandler обслуживает страницу калибровки антенны
+func CalibrationPageHandler(logger *zap.SugaredLogger) http.HandlerFunc {
+	return ServeStaticFile("calibration.html", logger)
+}

@@ -306,9 +306,9 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *http.Request) {
 	if h.taskStorage == nil {
 		SendJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"activeUsers":         0,
-			"measurementsToday":   0,
-			"onlineParticipants":  0,
+			"activeUsers":        0,
+			"measurementsToday":  0,
+			"onlineParticipants": 0,
 		}, h.logger)
 		return
 	}
@@ -317,9 +317,9 @@ func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		h.logger.Errorf("Failed to get system stats: %v", err)
 		SendJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"activeUsers":         0,
-			"measurementsToday":   0,
-			"onlineParticipants":  0,
+			"activeUsers":        0,
+			"measurementsToday":  0,
+			"onlineParticipants": 0,
 		}, h.logger)
 		return
 	}
@@ -373,4 +373,26 @@ func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model
 
 	// Invalidate cache so next history request reflects updated status
 	h.historyCache.Invalidate(login)
+}
+
+// NewMeasurementService создаёт MeasurementService с путями по умолчанию.
+// Используется хэндлером калибровки.
+func (h *MeasurementHandler) NewMeasurementService() *services.MeasurementService {
+	const (
+		defaultWorkDir   = "./tmp"
+		defaultConfigDir = "./cmd/solver/configs"
+		defaultSolverDir = "./cmd/solver/app"
+		defaultBLQScript = "./cmd/solver/src/generate_blq.py"
+		defaultBLQConfig = "./cmd/solver/src/fes_ocean_loading.yml"
+	)
+	configGen := services.NewConfigGenerator(defaultConfigDir, defaultWorkDir, h.logger)
+	downloader := services.NewFileDownloader(defaultWorkDir, h.logger)
+	converter := services.NewConverterService(defaultSolverDir, h.logger)
+	rtk := services.NewRTKService(defaultSolverDir, defaultWorkDir, h.logger)
+	fileSvc := services.NewFileService(defaultWorkDir, h.logger)
+	blqSvc := services.NewBLQService(defaultBLQScript, defaultBLQConfig, defaultWorkDir, h.logger)
+	return services.NewMeasurementService(
+		h.taskStorage, configGen, downloader, converter, rtk, fileSvc, blqSvc,
+		defaultWorkDir, h.logger,
+	)
 }

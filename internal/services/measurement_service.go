@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -416,6 +417,34 @@ func (s *MeasurementService) parseResult(
 	}
 
 	return result
+}
+
+// SubmitForPPP создаёт задачу PPP (PPP-static, все прецизионные продукты) и запускает её асинхронно.
+// Возвращает taskID немедленно. Используется сервисом калибровки.
+func (s *MeasurementService) SubmitForPPP(ctx context.Context, login string, fileData []byte, filename string) (string, error) {
+	taskID := uuid.NewString()
+	cfg := model.DefaultConfig(model.MethodPPP)
+	cfg.DeviceType = "mobile"
+
+	now := time.Now()
+	task := &model.ProcessingTask{
+		ID:        taskID,
+		UserLogin: login,
+		Filename:  filename,
+		Config:    cfg,
+		Status:    model.StatusPending,
+		CreatedAt: now,
+	}
+	if err := s.taskStorage.CreateTask(task); err != nil {
+		return "", fmt.Errorf("create ppp task: %w", err)
+	}
+
+	go func() {
+		if err := s.ProcessMeasurement(ctx, taskID, login, &cfg, fileData, filename); err != nil {
+			s.logger.Errorf("calibration PPP task %s: %v", taskID, err)
+		}
+	}()
+	return taskID, nil
 }
 
 // handleError обрабатывает ошибку

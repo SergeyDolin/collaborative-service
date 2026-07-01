@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Калибровка антенны — CPS</title>
+<link rel="stylesheet" href="/css/theme.css">
+<style>
+.main-content { max-width:860px; }
+.page-eyebrow {
+    font-family:var(--font-mono); font-size:0.7rem; font-weight:500;
+    text-transform:uppercase; letter-spacing:0.18em; color:var(--ink-3);
+    display:flex; align-items:center; gap:10px; margin-bottom:8px;
+}
+.page-eyebrow::before { content:''; width:24px; height:1px; background:var(--graphite); }
+.page-title {
+    font-size:1.9rem; font-weight:300; letter-spacing:-0.02em;
+    margin-bottom:32px; color:var(--ink);
+}
+.page-title em { font-style:normal; background:var(--signal); color:var(--signal-ink); padding:0 6px; }
+
+/* Wizard steps */
+.wizard-steps {
+    display:flex; gap:0; margin-bottom:32px;
+    border:1px solid var(--paper-edge); border-radius:var(--r-sm);
+    overflow:hidden;
+}
+.wizard-step {
+    flex:1; padding:10px 14px; background:var(--paper);
+    border-right:1px solid var(--paper-edge);
+    display:flex; align-items:center; gap:8px; cursor:default;
+    transition:background var(--t);
+}
+.wizard-step:last-child { border-right:none; }
+.wizard-step .step-n {
+    width:22px; height:22px; border-radius:50%;
+    background:var(--paper-2); border:1px solid var(--paper-edge);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:0.7rem; font-weight:600;
+    color:var(--ink-3); flex-shrink:0;
+}
+.wizard-step .step-label { font-size:0.73rem; color:var(--ink-3); font-weight:500; line-height:1.2; }
+.wizard-step.active { background:var(--paper-2); }
+.wizard-step.active .step-n { background:var(--signal); border-color:var(--signal); color:var(--signal-ink); }
+.wizard-step.active .step-label { color:var(--ink); }
+.wizard-step.done .step-n { background:var(--ok-bg); border-color:var(--ok); color:var(--ok); }
+.wizard-step.done .step-label { color:var(--ink-3); }
+
+/* Cards */
+.card { padding:32px; }
+.section-label {
+    font-family:var(--font-mono); font-size:0.7rem; font-weight:600;
+    color:var(--ink-3); text-transform:uppercase; letter-spacing:0.12em;
+    margin-bottom:14px; display:flex; align-items:center; gap:10px;
+}
+.section-label::before {
+    content:''; width:6px; height:6px; background:var(--signal);
+    border-radius:50%; box-shadow:0 0 0 3px var(--signal-soft);
+}
+
+/* Mode cards */
+.mode-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.mode-card {
+    background:var(--paper); border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); padding:20px 18px; cursor:pointer;
+    transition:all var(--t); position:relative; overflow:hidden;
+}
+.mode-card:hover { border-color:var(--graphite); }
+.mode-card.selected { border-color:var(--graphite); background:var(--paper-2); }
+.mode-card.selected::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:var(--signal);
+}
+.mode-tag {
+    font-family:var(--font-mono); font-size:0.65rem; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-3);
+    margin-bottom:6px;
+}
+.mode-title { font-size:0.95rem; font-weight:600; color:var(--ink); margin-bottom:6px; }
+.mode-desc { font-size:0.78rem; color:var(--ink-3); line-height:1.5; font-family:var(--font-mono); }
+
+/* Form rows */
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+.form-row.triple { grid-template-columns:1fr 1fr 1fr; }
+.form-row.single { grid-template-columns:1fr; }
+.fld label { display:block; font-size:0.72rem; font-weight:600; color:var(--ink-3);
+    text-transform:uppercase; letter-spacing:0.08em; margin-bottom:5px; }
+.fld input, .fld select {
+    width:100%; padding:9px 12px;
+    background:var(--paper); border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); font-size:0.88rem; color:var(--ink);
+    font-family:var(--font-mono); transition:border-color var(--t);
+}
+.fld input:focus, .fld select:focus {
+    outline:none; border-color:var(--graphite);
+    box-shadow:0 0 0 3px var(--signal-soft);
+}
+.fld .hint { font-size:0.72rem; color:var(--ink-faint); margin-top:4px; font-family:var(--font-mono); }
+
+/* Ref type selector */
+.ref-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+.ref-opt {
+    border:1px solid var(--paper-edge); border-radius:var(--r-sm);
+    padding:14px; cursor:pointer; transition:all var(--t); background:var(--paper);
+    position:relative; overflow:hidden;
+}
+.ref-opt:hover { border-color:var(--graphite); }
+.ref-opt.selected { border-color:var(--graphite); background:var(--paper-2); }
+.ref-opt.selected::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:var(--signal);
+}
+.ref-opt-title { font-size:0.85rem; font-weight:600; color:var(--ink); margin-bottom:4px; }
+.ref-opt-desc { font-size:0.72rem; color:var(--ink-3); line-height:1.4; font-family:var(--font-mono); }
+
+/* Session list */
+.session-list { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.session-item {
+    background:var(--paper); border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); padding:14px 16px;
+    display:flex; align-items:center; gap:12px;
+}
+.session-icon {
+    width:32px; height:32px; border-radius:50%;
+    background:var(--paper-2); border:1px solid var(--paper-edge);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1rem; flex-shrink:0;
+}
+.session-meta { flex:1; }
+.session-name { font-size:0.85rem; font-weight:600; color:var(--ink); }
+.session-sub { font-size:0.72rem; color:var(--ink-3); font-family:var(--font-mono); }
+.session-status { font-family:var(--font-mono); font-size:0.72rem; padding:3px 8px;
+    border-radius:100px; }
+.session-status.pending { background:var(--paper-2); color:var(--ink-3); }
+.session-status.done    { background:var(--ok-bg); color:var(--ok); }
+.session-status.error   { background:var(--err-bg); color:var(--err); }
+
+/* Upload zone */
+.drop-zone {
+    border:2px dashed var(--paper-edge); border-radius:var(--r-sm);
+    padding:28px; text-align:center; cursor:pointer;
+    transition:border-color var(--t), background var(--t);
+    margin-bottom:14px;
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color:var(--graphite); background:var(--paper-2);
+}
+.drop-zone p { color:var(--ink-3); font-size:0.85rem; margin:0; }
+.drop-zone input[type=file] { display:none; }
+
+/* Phone diagram */
+.phone-diagram {
+    width:100%; max-width:480px; margin:0 auto 20px;
+    aspect-ratio:1.6; position:relative;
+}
+.phone-diagram svg { width:100%; height:100%; }
+
+/* Info box */
+.info-box {
+    background:var(--info-bg); border:1px solid var(--info);
+    border-left:3px solid var(--info); border-radius:var(--r-sm);
+    padding:14px 16px; margin-bottom:16px;
+    font-size:0.82rem; color:var(--ink-2); line-height:1.5;
+}
+.warn-box {
+    background:var(--warn-bg); border:1px solid var(--warn);
+    border-left:3px solid var(--warn); border-radius:var(--r-sm);
+    padding:14px 16px; margin-bottom:16px;
+    font-size:0.82rem; color:var(--ink-2); line-height:1.5;
+}
+
+/* Nav buttons */
+.wizard-nav { display:flex; justify-content:space-between; align-items:center; margin-top:24px; }
+.btn-back {
+    background:none; border:1px solid var(--paper-edge); border-radius:var(--r-sm);
+    padding:10px 20px; font-size:0.85rem; color:var(--ink-2); cursor:pointer;
+    transition:all var(--t);
+}
+.btn-back:hover { border-color:var(--graphite); color:var(--ink); }
+.btn-next {
+    background:var(--ink); color:#fff; border:none; border-radius:var(--r-sm);
+    padding:10px 24px; font-size:0.88rem; font-weight:600; cursor:pointer;
+    transition:background var(--t);
+}
+.btn-next:hover { background:var(--graphite); }
+.btn-next:disabled { background:var(--paper-edge); color:var(--ink-faint); cursor:not-allowed; }
+
+/* Result */
+.result-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
+.result-cell {
+    background:var(--paper); border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); padding:20px; text-align:center;
+}
+.result-axis { font-family:var(--font-mono); font-size:0.7rem; color:var(--ink-3);
+    text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px; }
+.result-val { font-size:1.5rem; font-weight:300; color:var(--ink); letter-spacing:-0.02em; }
+.result-unit { font-family:var(--font-mono); font-size:0.7rem; color:var(--ink-3); }
+.result-sigma { font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-3); margin-top:4px; }
+
+/* Spinner */
+.spinner {
+    display:inline-block; width:18px; height:18px;
+    border:2px solid var(--paper-edge); border-top-color:var(--ink);
+    border-radius:50%; animation:spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.hidden { display:none !important; }
+
+/* Status poll bar */
+.progress-bar-wrap {
+    background:var(--paper-2); border-radius:100px; height:6px; margin:12px 0;
+    overflow:hidden;
+}
+.progress-bar-fill {
+    height:100%; background:var(--signal); border-radius:100px;
+    transition:width 0.4s ease;
+}
+
+/* Session add form */
+.add-session-form {
+    background:var(--paper-2); border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); padding:20px; margin-bottom:16px;
+}
+.pos-orient-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+
+@media (max-width:600px) {
+    .mode-grid { grid-template-columns:1fr; }
+    .ref-selector { grid-template-columns:1fr; }
+    .form-row { grid-template-columns:1fr; }
+    .form-row.triple { grid-template-columns:1fr 1fr; }
+    .result-grid { grid-template-columns:1fr; }
+    .wizard-steps .step-label { display:none; }
+}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-content">
+    <a class="logo" href="/">
+      <div class="logo-icon"></div>
+      <div class="logo-text"></div>
+    </a>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="theme-toggle" onclick="_toggleTheme()" title="Тёмная тема" data-icon="moon" data-icon-size="16"></button>
+      <div class="user-menu" id="userInfo"></div>
+    </div>
+  </div>
+</header>
+
+<main class="main-content">
+  <p class="page-eyebrow">Калибровка</p>
+  <h1 class="page-title">Фазовый центр <em>антенны</em></h1>
+
+  <!-- Steps -->
+  <div class="wizard-steps" id="wizardSteps">
+    <div class="wizard-step active" data-step="1"><div class="step-n">1</div><div class="step-label">Устройство</div></div>
+    <div class="wizard-step" data-step="2"><div class="step-n">2</div><div class="step-label">Режим</div></div>
+    <div class="wizard-step" data-step="3"><div class="step-n">3</div><div class="step-label">Опора</div></div>
+    <div class="wizard-step" data-step="4"><div class="step-n">4</div><div class="step-label">Редуцирование</div></div>
+    <div class="wizard-step" data-step="5"><div class="step-n">5</div><div class="step-label">Сеансы</div></div>
+    <div class="wizard-step" data-step="6"><div class="step-n">6</div><div class="step-label">Результат</div></div>
+  </div>
+
+  <!-- Step 1: Device -->
+  <div class="card" id="step1">
+    <div class="section-label">Шаг 1 — Смартфон</div>
+    <div class="form-row">
+      <div class="fld">
+        <label>Модель устройства</label>
+        <input type="text" id="deviceModel" placeholder="Например: iPhone 15 Pro">
+        <div class="hint">Используется для базы данных калибровок</div>
+      </div>
+      <div class="fld">
+        <label>Устройство из профиля</label>
+        <select id="deviceSelect">
+          <option value="">— загрузка... —</option>
+        </select>
+        <div class="hint">Или выберите из своего профиля</div>
+      </div>
+    </div>
+    <div class="info-box">
+      ARP (точка отсчёта антенны) всегда принимается как <strong>верхняя грань смартфона</strong>.
+      Смещения редуцирования измеряются рулеткой от маркированной точки до верхней грани.
+    </div>
+    <div class="wizard-nav">
+      <div></div>
+      <button class="btn-next" onclick="goStep(2)">Далее →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Mode -->
+  <div class="card hidden" id="step2">
+    <div class="section-label">Шаг 2 — Режим калибровки</div>
+    <div class="mode-grid">
+      <div class="mode-card" onclick="selectMode('full')">
+        <div class="mode-tag">Полная</div>
+        <div class="mode-title">Полная калибровка</div>
+        <div class="mode-desc">8 сеансов: 4 вертикальных + 4 горизонтальных.<br>Все три компоненты фазового центра.</div>
+      </div>
+      <div class="mode-card" onclick="selectMode('horizontal_only')">
+        <div class="mode-tag">Горизонт.</div>
+        <div class="mode-title">Только горизонталь</div>
+        <div class="mode-desc">4 вертикальных сеанса.<br>Горизонтальные компоненты без опорной точки.</div>
+      </div>
+      <div class="mode-card" onclick="selectMode('quick')">
+        <div class="mode-tag">Быстрая</div>
+        <div class="mode-title">Быстрая</div>
+        <div class="mode-desc">1 вертикальный сеанс + опорная точка.<br>Валидность 12 часов, ориентация — строго на север.</div>
+      </div>
+    </div>
+    <div id="modeDetail" class="info-box hidden"></div>
+    <div class="wizard-nav">
+      <button class="btn-back" onclick="goStep(1)">← Назад</button>
+      <button class="btn-next" id="step2Next" disabled onclick="goStep(3)">Далее →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Reference point -->
+  <div class="card hidden" id="step3">
+    <div class="section-label">Шаг 3 — Опорная точка</div>
+    <div class="ref-selector">
+      <div class="ref-opt" id="refGeodetic" onclick="selectRef('geodetic')">
+        <div class="ref-opt-title">Геодезическая марка</div>
+        <div class="ref-opt-desc">Известные координаты точки (B, L, H) — каталог, геодезическая съёмка</div>
+      </div>
+      <div class="ref-opt" id="refReceiver" onclick="selectRef('receiver')">
+        <div class="ref-opt-title">ГНСС-приёмник</div>
+        <div class="ref-opt-desc">Статические наблюдения приёмника ≥ 4 часов на произвольной точке</div>
+      </div>
+      <div class="ref-opt" id="refNone" onclick="selectRef('none')">
+        <div class="ref-opt-title">Без опоры</div>
+        <div class="ref-opt-desc">Только горизонтальные компоненты (из симметрии ориентаций)</div>
+      </div>
+    </div>
+
+    <!-- Geodetic coords -->
+    <div id="refGeodeticForm" class="hidden">
+      <div class="form-row triple">
+        <div class="fld"><label>Широта (°)</label><input type="number" id="refLat" step="0.000001" placeholder="55.751244"></div>
+        <div class="fld"><label>Долгота (°)</label><input type="number" id="refLon" step="0.000001" placeholder="37.618423"></div>
+        <div class="fld"><label>Высота (м)</label><input type="number" id="refH" step="0.001" placeholder="123.456"></div>
+      </div>
+    </div>
+
+    <!-- Receiver file -->
+    <div id="refReceiverForm" class="hidden">
+      <div class="info-box">
+        Загрузите RINEX-файл наблюдений приёмника. Рекомендуется ≥ 4 часов наблюдений.
+        Файл будет обработан методом PPP для получения координат точки.
+      </div>
+      <div class="drop-zone" id="receiverDrop" onclick="document.getElementById('receiverFile').click()">
+        <input type="file" id="receiverFile" accept=".obs,.rnx,.21o,.22o,.23o,.24o,.25o,.zip,.gz" onchange="handleReceiverFile(this)">
+        <p id="receiverDropText">Перетащите RINEX-файл или нажмите для выбора</p>
+      </div>
+    </div>
+
+    <div class="wizard-nav">
+      <button class="btn-back" onclick="goStep(2)">← Назад</button>
+      <button class="btn-next" id="step3Next" disabled onclick="goStep(4)">Далее →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Reduction elements -->
+  <div class="card hidden" id="step4">
+    <div class="section-label">Шаг 4 — Элементы редуцирования</div>
+    <div class="info-box">
+      Измерьте рулеткой расстояния от <strong>маркированной точки</strong> до верхней грани смартфона (ARP).
+      Используйте схему ниже для определения знаков смещений.
+    </div>
+
+    <!-- Phone orientation diagram -->
+    <div class="phone-diagram">
+      <svg viewBox="0 0 480 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Ground plane -->
+        <rect x="0" y="220" width="480" height="2" fill="var(--paper-edge)"/>
+        <text x="240" y="245" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="var(--ink-3)">поверхность земли / марка</text>
+        <!-- Phone body vertical -->
+        <rect x="170" y="60" width="60" height="160" rx="8" fill="var(--paper-2)" stroke="var(--graphite)" stroke-width="1.5"/>
+        <!-- Screen -->
+        <rect x="176" y="74" width="48" height="120" rx="4" fill="var(--paper-3)" stroke="var(--paper-edge)" stroke-width="1"/>
+        <!-- Camera -->
+        <circle cx="200" cy="68" r="3" fill="var(--graphite)"/>
+        <!-- ARP top edge label -->
+        <line x1="100" y1="60" x2="170" y2="60" stroke="var(--signal)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="94" y="58" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="var(--ok)" font-weight="600">ARP</text>
+        <text x="94" y="70" text-anchor="end" font-family="IBM Plex Mono" font-size="9" fill="var(--ink-3)">(верхн. грань)</text>
+        <!-- Mark dot -->
+        <circle cx="200" cy="220" r="5" fill="var(--graphite)"/>
+        <text x="215" y="218" font-family="IBM Plex Mono" font-size="10" fill="var(--ink-3)">марка</text>
+        <!-- h arrow -->
+        <line x1="155" y1="60" x2="155" y2="220" stroke="var(--err)" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="155" y1="60" x2="155" y2="60" stroke="var(--err)" stroke-width="1.5" marker-start="url(#arr2)"/>
+        <text x="143" y="145" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="var(--err)" font-weight="600">h</text>
+        <!-- dE arrow -->
+        <line x1="200" y1="230" x2="330" y2="230" stroke="var(--info)" stroke-width="1.5"/>
+        <polygon points="330,226 338,230 330,234" fill="var(--info)"/>
+        <text x="264" y="248" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="var(--info)" font-weight="600">dE (восток)</text>
+        <!-- defs -->
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+            <polygon points="0,0 8,4 0,8" fill="var(--err)"/>
+          </marker>
+          <marker id="arr2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
+            <polygon points="0,0 8,4 0,8" fill="var(--err)"/>
+          </marker>
+        </defs>
+        <!-- Legend -->
+        <text x="360" y="90" font-family="IBM Plex Mono" font-size="10" fill="var(--err)" font-weight="600">h</text>
+        <text x="372" y="90" font-family="IBM Plex Mono" font-size="10" fill="var(--ink-3)">— верт. смещение ARP→марка</text>
+        <text x="360" y="108" font-family="IBM Plex Mono" font-size="10" fill="var(--info)" font-weight="600">dE</text>
+        <text x="372" y="108" font-family="IBM Plex Mono" font-size="10" fill="var(--ink-3)">— смещ. ARP→марка на восток</text>
+        <text x="360" y="126" font-family="IBM Plex Mono" font-size="10" fill="var(--info)" font-weight="600">dN</text>
+        <text x="372" y="126" font-family="IBM Plex Mono" font-size="10" fill="var(--ink-3)">— смещ. ARP→марка на север</text>
+      </svg>
+    </div>
+
+    <div class="form-row triple">
+      <div class="fld">
+        <label>h (м) — вертикаль</label>
+        <input type="number" id="reduceH" step="0.001" value="0" placeholder="0.000">
+        <div class="hint">ARP выше марки → h > 0</div>
+      </div>
+      <div class="fld">
+        <label>dE (м) — восток</label>
+        <input type="number" id="reduceE" step="0.001" value="0" placeholder="0.000">
+        <div class="hint">ARP восточнее марки → dE > 0</div>
+      </div>
+      <div class="fld">
+        <label>dN (м) — север</label>
+        <input type="number" id="reduceN" step="0.001" value="0" placeholder="0.000">
+        <div class="hint">ARP севернее марки → dN > 0</div>
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn-back" onclick="goStep(3)">← Назад</button>
+      <button class="btn-next" onclick="startCalibTask()">Создать задачу →</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Upload sessions -->
+  <div class="card hidden" id="step5">
+    <div class="section-label">Шаг 5 — Сеансы наблюдений</div>
+
+    <div id="sessionsRequired" class="info-box"></div>
+
+    <div class="session-list" id="sessionList"></div>
+
+    <!-- Add session form -->
+    <div class="add-session-form" id="addSessionForm">
+      <div class="section-label" style="margin-bottom:12px">Добавить сеанс</div>
+      <div class="pos-orient-grid">
+        <div class="fld">
+          <label>Положение</label>
+          <select id="sessPosition">
+            <option value="vertical">Вертикальное (стоит)</option>
+            <option value="horizontal">Горизонтальное (лежит)</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Ориентация камеры / верхней грани</label>
+          <select id="sessOrientation">
+            <option value="north">Север (N)</option>
+            <option value="east">Восток (E)</option>
+            <option value="south">Юг (S)</option>
+            <option value="west">Запад (W)</option>
+          </select>
+          <div class="hint" id="compassHint"></div>
+        </div>
+      </div>
+      <div class="warn-box" id="compassWarn" style="display:none">
+        Убедитесь, что используете компас с поправкой на магнитное склонение,
+        либо ориентируйтесь по солнцу / карте.
+      </div>
+      <div class="drop-zone" id="sessDrop" onclick="document.getElementById('sessFile').click()">
+        <input type="file" id="sessFile" accept=".obs,.rnx,.21o,.22o,.23o,.24o,.25o,.zip,.gz" onchange="handleSessionFile(this)">
+        <p id="sessDropText">Перетащите RINEX-файл сеанса или нажмите для выбора</p>
+      </div>
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn-next" id="addSessBtn" onclick="uploadSession()" disabled>Загрузить сеанс</button>
+      </div>
+    </div>
+
+    <div class="wizard-nav">
+      <button class="btn-back" onclick="goStep(4)">← Назад</button>
+      <button class="btn-next" id="step5Next" disabled onclick="submitCalibration()">Запустить вычисление →</button>
+    </div>
+  </div>
+
+  <!-- Step 6: Result / polling -->
+  <div class="card hidden" id="step6">
+    <div class="section-label">Шаг 6 — Результат</div>
+
+    <div id="resultPolling">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div class="spinner"></div>
+        <span id="pollStatus" style="font-size:0.85rem;color:var(--ink-2)">Обработка сеансов PPP…</span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" id="pollBar" style="width:0%"></div></div>
+      <div style="font-size:0.75rem;color:var(--ink-3);font-family:var(--font-mono)" id="sessStatusList"></div>
+    </div>
+
+    <div id="resultContent" class="hidden">
+      <div class="result-grid">
+        <div class="result-cell">
+          <div class="result-axis">Лево ↔</div>
+          <div><span class="result-val" id="resLeft">—</span> <span class="result-unit">мм</span></div>
+          <div class="result-sigma" id="sigLeft"></div>
+        </div>
+        <div class="result-cell">
+          <div class="result-axis">Глубина ↓↑</div>
+          <div><span class="result-val" id="resDepth">—</span> <span class="result-unit">мм</span></div>
+          <div class="result-sigma" id="sigDepth"></div>
+        </div>
+        <div class="result-cell">
+          <div class="result-axis">Вниз от ARP</div>
+          <div><span class="result-val" id="resDown">—</span> <span class="result-unit">мм</span></div>
+          <div class="result-sigma" id="sigDown"></div>
+        </div>
+      </div>
+      <div id="validUntilBox" class="warn-box hidden"></div>
+      <div id="sessionTable"></div>
+    </div>
+
+    <div id="resultError" class="hidden" style="color:var(--err);font-size:0.9rem;padding:12px 0"></div>
+  </div>
+</main>
+
+<script src="/js/icons.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/calibration.js"></script>
+</body>
+</html>

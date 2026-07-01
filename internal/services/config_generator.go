@@ -387,13 +387,16 @@ func (g *ConfigGenerator) replaceParameters(
 	// Always replace file placeholders — leave empty if file unavailable.
 	// Unreplaced placeholders like {{BIA_FILE}} cause rnx2rtkp to try opening
 	// a file literally named "{{BIA_FILE}}" and abort without producing output.
-	replacements["{{NAV_FILE}}"] = files.NavigationFile
-	replacements["{{EPH_FILE}}"] = files.EphemerisFile
-	replacements["{{CLK_FILE}}"] = files.ClockFile
-	replacements["{{DCB_FILE}}"] = files.DCBFile
-	replacements["{{ERP_FILE}}"] = files.ERPFile
-	replacements["{{BIA_FILE}}"] = files.BIAFile
-	replacements["{{BLQ_FILE}}"] = files.BLQFile
+	// All paths must be absolute: rnx2rtkp runs with cmd.Dir set to the binary
+	// directory, so relative paths would resolve incorrectly.
+	replacements["{{NAV_FILE}}"] = absFilePath(files.NavigationFile)
+	replacements["{{EPH_FILE}}"] = absFilePath(files.EphemerisFile)
+	replacements["{{CLK_FILE}}"] = absFilePath(files.ClockFile)
+	replacements["{{DCB_FILE}}"] = absFilePath(files.DCBFile)
+	replacements["{{ERP_FILE}}"] = absFilePath(files.ERPFile)
+	replacements["{{BIA_FILE}}"] = absFilePath(files.BIAFile)
+	replacements["{{BLQ_FILE}}"] = absFilePath(files.BLQFile)
+	replacements["{{ATX_FILE}}"] = absFilePath(filepath.Join(g.templateDir, "..", "src", "igs20.atx"))
 
 	// If OSB/BIA file is unavailable, disable AR product to prevent RTKLIB abort.
 	if files.BIAFile == "" {
@@ -407,6 +410,18 @@ func (g *ConfigGenerator) replaceParameters(
 	}
 
 	return content
+}
+
+// absFilePath converts a relative path to absolute. Empty strings pass through unchanged.
+func absFilePath(p string) string {
+	if p == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	return abs
 }
 
 func (g *ConfigGenerator) getPosMode(config model.UserProcessingConfig) string {
