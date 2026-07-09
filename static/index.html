@@ -220,11 +220,166 @@ body { background:var(--paper); }
     color:var(--ink); letter-spacing:-0.02em; font-variant-numeric:tabular-nums;
     line-height:1;
 }
+/* ── Beta / testing notice ── */
+.beta-notice {
+    background:var(--card); border:1px solid var(--paper-edge);
+    border-radius:var(--r-lg); padding:28px 32px; margin-bottom:40px;
+    box-shadow:var(--shadow-sm); animation:fadeUp .4s .1s ease both;
+    position:relative; overflow:hidden;
+}
+.beta-notice::before {
+    content:''; position:absolute; top:0; left:0; bottom:0; width:3px;
+    background:var(--signal);
+}
+.beta-notice-eyebrow {
+    font-family:var(--font-mono); font-size:0.7rem; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.18em; color:var(--signal-dk);
+    display:flex; align-items:center; gap:10px; margin-bottom:12px;
+}
+[data-theme="dark"] .beta-notice-eyebrow { color:var(--signal); }
+.beta-notice-eyebrow::before {
+    content:''; width:6px; height:6px; border-radius:50%; background:var(--signal);
+    box-shadow:0 0 0 3px var(--signal-soft); animation:pulse 2s infinite;
+}
+.beta-notice h2 {
+    font-size:1.25rem; font-weight:500; color:var(--ink);
+    letter-spacing:-0.01em; margin-bottom:8px;
+}
+.beta-notice p.beta-lead {
+    color:var(--ink-3); line-height:1.55; font-size:0.95rem; margin-bottom:20px;
+}
+.beta-status-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;
+}
+.beta-status {
+    padding:14px 16px; border:1px solid var(--paper-edge);
+    border-radius:var(--r-sm); background:var(--paper-2);
+    display:flex; flex-direction:column; gap:6px;
+}
+.beta-status-label {
+    font-family:var(--font-mono); font-size:0.68rem; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.12em;
+    display:flex; align-items:center; gap:8px;
+}
+.beta-status.ok .beta-status-label { color:var(--signal-dk); }
+[data-theme="dark"] .beta-status.ok .beta-status-label { color:var(--signal); }
+.beta-status.testing .beta-status-label { color:var(--warn, #a06400); }
+.beta-status-label::before {
+    content:''; width:8px; height:8px; border-radius:50%;
+    display:inline-block;
+}
+.beta-status.ok .beta-status-label::before { background:var(--signal); }
+.beta-status.testing .beta-status-label::before {
+    background:var(--warn, #d99a3a); animation:pulse 1.6s infinite;
+}
+.beta-status-item { color:var(--ink); font-size:0.95rem; font-weight:500; }
+.beta-status-note { color:var(--ink-3); font-size:0.82rem; line-height:1.45; }
+.beta-contact {
+    padding-top:18px; border-top:1px dashed var(--paper-edge);
+    font-size:0.9rem; color:var(--ink-3); line-height:1.55;
+}
+.beta-contact strong { color:var(--ink); font-weight:500; }
+.beta-contact a { color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
+.beta-contact a:hover { color:var(--signal-dk); }
 
 @media(max-width:900px){
     .welcome-banner { grid-template-columns:1fr; gap:28px; }
     .welcome-art { max-width:280px; margin:0 auto; order:-1; }
 }
+
+/* ── PPP-AR info block ── */
+.ppp-section {
+    background:var(--card); border:1px solid var(--paper-edge);
+    border-radius:var(--r-lg); padding:36px 40px; margin-bottom:40px;
+    animation:fadeUp .5s .18s ease both;
+}
+.ppp-section-head {
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:16px; flex-wrap:wrap; margin-bottom:8px;
+}
+.ppp-eyebrow {
+    font-family:var(--font-mono); font-size:0.68rem; font-weight:500;
+    text-transform:uppercase; letter-spacing:0.14em; color:var(--ink-3);
+}
+.ppp-eyebrow::before { content:'// '; color:var(--signal-dk); font-weight:700; }
+[data-theme="dark"] .ppp-eyebrow::before { color:var(--signal); }
+.ppp-section h2 {
+    font-size:1.5rem; font-weight:500; letter-spacing:-0.015em;
+    color:var(--ink); margin:6px 0 6px;
+}
+.ppp-lede {
+    color:var(--ink-3); line-height:1.6; font-size:0.95rem;
+    max-width:780px; margin-bottom:26px;
+}
+.ppp-grid {
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:0;
+    border-top:1px solid var(--paper-edge);
+}
+.ppp-cell {
+    padding:22px 24px 22px 0;
+    border-bottom:1px solid var(--paper-edge);
+}
+.ppp-cell:nth-child(2n) { padding-left:24px; padding-right:0; border-left:1px solid var(--paper-edge); }
+.ppp-cell:nth-last-child(-n+2) { border-bottom:none; }
+.ppp-cell-label {
+    font-family:var(--font-mono); font-size:0.68rem; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-3);
+    margin-bottom:8px;
+}
+.ppp-cell-value {
+    font-size:0.95rem; color:var(--ink); line-height:1.5;
+}
+.ppp-cell-value strong { font-weight:600; }
+.ppp-cell-note {
+    margin-top:6px; font-family:var(--font-mono); font-size:0.72rem;
+    color:var(--ink-3); line-height:1.5;
+}
+.ppp-cell-note a {
+    color:var(--ink-2); text-decoration:none;
+    border-bottom:1px dashed var(--paper-edge);
+    transition:color var(--t), border-color var(--t);
+}
+.ppp-cell-note a:hover { color:var(--signal-dk); border-bottom-color:var(--signal-dk); }
+[data-theme="dark"] .ppp-cell-note a:hover { color:var(--signal); border-bottom-color:var(--signal); }
+
+.ppp-sources {
+    margin-top:24px; padding-top:20px;
+    border-top:1px dashed var(--paper-edge);
+}
+.ppp-sources-label {
+    font-family:var(--font-mono); font-size:0.68rem; font-weight:500;
+    text-transform:uppercase; letter-spacing:0.14em; color:var(--ink-3);
+    margin-bottom:12px;
+}
+.ppp-sources ul {
+    list-style:none; padding:0; margin:0;
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:8px 24px;
+}
+.ppp-sources li {
+    font-family:var(--font-mono); font-size:0.78rem; color:var(--ink-2);
+    display:flex; gap:10px; align-items:baseline;
+}
+.ppp-sources li::before {
+    content:'→'; color:var(--ink-faint); flex-shrink:0;
+}
+.ppp-sources a {
+    color:var(--ink); text-decoration:none;
+    border-bottom:1px solid var(--paper-edge);
+    transition:color var(--t), border-color var(--t);
+}
+.ppp-sources a:hover { color:var(--signal-dk); border-bottom-color:var(--signal-dk); }
+[data-theme="dark"] .ppp-sources a:hover { color:var(--signal); border-bottom-color:var(--signal); }
+
+@media(max-width:768px){
+    .ppp-section { padding:28px 22px; }
+    .ppp-grid { grid-template-columns:1fr; }
+    .ppp-cell,
+    .ppp-cell:nth-child(2n) {
+        padding:18px 0; border-left:none;
+    }
+    .ppp-sources ul { grid-template-columns:1fr; }
+}
+.beta-status-grid { grid-template-columns:1fr; }
 @media(max-width:900px){
     .stats-section { grid-template-columns:repeat(2,1fr); }
     .stat-card:nth-child(2) { border-right:none; }
@@ -367,6 +522,25 @@ body { background:var(--paper); }
             </svg>
         </div>
     </div>
+    <div class="beta-notice">
+        <div class="beta-notice-eyebrow"><span>BETA · Стадия тестирования</span></div>
+        <h2>Сервис находится в стадии тестирования</h2>
+        <div class="beta-status-grid">
+            <div class="beta-status ok">
+                <div class="beta-status-label">Работает</div>
+                <div class="beta-status-item">Обработка ГНСС-измерений (PPP-AR)</div>
+                <div class="beta-status-item">Преобразование координат от geocentric.xyz</div>
+            </div>
+            <div class="beta-status testing">
+                <div class="beta-status-label">Тестируется</div>
+                <div class="beta-status-item">Калибровка антенны смартфонов и коллаборативное позиционирование</div>
+                <div class="beta-status-note">Возможны нестабильности и изменения в результатах. Рекомендуем сверять результаты и сообщать о замечаниях.</div>
+            </div>
+        </div>
+        <div class="beta-contact">
+            По вопросам работы сервиса, замечаниям и предложениям обращайтесь: <strong>Долин Сергей Владимирович</strong> — <a href="mailto:Sergeydolin@mail.ru">Sergeydolin@mail.ru</a>
+        </div>
+    </div>
     <div class="menu-grid">
         <div class="menu-item" data-page="measurements" data-protected="true">
             <div class="menu-coord">01 / SVC-A</div>
@@ -411,6 +585,124 @@ body { background:var(--paper); }
             </div>
         </div>
     </div>
+    <section class="ppp-section" aria-labelledby="ppp-title">
+        <div class="ppp-section-head">
+            <div>
+                <div class="ppp-eyebrow">Обработка · PPP-AR</div>
+                <h2 id="ppp-title">Модели и продукты, используемые при обработке</h2>
+            </div>
+        </div>
+        <p class="ppp-lede">
+            Сервис реализует пост-обработку методом Precise Point Positioning с разрешением фазовых
+            неоднозначностей (PPP-AR) на двух частотах (L1/L2 || L1/L5) для систем
+            GPS, ГЛОНАСС, Galileo и BeiDou.
+        </p>
+        <div class="ppp-grid">
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Точные эфемериды (SP3) и часы (CLK)</div>
+                <div class="ppp-cell-value">
+                    <strong>IGS</strong> (Final / Rapid / Ultra-Rapid),
+                    <strong>CODE</strong> (AIUB Bern),
+                    <strong>COD MGEX</strong>
+                </div>
+                <div class="ppp-cell-note">
+                    Источники:
+                    <a href="https://cddis.nasa.gov/archive/gnss/products/" target="_blank" rel="noopener">CDDIS/NASA</a>,
+                    <a href="https://igs.bkg.bund.de/" target="_blank" rel="noopener">IGS BKG</a>,
+                    <a href="http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/" target="_blank" rel="noopener">AIUB CODE MGEX</a>
+                </div>
+            </div>
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Фазовые смещения OSB (для PPP-AR)</div>
+                <div class="ppp-cell-value">
+                    <strong>CODE MGEX OSB</strong> (Observation-Specific Signal Biases)
+                </div>
+                <div class="ppp-cell-note">
+                    Формат Bias-SINEX,
+                    <a href="http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/" target="_blank" rel="noopener">COD0MGXFIN…_OSB.BIA</a>.
+                    См.
+                    <a href="https://files.igs.org/pub/data/format/sinex_bias_100.pdf" target="_blank" rel="noopener">SINEX Bias 1.00</a>
+                </div>
+            </div>
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Дифференциальные кодовые задержки (DCB)</div>
+                <div class="ppp-cell-value">
+                    <strong>CAS MGEX</strong> (Chinese Academy of Sciences), CODE
+                </div>
+                <div class="ppp-cell-note">
+                    <a href="https://cddis.nasa.gov/archive/gnss/products/bias/" target="_blank" rel="noopener">CDDIS bias</a>,
+                    <a href="https://ftp.gipp.org.cn/" target="_blank" rel="noopener">GIPP (Wuhan)</a>
+                </div>
+            </div>
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Параметры вращения Земли (ERP)</div>
+                <div class="ppp-cell-value">
+                    <strong>IGS ERP</strong> (Final / Rapid),
+                    <strong>COD MGEX ERP</strong>
+                </div>
+                <div class="ppp-cell-note">
+                    Согласованы с
+                    <a href="https://iers-conventions.obspm.fr/" target="_blank" rel="noopener">IERS Conventions 2010</a>
+                </div>
+            </div>
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Калибровки антенн (PCO/PCV)</div>
+                <div class="ppp-cell-value">
+                    <strong>ANTEX igs20.atx</strong> — модель IGS20 (спутниковые и приёмные антенны)
+                </div>
+                <div class="ppp-cell-note">
+                    <a href="https://files.igs.org/pub/station/general/igs20.atx" target="_blank" rel="noopener">igs20.atx</a>,
+                    <a href="https://files.igs.org/pub/data/format/antex14.txt" target="_blank" rel="noopener">формат ANTEX 1.4</a>
+                </div>
+            </div>
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Тропосферная задержка</div>
+                <div class="ppp-cell-value">
+                    <strong>GPT3</strong> (эмпирическая модель) + оценка зенитной влажной задержки (ZWD) в фильтре
+                </div>
+                <div class="ppp-cell-note">
+                    Böhm et al., 2015 —
+                    <a href="https://vmf.geo.tuwien.ac.at/" target="_blank" rel="noopener">TU Wien VMF</a>
+                    (сетка gpt3_1.grd)
+                </div>
+            </div>
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Океаническая приливная нагрузка (BLQ)</div>
+                <div class="ppp-cell-value">
+                    <strong>FES2022</strong> через
+                    <a href="https://github.com/CNES/aviso-fes" target="_blank" rel="noopener" style="color:inherit;">pyfes</a>
+                    (CNES/AVISO)
+                </div>
+                <div class="ppp-cell-note">
+                    Генерация BLQ по координатам станции,
+                    <a href="http://holt.oso.chalmers.se/loading/" target="_blank" rel="noopener">формат Onsala</a>
+                </div>
+            </div>
+            <div class="ppp-cell">
+                <div class="ppp-cell-label">Твёрдотельные приливы, полярные приливы</div>
+                <div class="ppp-cell-value">
+                    <strong>IERS Conventions 2010</strong>
+                </div>
+                <div class="ppp-cell-note">
+                    Solid Earth tides, pole tide, permanent tide
+                </div>
+            </div>
+        </div>
+        <div class="ppp-sources">
+            <div class="ppp-sources-label">Ключевые источники и стандарты</div>
+            <ul>
+                <li><a href="https://igs.org/products/" target="_blank" rel="noopener">IGS Products — Analysis Center outputs</a></li>
+                <li><a href="https://cddis.nasa.gov/Data_and_Derived_Products/GNSS/GNSS_data_and_product_archive.html" target="_blank" rel="noopener">CDDIS GNSS Archive (NASA)</a></li>
+                <li><a href="http://www.aiub.unibe.ch/research/code___analysis_center/" target="_blank" rel="noopener">CODE Analysis Center (AIUB Bern)</a></li>
+                <li><a href="https://igs.bkg.bund.de/" target="_blank" rel="noopener">IGS BKG Data Center (Frankfurt)</a></li>
+                <li><a href="https://glonass-iac.ru/" target="_blank" rel="noopener">ИАЦ КВНО ГЛОНАСС</a></li>
+                <li><a href="https://iers-conventions.obspm.fr/" target="_blank" rel="noopener">IERS Conventions 2010</a></li>
+                <li><a href="https://files.igs.org/pub/data/format/rinex_4.02.pdf" target="_blank" rel="noopener">RINEX 4.02 Format Specification</a></li>
+                <li><a href="https://www.researchgate.net/publication/319870312_VMF3GPT3_refined_discrete_and_empirical_troposphere_mapping_functions" target="_blank" rel="noopener">Böhm et al. (2015) — GPT3/VMF3</a></li>
+                <li><a href="https://link.springer.com/article/10.1007/s00190-007-0208-3" target="_blank" rel="noopener">Ge et al. (2008) — PPP with AR</a></li>
+            </ul>
+        </div>
+    </section>
     <div class="stats-section">
         <div class="stat-card">
             <div class="stat-label">Активных пользователей</div>

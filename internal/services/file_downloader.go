@@ -89,6 +89,40 @@ func getGPSWeekAndDOW(date time.Time) (week int, dow int) {
 	return
 }
 
+// ultraRapidIssue описывает выпуск Ultra-Rapid продукта.
+// Ultra-Rapid обновляется 4 раза в сутки (00/06/12/18 UTC) и покрывает 48 часов
+// (первые ~24ч — наблюдённая часть, вторые ~24ч — прогноз). Для обработки
+// PPP/PPP-AR день-в-день нужен файл, чей 48-часовой интервал перекрывает
+// целевой день; такой файл — это выпуск текущего дня в 00 UTC либо любой
+// выпуск предыдущего дня.
+type ultraRapidIssue struct {
+	year int // год выпуска
+	doy  int // DOY выпуска
+	hour int // час выпуска (00, 06, 12, 18)
+}
+
+// ultraRapidIssues возвращает выпуски Ultra-Rapid для целевой даты date,
+// упорядоченные от самого свежего к самому старому. Первым идёт выпуск,
+// изданный в самое позднее допустимое время — он содержит максимальный
+// объём фактических (не прогнозных) данных для даты наблюдения.
+func ultraRapidIssues(date time.Time) []ultraRapidIssue {
+	d0 := date.UTC().Truncate(24 * time.Hour)
+	dPrev := d0.AddDate(0, 0, -1)
+	hours := []int{18, 12, 6, 0}
+
+	issues := make([]ultraRapidIssue, 0, 8)
+	// Выпуск текущего дня в 00 UTC — единственный выпуск дня наблюдения,
+	// у которого весь целевой день попадает в наблюдённую половину окна.
+	y0, doy0 := d0.Year(), d0.YearDay()
+	issues = append(issues, ultraRapidIssue{year: y0, doy: doy0, hour: 0})
+	// Затем выпуски предыдущего дня — сначала самый свежий (18 UTC).
+	yP, doyP := dPrev.Year(), dPrev.YearDay()
+	for _, h := range hours {
+		issues = append(issues, ultraRapidIssue{year: yP, doy: doyP, hour: h})
+	}
+	return issues
+}
+
 // getWeekSunday возвращает год и DOY воскресенья (начала GPS-недели).
 // Файлы ERP нового формата (IGS0OPSFIN/IGS0OPSRAP) используют DOY воскресенья,
 // а не DOY дня наблюдения. Воскресенье может быть в другом году (например,
@@ -157,12 +191,36 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy)},
 		{"CDDIS_IGS_RAPID", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy)},
-		{"CDDIS_IGS_ULTRA", ftpWeekDir,
-			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_15M_ORB.SP3.gz", year, doy)},
 		{"BKG_IGS_FINAL", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
 		{"BKG_IGS_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy)},
+	}
+
+	// ── Ultra-Rapid: для обработки день-в-день, когда rapid ещё не вышел ──
+	// Пробуем свежие выпуски (текущего дня 00 UTC, затем предыдущего 18/12/06/00).
+	// Файл покрывает 48ч от момента выпуска; целевой день должен попадать
+	// в наблюдённую половину. Три центра поддерживают AR из Ultra продуктов:
+	//   IGS0OPSULT — базовый IGS Ultra (GPS+GLO)
+	//   WUM0MGXULT — Wuhan MGEX Ultra (multi-GNSS + фазовые смещения)
+	//   GFZ0OPSULT — GFZ Ultra (GPS+GLO+GAL+BDS)
+	for _, u := range ultraRapidIssues(date) {
+		uWeek, _ := getGPSWeekAndDOW(time.Date(u.year, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, u.doy-1))
+		uWeekDir := fmt.Sprintf("/gnss/products/%d", uWeek)
+		candidates = append(candidates,
+			candidate{fmt.Sprintf("CDDIS_IGS_ULTRA_%02d", u.hour), uWeekDir,
+				fmt.Sprintf("IGS0OPSULT_%d%03d%02d00_02D_15M_ORB.SP3.gz", u.year, u.doy, u.hour)},
+			candidate{fmt.Sprintf("BKG_IGS_ULTRA_%02d", u.hour), "",
+				fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSULT_%d%03d%02d00_02D_15M_ORB.SP3.gz",
+					uWeek, u.year, u.doy, u.hour)},
+			candidate{fmt.Sprintf("CDDIS_WUM_ULTRA_%02d", u.hour), fmt.Sprintf("/gnss/products/mgex/%d", uWeek),
+				fmt.Sprintf("WUM0MGXULT_%d%03d%02d00_01D_05M_ORB.SP3.gz", u.year, u.doy, u.hour)},
+			candidate{fmt.Sprintf("CDDIS_GFZ_ULTRA_%02d", u.hour), uWeekDir,
+				fmt.Sprintf("GFZ0OPSULT_%d%03d%02d00_02D_05M_ORB.SP3.gz", u.year, u.doy, u.hour)},
+		)
+	}
+
+	candidates = append(candidates, []candidate{
 		// ── CODE MGEX (AIUB Bern) — организованы по году, охватывают 2012–наст. ──
 		// Используются для данных до ~2022, когда IGS ещё не перешёл на новый формат.
 		{"AIUB_CODE_MGEX_FINAL", "",
@@ -181,7 +239,7 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.sp3.gz", week, week, dow)},
 		{"BKG_OLD_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.sp3.gz", week, week, dow)},
-	}
+	}...)
 
 	var lastErr error
 	for _, c := range candidates {
@@ -243,12 +301,32 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 			fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy)},
 		{"CDDIS_IGS_RAPID", ftpWeekDir,
 			fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy)},
-		{"CDDIS_IGS_ULTRA", ftpWeekDir,
-			fmt.Sprintf("IGS0OPSULT_%d%03d0000_02D_05M_CLK.CLK.gz", year, doy)},
 		{"BKG_IGS_FINAL", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", week, year, doy)},
 		{"BKG_IGS_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", week, year, doy)},
+	}
+
+	// ── Ultra-Rapid CLK: свежие часы для обработки день-в-день ──
+	// IGS Ultra публикует часы 15-мин; WUM/GFZ MGEX Ultra — 5-мин и
+	// поддерживают PPP-AR (совместимы с фазовыми смещениями того же центра).
+	for _, u := range ultraRapidIssues(date) {
+		uWeek, _ := getGPSWeekAndDOW(time.Date(u.year, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, u.doy-1))
+		uWeekDir := fmt.Sprintf("/gnss/products/%d", uWeek)
+		candidates = append(candidates,
+			candidate{fmt.Sprintf("CDDIS_IGS_ULTRA_%02d", u.hour), uWeekDir,
+				fmt.Sprintf("IGS0OPSULT_%d%03d%02d00_02D_15M_CLK.CLK.gz", u.year, u.doy, u.hour)},
+			candidate{fmt.Sprintf("BKG_IGS_ULTRA_%02d", u.hour), "",
+				fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSULT_%d%03d%02d00_02D_15M_CLK.CLK.gz",
+					uWeek, u.year, u.doy, u.hour)},
+			candidate{fmt.Sprintf("CDDIS_WUM_ULTRA_%02d", u.hour), fmt.Sprintf("/gnss/products/mgex/%d", uWeek),
+				fmt.Sprintf("WUM0MGXULT_%d%03d%02d00_01D_05M_CLK.CLK.gz", u.year, u.doy, u.hour)},
+			candidate{fmt.Sprintf("CDDIS_GFZ_ULTRA_%02d", u.hour), uWeekDir,
+				fmt.Sprintf("GFZ0OPSULT_%d%03d%02d00_02D_05M_CLK.CLK.gz", u.year, u.doy, u.hour)},
+		)
+	}
+
+	candidates = append(candidates, []candidate{
 		// ── CODE MGEX (AIUB Bern) — организованы по году, охватывают 2012–наст. ──
 		{"AIUB_CODE_MGEX_FINAL", "",
 			fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_30S_CLK.CLK.gz",
@@ -265,7 +343,7 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.clk.gz", week, week, dow)},
 		{"BKG_OLD_RAPID", "",
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.clk.gz", week, week, dow)},
-	}
+	}...)
 
 	var lastErr error
 	for _, c := range candidates {
@@ -439,18 +517,56 @@ func (d *FileDownloader) DownloadBIA(date time.Time, taskID string) (string, err
 	gzFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_bia.bia.gz", taskID))
 	outFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_bia.bia", taskID))
 
-	ftpDir := fmt.Sprintf("/gnss/products/%d", week)
+	// MGEX-продукты (COD0MGX*, GRG0MGX*, WUM0MGX*) на CDDIS лежат в
+	// /gnss/products/mgex/{week}/; стандартные IGS-продукты (COD0OPS*)
+	// — в /gnss/products/{week}/.
+	opsDir := fmt.Sprintf("/gnss/products/%d", week)
+	mgexDir := fmt.Sprintf("/gnss/products/mgex/%d", week)
 
-	candidates := []struct {
-		label    string
-		filename string
-	}{
-		{"CODE", fmt.Sprintf("COD0MGXFIN_%d%03d0000_01D_01D_OSB.BIA.gz", year, doy)},
+	type biaCandidate struct {
+		label   string
+		ftpPath string // если не пусто — FTP CDDIS
+		httpURL string
+	}
+
+	candidates := []biaCandidate{
+		// ── Финальный CODE MGEX (задержка ~2 недели) ──
+		{label: "CODE_MGX_FIN",
+			ftpPath: fmt.Sprintf("%s/COD0MGXFIN_%d%03d0000_01D_01D_OSB.BIA.gz", mgexDir, year, doy)},
+		// ── Rapid/Ultra источники для PPP-AR день-в-день ──
+		// CODE rapid OSB (~1 сутки задержки)
+		{label: "CODE_OPS_RAP",
+			ftpPath: fmt.Sprintf("%s/COD0OPSRAP_%d%03d0000_01D_01D_OSB.BIA.gz", opsDir, year, doy)},
+		{label: "CODE_MGX_RAP",
+			ftpPath: fmt.Sprintf("%s/COD0MGXRAP_%d%03d0000_01D_01D_OSB.BIA.gz", mgexDir, year, doy)},
+		{label: "AIUB_CODE_RAP",
+			httpURL: fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXRAP_%d%03d0000_01D_01D_OSB.BIA.gz",
+				year, year, doy)},
+		// CNES/CLS GRG rapid — целевой продукт для PPP-AR (integer WL/NL biases)
+		{label: "GRG_RAP",
+			ftpPath: fmt.Sprintf("%s/GRG0MGXRAP_%d%03d0000_01D_01D_OSB.BIA.gz", mgexDir, year, doy)},
+	}
+
+	// WUM (Wuhan) Ultra BIA — свежайшие фазовые смещения, публикуются вместе
+	// с WUM Ultra SP3/CLK, поддерживают PPP-AR по multi-GNSS.
+	for _, u := range ultraRapidIssues(date) {
+		uWeek, _ := getGPSWeekAndDOW(time.Date(u.year, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, u.doy-1))
+		candidates = append(candidates, biaCandidate{
+			label: fmt.Sprintf("WUM_ULTRA_%02d", u.hour),
+			ftpPath: fmt.Sprintf("/gnss/products/mgex/%d/WUM0MGXULT_%d%03d%02d00_01D_01D_OSB.BIA.gz",
+				uWeek, u.year, u.doy, u.hour),
+		})
 	}
 
 	var lastErr error
 	for _, c := range candidates {
-		if err := d.downloadFTP(ftpDir+"/"+c.filename, gzFile); err != nil {
+		var err error
+		if c.ftpPath != "" {
+			err = d.downloadFTP(c.ftpPath, gzFile)
+		} else {
+			err = d.downloadFile(c.httpURL, gzFile)
+		}
+		if err != nil {
 			d.logger.Warnf("Failed to download %s BIA: %v", c.label, err)
 			lastErr = err
 			continue

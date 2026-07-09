@@ -149,6 +149,26 @@ func (s *MeasurementService) ProcessMeasurement(
 		files.DCBFile, _ = s.downloader.DownloadDCB(date, taskID)
 		files.BIAFile, _ = s.downloader.DownloadBIA(date, taskID)
 
+		// Для PPP нужны точные эфемериды И точные часы. Если один из этих
+		// продуктов ещё не опубликован (Final ~2 недели, Rapid ~17ч, Ultra
+		// ~3ч после выпуска), обработку запускать бессмысленно — сообщаем
+		// пользователю подождать до появления данных за эту дату.
+		if files.EphemerisFile == "" || files.ClockFile == "" {
+			// Префикс PRODUCTS_UNAVAILABLE: фронт распознаёт такие задачи и
+			// показывает сообщение отдельным баннером, а саму задачу удаляет
+			// (чтобы не оставалась в истории как ошибочная).
+			msg := fmt.Sprintf(
+				"PRODUCTS_UNAVAILABLE: Точные эфемериды/часы за %s ещё не "+
+					"опубликованы центрами IGS. Для PPP-обработки данных "+
+					"«день в день» нужно дождаться выхода Ultra-Rapid "+
+					"продукта (обычно в течение суток после наблюдений). "+
+					"Попробуйте запустить обработку повторно позже — как "+
+					"правило, на следующий день данные уже доступны.",
+				date.Format("2006-01-02"))
+			s.handleError(taskID, login, msg)
+			return fmt.Errorf("precise products not yet available for %s", date.Format("2006-01-02"))
+		}
+
 		// ← obsPath передаётся как источник для чтения антенны
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {

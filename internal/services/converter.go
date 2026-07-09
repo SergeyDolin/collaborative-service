@@ -27,9 +27,17 @@ func NewConverterService(rtklibPath string, logger *zap.SugaredLogger) *Converte
 // reHatanakaExt соответствует расширению .YYd / .YYD (Hatanaka compact RINEX 2).
 var reHatanakaExt = regexp.MustCompile(`\.\d{2}[dD]$`)
 
+// reRinex2ObsExt соответствует расширению .YYo / .YYO (RINEX 2 observation).
+var reRinex2ObsExt = regexp.MustCompile(`\.\d{2}[oO]$`)
+
 // isHatanakaExt возвращает true если расширение файла — Hatanaka (.YYd / .YYD).
 func isHatanakaExt(lower string) bool {
 	return reHatanakaExt.MatchString(lower)
+}
+
+// isRinex2ObsExt возвращает true если расширение — RINEX 2 observation (.YYo / .YYO).
+func isRinex2ObsExt(lower string) bool {
+	return reRinex2ObsExt.MatchString(lower)
 }
 
 // ConvertCRX2RNX конвертирует Hatanaka сжатый файл (.crx или .YYd) в RINEX (.obs)
@@ -179,7 +187,8 @@ func (c *ConverterService) IsRINEX3(filePath string) bool {
 //
 // Поддерживаемые форматы на входе:
 //
-//	.obs / .o / .rnx — RINEX 3 наблюдений (без конвертации)
+//	.obs / .o / .rnx — RINEX 3 наблюдений (без конвертации; если внутри RINEX 2 — convbin → RINEX 3)
+//	.YYo / .YYO      — RINEX 2 observation (например NSK1.26o) → convbin → RINEX 3
 //	.crx             — Hatanaka CRX → crx2rnx → RINEX 3
 //	.YYd / .YYD      — Hatanaka compact RINEX 2 → crx2rnx → RINEX 2 → convbin → RINEX 3
 //	.gz              — gzip → распаковка → рекурсивная обработка
@@ -187,6 +196,17 @@ func (c *ConverterService) ConvertFile(filePath, workDir string) (string, error)
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	c.logger.Infof("ConvertFile: %s (ext=%s)", filePath, ext)
+
+	// ── RINEX 2 observation (.YYo / .YYO, например NSK1.26o) ────────────────
+	if isRinex2ObsExt(ext) {
+		c.logger.Infof("Detected RINEX 2 observation (.YYo): %s", filePath)
+		out := filepath.Join(workDir, "converted.rnx")
+		if err := c.ConvertRINEX2to3(filePath, out); err != nil {
+			c.logger.Warnf("RINEX 2→3 for .YYo failed: %v, using original", err)
+			return filePath, nil
+		}
+		return out, nil
+	}
 
 	// ── RINEX 3 (.obs / .o / .rnx) ──────────────────────────────────────────
 	if ext == ".obs" || ext == ".o" || ext == ".rnx" {

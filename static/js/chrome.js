@@ -172,4 +172,98 @@
   document.addEventListener('DOMContentLoaded', mountAvatarLink);
   // Re-mount if main.js or others repaint the user menu
   window._cpsRefreshAvatar = mountAvatarLink;
+
+  // ── Session / token-expiry guard ────────────────────────────────────────
+  // Тихий перелогин потребовал бы хранить пароль или refresh-токен в браузере —
+  // и то и другое небезопасно. Поэтому:
+  //  1) заранее вычисляем момент истечения JWT и чистим сессию в этот момент;
+  //  2) любой ответ 401 от /api/* трактуем как истечение сессии — чистим
+  //     локальные данные и уводим на /login с сохранением исходного URL;
+  //  3) на публичных страницах ничего не делаем.
+  const AUTH_PATHS = new Set(['/login', '/register', '/', '/index', '/terms']);
+  function normPath() { return location.pathname.replace(/\/+$/, '') || '/'; }
+  function isAuthPage() { return AUTH_PATHS.has(normPath()); }
+
+  function decodeJwtExpMs(token) {
+    try {
+      const p = token.split('.')[1]; if (!p) return 0;
+      const json = atob(p.replace(/-/g, '+').replace(/_/g, '/'));
+      const c = JSON.parse(json);
+      return (c && typeof c.exp === 'number') ? c.exp * 1000 : 0;
+    } catch (_) { return 0; }
+  }
+  function clearSession() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userLogin');
+    localStorage.removeItem('_av_cache');
+    localStorage.removeItem('_av_login');
+    localStorage.removeItem('userAvatar');
+  }
+  let _redirecting = false;
+  function redirectToLogin() {
+    if (_redirecting || isAuthPage()) return;
+    _redirecting = true;
+    const back = encodeURIComponent(location.pathname + location.search);
+    location.replace('/login?expired=1&back=' + back);
+  }
+  function endSession() { clearSession(); redirectToLogin(); }
+
+  // Проактивная проверка при загрузке + таймер до exp.
+  (function scheduleExpiry() {
+    const t = localStorage.getItem('token');
+    if (!t) return;
+    const expMs = decodeJwtExpMs(t);
+    if (!expMs) return;
+    const now = Date.now();
+    if (expMs <= now) { endSession(); return; }
+    // setTimeout ограничен ~24.8 дн; для токенов такого не бывает, но подстрахуемся.
+    const delay = Math.min(expMs - now, 2147483000);
+    setTimeout(endSession, delay);
+  })();
+
+  // Ссылки на API, которые НЕ должны триггерить выход при 401
+  // (это как раз попытка входа/регистрации).
+  function isApiUrl(u) {
+    if (!u) return false;
+    if (u.indexOf('/api/') === 0) return true;
+    try { return new URL(u, location.origin).pathname.indexOf('/api/') === 0; }
+    catch (_) { return false; }
+  }
+  function isAuthEndpoint(u) {
+    return /\/api\/(login|register)(\?|$)/.test(u);
+  }
+
+  // Перехват fetch
+  const _origFetch = window.fetch ? window.fetch.bind(window) : null;
+  if (_origFetch) {
+    window.fetch = function (input, init) {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      return _origFetch(input, init).then(function (res) {
+        if (res && res.status === 401 && isApiUrl(url) && !isAuthEndpoint(url)) {
+          endSession();
+        }
+        return res;
+      });
+    };
+  }
+
+  // Перехват XMLHttpRequest (используется, например, при загрузке измерений)
+  const _XHRopen = XMLHttpRequest.prototype.open;
+  const _XHRsend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this.__cps_url = url;
+    return _XHRopen.apply(this, arguments);
+  };
+  XMLHttpRequest.prototype.send = function () {
+    const self = this;
+    this.addEventListener('load', function () {
+      if (self.status === 401 && isApiUrl(self.__cps_url) && !isAuthEndpoint(self.__cps_url)) {
+        endSession();
+      }
+    });
+    return _XHRsend.apply(this, arguments);
+  };
+
+  // Экспорт для страниц входа
+  window._cpsClearSession = clearSession;
 })();

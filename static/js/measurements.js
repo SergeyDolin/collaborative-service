@@ -5,10 +5,10 @@ let selectedDeviceType = null;
 const methodDetails = {
     single: {
         title: "Абсолютный метод (SPP)",
-        description: "Одиночное точечное позиционирование с использованием псевдодальностей и широковещательных эфемерид.",
+        description: "Абсолютный геометрический метод. Позиционирование с использованием псевдодальностей и бортовых эфемерид.",
         features: [
             "Не требует базовой станции",
-            "Быстрая обработка (несколько секунд)",
+            "Быстрая обработка",
             "Подходит для навигации"
         ],
         config: { 
@@ -25,12 +25,11 @@ const methodDetails = {
     },
     "ppp-kinematic": {
         title: "PPP-AR Кинематика",
-        description: "Прецизионное точечное позиционирование с разрешением неоднозначностей для движущихся объектов.",
+        description: "Метод Precise Point Positioning с разрешением неоднозначностей для движущихся объектов.",
         features: [
             "Не требует базовой станции",
-            "Разрешение целочисленных неоднозначностей (AR)",
-            "Для движущихся объектов",
-            "Требует 15-30 минут для инициализации"
+            "Разрешение фазовых неоднозначностей (AR)",
+            "Для движущихся объектов"
         ],
         config: { 
             method: "ppp", 
@@ -51,12 +50,11 @@ const methodDetails = {
     },
     "ppp-static": {
         title: "PPP-AR Статика",
-        description: "Прецизионное точечное позиционирование с разрешением неоднозначностей для неподвижных объектов.",
+        description: "Метод Precise Point Positioning с разрешением неоднозначностей для неподвижных объектов.",
         features: [
             "Не требует базовой станции",
-            "Разрешение целочисленных неоднозначностей (AR)",
-            "Для неподвижных объектов",
-            "Накопление решения со временем"
+            "Разрешение фазовых неоднозначностей (AR)",
+            "Для неподвижных объектов"
         ],
         config: { 
             method: "ppp", 
@@ -292,7 +290,7 @@ async function startProcessing() {
                 selectedFile = null;
                 selectedMethod = null;
                 selectedDeviceType = null;
-                document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYd), сжатые (.gz)';
+                document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYo, .YYd), сжатые (.gz)';
                 document.getElementById('fileInfo').style.color = '#718096';
                 document.querySelectorAll('.method-option[data-method]').forEach(opt => opt.classList.remove('selected'));
                 document.querySelectorAll('.device-option').forEach(el => el.classList.remove('selected'));

@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -144,6 +145,200 @@ func (p *RINEXParser) GetSNRMaskValues(info *SNRInfo) []int {
 	}
 
 	return thresholds
+}
+
+// ComputeSNRMaskFromObservations сканирует тело RINEX 3 файла и вычисляет пороги SNR
+// для полос L1 и L5 (плюс L2, если присутствует), когда SNR-маппинг отсутствует в заголовке.
+//
+// Возвращает строки-маски вида "T,T,T,T,T,T,T,T,T" (9 значений на 9 углов возвышения),
+// пригодные для параметров RTKLIB pos1-snrmask_L1/L2/L5.
+//
+// Порог берётся как 5-й перцентиль минус запас 2 dBHz, чтобы отсечь только явный шумовой
+// хвост распределения (мультипас/срыв слежения), сохранив основную массу слабых, но валидных
+// наблюдений — на смартфонах их количество критично для решения.
+//
+// ok=false, если формат не RINEX 3 или в теле не набралось достаточно значений (< 30 на полосу).
+func (p *RINEXParser) ComputeSNRMaskFromObservations(filePath string) (l1Mask, l2Mask, l5Mask string, ok bool) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", "", "", false
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	// В теле файла строка satRecord может быть длинной; поднимаем лимит.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	// Индексы позиций (обзвон 16-символьных полей) для колонок S1x/S2x/S5x по системам.
+	// Ключ — символ системы ('G','R','E','J','C','I','S'); значение — индексы полей.
+	snr1 := make(map[byte][]int)
+	snr2 := make(map[byte][]int)
+	snr5 := make(map[byte][]int)
+
+	var (
+		currentSys        byte
+		remainingObsTypes int
+		obsIdx            int
+		inHeader          = true
+		version3          bool
+	)
+
+	// Проход по заголовку: собираем индексы S1x/S2x/S5x per system.
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "RINEX VERSION / TYPE") {
+			// Первая колонка — версия. RINEX 3 если начинается с "3".
+			ver := strings.TrimSpace(line[:9])
+			if strings.HasPrefix(ver, "3") {
+				version3 = true
+			}
+		}
+		if strings.Contains(line, "SYS / # / OBS TYPES") {
+			if !version3 {
+				continue
+			}
+			// Начало или продолжение блока для системы.
+			if remainingObsTypes == 0 {
+				if len(line) < 6 {
+					continue
+				}
+				currentSys = line[0]
+				n, _ := strconv.Atoi(strings.TrimSpace(line[3:6]))
+				remainingObsTypes = n
+				obsIdx = 0
+			}
+			// Токены типов наблюдений: с колонки 7, поля по 4 символа (3 символа + пробел).
+			// Проще — Fields по пробелам, пропуская первый токен-заголовок системы для первой строки.
+			fields := strings.Fields(line[:60])
+			start := 0
+			// Первое поле первой строки блока — символ системы или число: определим по длине.
+			// Если поле длиной 1 (например "G") или это число — пропускаем два первых токена (sys, n).
+			// Для строк-продолжений поля начинаются сразу с типов наблюдений.
+			if len(fields) > 0 && (fields[0] == string(currentSys) || (obsIdx == 0 && len(fields) > 1)) {
+				// Это первая строка блока: пропускаем "sys" и "n".
+				if _, err := strconv.Atoi(fields[0]); err == nil {
+					// Формат без sys в начале (редко) — пропускаем только число.
+					start = 1
+				} else {
+					start = 2
+				}
+			}
+			for i := start; i < len(fields) && remainingObsTypes > 0; i++ {
+				t := fields[i]
+				if len(t) >= 2 && t[0] == 'S' {
+					switch t[1] {
+					case '1':
+						snr1[currentSys] = append(snr1[currentSys], obsIdx)
+					case '2':
+						snr2[currentSys] = append(snr2[currentSys], obsIdx)
+					case '5':
+						snr5[currentSys] = append(snr5[currentSys], obsIdx)
+					}
+				}
+				obsIdx++
+				remainingObsTypes--
+			}
+			continue
+		}
+		if strings.Contains(line, "END OF HEADER") {
+			inHeader = false
+			break
+		}
+	}
+
+	if inHeader || !version3 {
+		return "", "", "", false
+	}
+	if len(snr1) == 0 && len(snr5) == 0 {
+		return "", "", "", false
+	}
+
+	// Собираем значения SNR из тела.
+	var vals1, vals2, vals5 []float64
+	// Общее количество полей наблюдений per system (для парсинга строки спутника).
+	// Мы уже знаем obsIdx на конец каждого блока, но перезаписали — восстановим из мап.
+	// Проще: при чтении строки спутника достаточно извлечь 16-символьные поля по нужным индексам,
+	// не зная общего числа полей — если поле выходит за длину строки, пропускаем.
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) == 0 {
+			continue
+		}
+		// Заголовок эпохи в RINEX 3 начинается с '>'.
+		if line[0] == '>' {
+			continue
+		}
+		// Строка спутника: колонки 0-2 — идентификатор ('G01', 'E13', ...).
+		if len(line) < 4 {
+			continue
+		}
+		sys := line[0]
+		body := line[3:] // наблюдения идут с 4-го символа
+
+		extract := func(indices []int, dst *[]float64) {
+			for _, idx := range indices {
+				start := idx * 16
+				end := start + 14 // 14.3 float; последние 2 символа — LLI и SNR-флаг
+				if end > len(body) {
+					continue
+				}
+				s := strings.TrimSpace(body[start:end])
+				if s == "" {
+					continue
+				}
+				v, err := strconv.ParseFloat(s, 64)
+				if err != nil || v <= 0 {
+					continue
+				}
+				*dst = append(*dst, v)
+			}
+		}
+		extract(snr1[sys], &vals1)
+		extract(snr2[sys], &vals2)
+		extract(snr5[sys], &vals5)
+	}
+
+	// Маска RTKLIB: 9 значений на углы возвышения 5°,15°,25°,35°,45°,55°,65°,75°,85°.
+	// Плоская маска: одинаковый порог для всех углов. Базовый порог — 3-й перцентиль
+	// минус запас 3 dBHz, зажат в [minT, maxT]. Отсекает только явный шумовой хвост.
+	toMask := func(vals []float64, minT, maxT int) (string, bool) {
+		if len(vals) < 30 {
+			return "", false
+		}
+		sort.Float64s(vals)
+		idx := int(math.Floor(0.03 * float64(len(vals)-1)))
+		threshold := int(math.Floor(vals[idx])) - 3
+		if threshold < minT {
+			threshold = minT
+		}
+		if threshold > maxT {
+			threshold = maxT
+		}
+		parts := make([]string, 9)
+		for i := range parts {
+			parts[i] = strconv.Itoa(threshold)
+		}
+		return strings.Join(parts, ","), true
+	}
+
+	l1, ok1 := toMask(vals1, 22, 28)
+	l5, ok5 := toMask(vals5, 25, 30)
+	l2, _ := toMask(vals2, 22, 28) // L2 опционален
+
+	if !ok1 && !ok5 {
+		return "", "", "", false
+	}
+	if !ok1 {
+		l1 = "0,0,0,0,0,0,0,0,0"
+	}
+	if !ok5 {
+		l5 = "0,0,0,0,0,0,0,0,0"
+	}
+	if l2 == "" {
+		l2 = "0,0,0,0,0,0,0,0,0"
+	}
+	return l1, l2, l5, true
 }
 
 // ParseObservationDate extracts the start date from a RINEX observation file header.

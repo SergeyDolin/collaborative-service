@@ -608,7 +608,7 @@ async function loadHistory() {
             el.innerHTML = r.status === 401 ? '<div class="empty-history">🔒 Сессия истекла</div>' : '<div class="empty-history">❌ Ошибка загрузки</div>';
             return;
         }
-        const tasks = await r.json();
+        let tasks = await r.json();
         if (!tasks || tasks.length === 0) {
             el.innerHTML = '<div class="empty-history">📭 История обработок пуста</div>';
             document.getElementById('btnDeleteAll').style.display = 'none';
@@ -616,6 +616,25 @@ async function loadHistory() {
             return;
         }
         document.getElementById('btnDeleteAll').style.display = selectMode ? 'none' : 'block';
+
+        // Задачи, упавшие из-за неопубликованных Ultra-Rapid продуктов,
+        // не показываем в истории — вместо этого рендерим баннер сверху
+        // и удаляем их из БД (это не пользовательская ошибка, а «данные
+        // за эту дату ещё не вышли»).
+        const unavailableMark = 'PRODUCTS_UNAVAILABLE:';
+        const unavailable = tasks.filter(t => t.status === 'failed'
+            && typeof t.errorMessage === 'string'
+            && t.errorMessage.startsWith(unavailableMark));
+        tasks = tasks.filter(t => !unavailable.includes(t));
+        renderUnavailableBanners(unavailable, unavailableMark);
+
+        if (tasks.length === 0) {
+            el.innerHTML = '<div class="empty-history">📭 История обработок пуста</div>';
+            document.getElementById('btnDeleteAll').style.display = 'none';
+            document.getElementById('statsGrid').style.display = 'none';
+            return;
+        }
+
         updateStats(tasks);
         // Сохраняем задачи для доступа из generateReport
         window._histTasks = {};
@@ -738,6 +757,40 @@ function removeItemDom(id) {
     if (!el) return;
     el.classList.add('deleting');
     setTimeout(() => { el.remove(); if (!document.querySelector('.history-item')) { document.getElementById('historyList').innerHTML='<div class="empty-history">📭 История обработок пуста</div>'; document.getElementById('btnDeleteAll').style.display='none'; document.getElementById('statsGrid').style.display='none'; } }, 270);
+}
+
+// renderUnavailableBanners показывает баннер для задач, чью обработку не удалось
+// выполнить из-за того, что точные эфемериды/часы за наблюдённую дату ещё не
+// опубликованы центрами IGS (типично для запросов «день в день»). После
+// показа задачи удаляются из БД, чтобы не оставаться в истории как ошибочные.
+function renderUnavailableBanners(items, prefix) {
+    const cont = document.getElementById('historyBanners');
+    if (!cont) return;
+    if (!items || items.length === 0) { cont.innerHTML = ''; return; }
+    cont.innerHTML = items.map(t => {
+        const msg = t.errorMessage.slice(prefix.length).trim();
+        const fname = escHtml(t.filename || '—');
+        return `<div class="info-banner" data-task-id="${t.id}">
+            <div class="info-banner-icon">⏳</div>
+            <div class="info-banner-body">
+                <div class="info-banner-title">Данные ещё не опубликованы (${fname})</div>
+                <div class="info-banner-text">${escHtml(msg)}</div>
+            </div>
+            <button class="info-banner-close" aria-label="Закрыть" onclick="dismissUnavailableBanner('${t.id}')">×</button>
+        </div>`;
+    }).join('');
+    // Удаляем эти задачи из БД в фоне — они не имеют полезной нагрузки.
+    items.forEach(t => {
+        fetch(`/api/measurements/delete?id=${t.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        }).catch(() => {});
+    });
+}
+
+function dismissUnavailableBanner(taskId) {
+    const b = document.querySelector(`#historyBanners .info-banner[data-task-id="${taskId}"]`);
+    if (b) b.remove();
 }
 
 function confirmDeleteOne(id) {

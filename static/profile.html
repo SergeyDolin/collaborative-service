@@ -220,6 +220,18 @@
 .error-msg { background:var(--err-bg); color:var(--err); padding:6px 10px; border-radius:var(--r-sm); font-size:0.74rem; margin-top:6px; font-family:var(--font-mono); }
 .empty-history, .loading-hist { text-align:center; padding:36px; color:var(--ink-3); font-size:0.88rem; font-family:var(--font-mono); }
 
+/* Информационные баннеры над историей — задачи, обработка которых
+   отложена, потому что за наблюдённую дату ещё нет точных продуктов IGS. */
+#historyBanners { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+#historyBanners:empty { display:none; }
+.info-banner { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:var(--r-sm); background:var(--warn-bg, #fff4e0); border:1px solid var(--warn, #c88a00); color:var(--ink-1); font-size:0.85rem; }
+.info-banner-icon { font-size:1.1rem; line-height:1.2; }
+.info-banner-body { flex:1; min-width:0; }
+.info-banner-title { font-weight:600; margin-bottom:4px; }
+.info-banner-text { color:var(--ink-2); line-height:1.4; }
+.info-banner-close { background:transparent; border:none; color:var(--ink-3); font-size:1.2rem; cursor:pointer; padding:0 4px; line-height:1; }
+.info-banner-close:hover { color:var(--ink-1); }
+
 /* Select mode */
 .task-checkbox { display:none; width:16px; height:16px; cursor:pointer; accent-color:var(--graphite); flex-shrink:0; margin-top:2px; }
 .select-mode .task-checkbox { display:block; }
@@ -369,6 +381,7 @@
             <button class="btn-sm btn-sm-err" onclick="confirmDeleteSelected()"><span data-icon="trash" data-icon-size="12"></span> Удалить выбранные</button>
             <button class="btn-sm btn-sm-ghost" onclick="toggleSelectMode()">Отмена</button>
         </div>
+        <div id="historyBanners"></div>
         <div id="historyList" class="history-list">
             <div class="empty-history">Нажмите «Обновить» для загрузки истории</div>
         </div>

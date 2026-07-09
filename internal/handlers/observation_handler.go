@@ -135,6 +135,14 @@ func (h *ObservationHandler) findRINEXFile(dir string) string {
 		return entries[0]
 	}
 
+	// RINEX 2 observation с расширением .YYo / .YYO (например NSK1.26o)
+	for _, pattern := range []string{"*.[0-9][0-9]o", "*.[0-9][0-9]O"} {
+		entries, _ = filepath.Glob(filepath.Join(dir, pattern))
+		if len(entries) > 0 {
+			return entries[0]
+		}
+	}
+
 	entries, _ = filepath.Glob(filepath.Join(dir, "converted.obs"))
 	if len(entries) > 0 {
 		return entries[0]

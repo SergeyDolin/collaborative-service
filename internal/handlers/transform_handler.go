@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -92,6 +91,9 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	if targetCoordType == "" {
 		targetCoordType = "BLH"
 	}
+	if heightSurface == "" {
+		heightSurface = "ELLIPSOID"
+	}
 
 	// Для статических СК эпоха фиксирована и не зависит от ввода пользователя
 	sourceEpoch := resolveEpoch(sourceCRS, sourceEpochRaw)
@@ -122,12 +124,6 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	operationCode := h.encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface, sourceEpoch, targetEpoch)
-	if operationCode == "" {
-		SendJSONError(w, "Failed to encode operation", http.StatusBadGateway, h.logger)
-		return
-	}
-
 	sourceDataset := map[string]interface{}{
 		"type": "FeatureCollection",
 		"features": []interface{}{
@@ -144,15 +140,15 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	sourceDatasetJSON, _ := json.Marshal(sourceDataset)
 
 	transformReq := map[string]interface{}{
-		"operation_code": operationCode,
-		"source_dataset": string(sourceDatasetJSON),
-		"source_epoch":   sourceEpoch,
-		"target_epoch":   targetEpoch,
+		"source_dataset":  string(sourceDatasetJSON),
+		"source_metadata": buildMetadata(sourceCRS, sourceCoordType, heightSurface, sourceEpoch),
+		"target_metadata": buildMetadata(targetCRS, targetCoordType, heightSurface, targetEpoch),
 	}
 	reqBody, _ := json.Marshal(transformReq)
+	h.logger.Debugf("transform request: %s", string(reqBody))
 
 	resp, err := h.client.Post(
-		"https://geocentric.xyz/api/operation/from_code/geojson",
+		"https://geocentric.xyz/api/transform/geojson",
 		"application/json",
 		bytes.NewReader(reqBody),
 	)
@@ -165,6 +161,7 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
+		h.logger.Errorf("transform status %d: %s", resp.StatusCode, string(respBody))
 		SendJSONError(w, fmt.Sprintf("Transform failed: %s", string(respBody)), resp.StatusCode, h.logger)
 		return
 	}
@@ -197,6 +194,16 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	// operation_code как таковой сервисом больше не выдаётся — собираем читаемое описание из ответа
+	operationCode := ""
+	if details, ok := result["details"].(map[string]interface{}); ok {
+		if src, ok := details["source_metadata_as_code"].(string); ok {
+			if tgt, ok := details["target_metadata_as_code"].(string); ok {
+				operationCode = src + " → " + tgt
+			}
+		}
+	}
+
 	h.logger.Infof("Transform result: %v -> %v", coordinates, targetCoords)
 
 	response := map[string]interface{}{
@@ -215,52 +222,19 @@ func (h *TransformHandler) TransformCoordinates(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(response)
 }
 
-func (h *TransformHandler) encodeOperation(sourceCRS, targetCRS, sourceCoordType, targetCoordType, heightSurface, sourceEpoch, targetEpoch string) string {
-	encodeReq := map[string]interface{}{
-		"source_metadata": map[string]interface{}{
-			"crs": map[string]interface{}{
-				"referenceFrameID":   getReferenceFrameID(sourceCRS),
-				"deformated":         false,
-				"representationType": sourceCoordType,
+func buildMetadata(crs, coordType, heightSurface, epoch string) map[string]interface{} {
+	return map[string]interface{}{
+		"crs": map[string]interface{}{
+			"referenceFrameID":   getReferenceFrameID(crs),
+			"deformated":         false,
+			"representationType": coordType,
+			"heightReference": map[string]interface{}{
+				"surface": heightSurface,
 			},
-			"epoch":      map[string]interface{}{"date": sourceEpoch},
-			"coord_type": sourceCoordType,
 		},
-		"target_metadata": map[string]interface{}{
-			"crs": map[string]interface{}{
-				"referenceFrameID":   getReferenceFrameID(targetCRS),
-				"deformated":         false,
-				"representationType": targetCoordType,
-			},
-			"epoch":      map[string]interface{}{"date": targetEpoch},
-			"coord_type": targetCoordType,
-		},
-		"height_surface": heightSurface,
+		"epoch":  map[string]interface{}{"date": epoch},
+		"format": "GEOJSON",
 	}
-
-	reqBody, _ := json.Marshal(encodeReq)
-	h.logger.Debugf("encodeOperation body: %s", string(reqBody))
-
-	resp, err := h.client.Post(
-		"https://geocentric.xyz/api/operation/encode",
-		"application/json",
-		bytes.NewReader(reqBody),
-	)
-	if err != nil {
-		h.logger.Errorf("encodeOperation failed: %v", err)
-		return ""
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		h.logger.Errorf("encodeOperation status %d: %s", resp.StatusCode, string(respBody))
-		return ""
-	}
-
-	code := strings.Trim(string(respBody), "\"\n ")
-	h.logger.Infof("encodeOperation result: %s", code)
-	return code
 }
 
 func normalizeDate(date string) string {

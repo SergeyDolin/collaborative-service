@@ -57,13 +57,27 @@ type SNRConfig struct {
 	MaskL5  string
 }
 
-func (g *ConfigGenerator) getSNRConfig(rinexPath string) SNRConfig {
+func (g *ConfigGenerator) getSNRConfig(rinexPath string, isMobile bool, mobileSourcePath string) SNRConfig {
 	snrInfo := g.rinexParser.ParseSNRMapping(rinexPath)
 
-	if !snrInfo.Present {
-		g.logger.Info("SNR mapping not found in RINEX header, SNR mask disabled")
-		return SNRConfig{Enabled: false}
-	}
+	// if !snrInfo.Present {
+	// 	// Для телефонов пытаемся вычислить маску по значениям SNR в теле файла.
+	// 	if isMobile {
+	// 		src := mobileSourcePath
+	// 		if src == "" {
+	// 			src = rinexPath
+	// 		}
+	// 		l1, l2, l5, ok := g.rinexParser.ComputeSNRMaskFromObservations(src)
+	// 		if ok {
+	// 			g.logger.Infof("Mobile SNR mask computed from observations: L1=%s L2=%s L5=%s", l1, l2, l5)
+	// 			return SNRConfig{Enabled: true, MaskL1: l1, MaskL2: l2, MaskL5: l5}
+	// 		}
+	// 		g.logger.Info("Mobile SNR mask: not enough observations to derive threshold, mask disabled")
+	// 	} else {
+	// 		g.logger.Info("SNR mapping not found in RINEX header, SNR mask disabled")
+	// 	}
+	// 	return SNRConfig{Enabled: false}
+	// }
 
 	thresholds := g.rinexParser.GetSNRMaskValues(snrInfo)
 	if len(thresholds) != 9 {
@@ -147,7 +161,8 @@ func (g *ConfigGenerator) GenerateConfig(
 		return "", fmt.Errorf("failed to read template: %w", err)
 	}
 
-	content := g.replaceParameters(string(templateData), config, date, files, ant, rinexPath)
+	snrConfig := g.getSNRConfig(rinexPath, config.DeviceType == "mobile", antFile)
+	content := g.replaceParameters(string(templateData), config, date, files, ant, snrConfig)
 
 	configPath := filepath.Join(g.workDir, taskID, fmt.Sprintf("%s_config.conf", taskID))
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
@@ -339,7 +354,7 @@ func (g *ConfigGenerator) replaceParameters(
 	date time.Time,
 	files *ProcessingFiles,
 	ant AntennaInfo,
-	rinexPath string,
+	snrConfig SNRConfig,
 ) string {
 	fmtDelta := func(v float64) string {
 		return strconv.FormatFloat(v, 'f', 4, 64)
@@ -362,8 +377,6 @@ func (g *ConfigGenerator) replaceParameters(
 		"{{ANT_DELTA_E}}": fmtDelta(ant.DeltaE),
 		"{{ANT_DELTA_N}}": fmtDelta(ant.DeltaN),
 	}
-
-	snrConfig := g.getSNRConfig(rinexPath)
 
 	snrMaskR := "off"
 	snrMaskB := "off"

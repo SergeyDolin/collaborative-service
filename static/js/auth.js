@@ -1,3 +1,26 @@
+// Разрешаем только внутренние пути, чтобы ?back= не увёл на чужой домен.
+function safeBackPath() {
+    try {
+        const q = new URLSearchParams(location.search);
+        const back = q.get('back');
+        if (!back) return '/profile';
+        // Только относительные пути на своём origin.
+        if (back.charAt(0) !== '/' || back.charAt(1) === '/') return '/profile';
+        return back;
+    } catch (_) { return '/profile'; }
+}
+
+// Показать плашку "сессия истекла" при переходе с ?expired=1
+(function showExpiredHint() {
+    const q = new URLSearchParams(location.search);
+    if (q.get('expired') !== '1') return;
+    const errorDiv = document.getElementById('errorMessage');
+    if (!errorDiv) return;
+    errorDiv.textContent = 'Сессия истекла. Пожалуйста, войдите снова.';
+    errorDiv.style.display = 'block';
+})();
+
+
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const login = document.getElementById('login').value;
@@ -18,7 +41,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             localStorage.setItem('userLogin', data.login);
             successDiv.textContent = 'Вход выполнен успешно! Перенаправление...';
             successDiv.style.display = 'block';
-            setTimeout(() => { window.location.href = '/profile'; }, 1000);
+            const dest = safeBackPath();
+            setTimeout(() => { window.location.href = dest; }, 1000);
         } else {
             errorDiv.textContent = data.error || 'Ошибка входа. Проверьте логин и пароль.';
             errorDiv.style.display = 'block';
