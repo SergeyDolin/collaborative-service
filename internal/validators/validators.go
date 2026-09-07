@@ -63,6 +63,16 @@ func (v *ConfigValidator) ValidateProcessingConfig(config *model.UserProcessingC
 		return fmt.Errorf("elevation mask must be between 0 and 90 degrees, got %.1f", config.ElevationMask)
 	}
 
+	if config.AntennaSource != "" && config.AntennaSource != "profile" {
+		return fmt.Errorf("неизвестный источник параметров антенны")
+	}
+	if strings.ContainsAny(config.AntennaType, "\r\n") || len(config.AntennaType) > 60 {
+		return fmt.Errorf("проверьте название антенны")
+	}
+	if config.AntennaSource == "profile" && strings.TrimSpace(config.AntennaType) == "" {
+		return fmt.Errorf("в профиле приёмника не указана антенна")
+	}
+
 	return nil
 }
 

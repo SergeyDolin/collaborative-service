@@ -8,60 +8,44 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/middleware"
 	"go.uber.org/zap"
-)
-
-type (
-	responseData struct {
-		status int
-		size   int
-	}
-
-	loggingResponseWriter struct {
-		http.ResponseWriter
-		responseData *responseData
-	}
 )
 
 type contextKey string
 
 const UserContextKey contextKey = "user"
 
-func (r *loggingResponseWriter) Write(b []byte) (int, error) {
-	size, err := r.ResponseWriter.Write(b)
-	r.responseData.size += size
-	return size, err
-}
-
-func (r *loggingResponseWriter) WriteHeader(statusCode int) {
-	r.ResponseWriter.WriteHeader(statusCode)
-	r.responseData.status = statusCode
-}
-
+// LogMiddleware keeps routine requests at debug and failures visible at info level.
 func LogMiddleware(logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-
-			responseData := responseData{
-				status: 0,
-				size:   0,
-			}
-
-			lw := loggingResponseWriter{
-				ResponseWriter: w,
-				responseData:   &responseData,
-			}
-
+			lw := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			defer func() {
 				if err := recover(); err != nil {
-					logger.Errorf("PANIC recovered: %v", err)
-					http.Error(&lw, "Internal Server Error", http.StatusInternalServerError)
+					logger.Errorw("HTTP panic", "request_id", middleware.GetReqID(r.Context()), "panic", err)
+					http.Error(lw, "Internal Server Error", http.StatusInternalServerError)
+				}
+				status := lw.Status()
+				if status == 0 {
+					status = http.StatusOK
+				}
+				fields := []interface{}{
+					"method", r.Method, "path", r.URL.Path, "status", status,
+					"duration", time.Since(start), "bytes", lw.BytesWritten(),
+					"request_id", middleware.GetReqID(r.Context()),
+				}
+				switch {
+				case status >= 500:
+					logger.Errorw("HTTP request", fields...)
+				case status >= 400:
+					logger.Warnw("HTTP request", fields...)
+				default:
+					logger.Debugw("HTTP request", fields...)
 				}
 			}()
-			h.ServeHTTP(&lw, r)
-			duration := time.Since(start)
-			logger.Infof("%s %s %d %v %d", r.RequestURI, r.Method, responseData.status, duration, responseData.size)
+			h.ServeHTTP(lw, r)
 		})
 	}
 }
@@ -69,13 +53,9 @@ func LogMiddleware(logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 func AuthMiddleware(jwtService *auth.JWTService, logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger.Infof("Auth check for: %s", r.URL.Path)
-
 			authHeader := r.Header.Get("Authorization")
-			logger.Infof("Authorization header: %s", authHeader)
 
 			if authHeader == "" {
-				logger.Warn("No authorization header")
 				SendJSONError(w, "Authorization header required", http.StatusUnauthorized, logger)
 				return
 			}
@@ -88,7 +68,7 @@ func AuthMiddleware(jwtService *auth.JWTService, logger *zap.SugaredLogger) func
 
 			claims, err := jwtService.ValidateToken(tokenString)
 			if err != nil {
-				logger.Errorf("Invalid token: %v", err)
+				logger.Debugf("Token validation failed: %v", err)
 				SendJSONError(w, "Invalid or expired token", http.StatusUnauthorized, logger)
 				return
 			}

@@ -11,6 +11,9 @@ let newDevType   = null;
 let newMountType = null;
 let newPcMethod  = null;
 let isHistLoading = false;
+let historyOffset = 0, historyReload = false;
+const pollingBusy = new Set();
+const comparisonTasks = new Map();
 
 /* ════════════════════════════════════════════
    COORDINATE HELPERS
@@ -132,11 +135,20 @@ function startPolling(taskId) {
 }
 
 async function pollTaskStatus(taskId) {
+    if (pollingBusy.has(taskId) || document.hidden) return;
+    pollingBusy.add(taskId);
     try {
         const r = await fetch(`/api/measurements/status?id=${taskId}`, {
             headers: { 'Authorization': `Bearer ${getToken()}` }
         });
-        if (!r.ok) { stopPolling(taskId); return; }
+        if (!r.ok) {
+            if (r.status === 401 || r.status === 403 || r.status === 404) {
+                stopPolling(taskId);
+                setTaskConnectionHint(taskId, r.status === 404 ? 'Задача больше недоступна.' : 'Войдите заново для обновления статуса.');
+                return;
+            }
+            throw new Error('status unavailable');
+        }
         const data = await r.json();
         const status = data.status;
 
@@ -152,19 +164,33 @@ async function pollTaskStatus(taskId) {
 
         if (status === 'completed' || status === 'failed') {
             stopPolling(taskId);
+            if (status === 'failed') {
+                const notice = document.getElementById('taskNotice');
+                notice.hidden = false;
+                notice.textContent = 'Обработка не завершена: ' + (data.errorMessage || 'Не удалось получить решение') + '. Вы можете выбрать файл и повторить запуск.';
+            }
             // Полностью перерисовываем историю чтобы показать результат
             loadHistory();
         } else {
             // Обновляем label прогресс-бара
             const label = item.querySelector('.task-progress-label');
-            if (label) label.textContent = getProgressLabel(status, data.processingSec);
+            if (label) label.textContent = getProgressLabel(status, data.processingSec, data.stage)
+                + (data.startedAt ? ' · Начало: ' + new Date(data.startedAt).toLocaleTimeString('ru-RU') : '')
+                + ' · Проверено: ' + new Date(data.checkedAt || Date.now()).toLocaleTimeString('ru-RU');
         }
-    } catch { /* игнорируем сетевые ошибки */ }
+    } catch {
+        setTaskConnectionHint(taskId, 'Связь с сервером потеряна. Повторяем проверку…');
+    } finally { pollingBusy.delete(taskId); }
 }
 
-function getProgressLabel(status, sec) {
+function setTaskConnectionHint(taskId, text) {
+    const label = document.querySelector(`.history-item[data-task-id="${taskId}"] .task-progress-label`);
+    if (label) label.textContent = text;
+}
+
+function getProgressLabel(status, sec, stage) {
     if (status === 'pending')    return 'В очереди…';
-    if (status === 'processing') return sec ? `Обработка ${sec.toFixed(0)} с…` : 'Обработка…';
+    if (status === 'processing') return (Workflow.stages[stage] || 'Обработка') + (sec ? ` · ${sec.toFixed(0)} с` : '…');
     return '';
 }
 
@@ -597,11 +623,14 @@ function updateStats(tasks) {
 }
 
 async function loadHistory() {
-    if (isHistLoading) return; isHistLoading = true;
+    if (isHistLoading) { historyReload = true; return; } isHistLoading = true;
+    stopAllPolling();
     const el = document.getElementById('historyList');
     el.innerHTML = '<div class="loading-hist">⏳ Загрузка…</div>';
     try {
-        const r = await fetch('/api/measurements/history?limit=50&offset=0', {
+        const params = new URLSearchParams(new FormData(document.getElementById('historyFilters')));
+        params.set('limit', '50'); params.set('offset', String(historyOffset));
+        const r = await fetch('/api/measurements/history?' + params, {
             headers: { 'Authorization': `Bearer ${getToken()}` }
         });
         if (!r.ok) {
@@ -609,8 +638,12 @@ async function loadHistory() {
             return;
         }
         let tasks = await r.json();
+        document.getElementById('historyPrev').disabled = historyOffset === 0;
+        document.getElementById('historyNext').disabled = !tasks || tasks.length < 50;
+        document.getElementById('historyPage').textContent = 'Страница ' + (historyOffset/50+1);
+        selectedIds.clear(); updateSelCount();
         if (!tasks || tasks.length === 0) {
-            el.innerHTML = '<div class="empty-history">📭 История обработок пуста</div>';
+            el.innerHTML = '<div class="empty-history">Нет доступных записей для выбранных фильтров</div>';
             document.getElementById('btnDeleteAll').style.display = 'none';
             document.getElementById('statsGrid').style.display = 'none';
             return;
@@ -629,7 +662,7 @@ async function loadHistory() {
         renderUnavailableBanners(unavailable, unavailableMark);
 
         if (tasks.length === 0) {
-            el.innerHTML = '<div class="empty-history">📭 История обработок пуста</div>';
+            el.innerHTML = '<div class="empty-history">Нет доступных записей для выбранных фильтров</div>';
             document.getElementById('btnDeleteAll').style.display = 'none';
             document.getElementById('statsGrid').style.display = 'none';
             return;
@@ -647,8 +680,8 @@ async function loadHistory() {
             let resultHtml = '';
             if (status==='completed' && task.result) {
                 const r = task.result;
-                const hasCoords = r.latitude || r.longitude;
-                const fixRate = r.fixRate ? r.fixRate.toFixed(1) : null;
+                const hasCoords = r.q > 0 && Number.isFinite(r.latitude) && Number.isFinite(r.longitude);
+                const fixRate = Number.isFinite(r.fixRate) ? r.fixRate.toFixed(1) : null;
                 let coordsHtml = '';
                 // Извлекаем координаты и СКП из lastSolutionLine (формат RTKLIB .pos)
                 // Колонки: date time lat lon h Q ns sdn sde sdu ...
@@ -671,18 +704,25 @@ async function loadHistory() {
                     sE = r.sdy;
                     sU = r.sdz;
                 }
-                if (lat && lon) {
+                if (hasCoords && Number.isFinite(lat) && Number.isFinite(lon)) {
                     coordsHtml = buildCoordsHtml(lat, lon, h, sN, sE, sU, isKinOrAbs);
                 }
-                const dlBtn = task.fileType !== 'static'
+                const dlBtn = task.fileType !== 'static' && task.hasResultFile
                     ? `<button class="download-btn" onclick="downloadResult('${task.id}',event)"><span data-icon="download" data-icon-size="14"></span> Скачать .pos</button>` : '';
                 const trBtn = hasCoords
                     ? `<button class="btn-transform" onclick="openTransform(${r.latitude},${r.longitude},${r.height||0},'${task.id}')"><span data-icon="refresh" data-icon-size="14"></span> Пересчёт</button>` : '';
                 const repBtn = `<button class="btn-report" onclick="generateReport('${task.id}', _histTasks['${task.id}'])"><span data-icon="file" data-icon-size="14"></span> Отчёт</button>`;
                 resultHtml = `<div class="result-block">
                     <div class="stats-info">${getSolutionStatus(r.q)}${fixRate?` <span>(${fixRate}%)</span>`:''} ${r.nSat?`<span><span data-icon="satellite" data-icon-size="12"></span> ${r.nSat}</span>`:''}</div>
+                    <p class="workflow-note">${Workflow.escape(Workflow.qualityText(r.q, r.fixRate))} Завершение расчёта не гарантирует заданную точность.</p>
                     ${coordsHtml}
+                    <p class="workflow-note">B, L — градусы; H — высота над эллипсоидом. Реализация системы координат и эпоха требуют проверки по исходным продуктам перед пересчётом.</p>
                     <div class="action-buttons">${dlBtn}${trBtn}${repBtn}</div>
+                    <div class="workflow-actions">
+                     ${hasCoords ? `<button onclick="copyResultCoords('${task.id}')">Скопировать B, L, H</button><button onclick="compareResult('${task.id}')">Сравнить</button>` : ''}
+                     <button onclick="repeatSettings('${task.id}')">Повторить с этими настройками</button>
+                    </div>
+                    <p class="workflow-note">Доступен до ${escHtml(new Date(task.resultExpiresAt).toLocaleString('ru-RU'))}. ${task.hasResultFile ? 'Файл удаляется с сервера после скачивания.' : 'Файл уже недоступен для скачивания.'}</p>
                 </div>`;
             }
             const inProgress = status === 'pending' || status === 'processing';
@@ -706,6 +746,10 @@ async function loadHistory() {
                 </div>
             </div>`;
         }).join('');
+        if (location.hash.startsWith('#task-')) {
+            const target = document.querySelector('.history-item[data-task-id="' + CSS.escape(decodeURIComponent(location.hash.slice(6))) + '"]');
+            if (target) { target.scrollIntoView({block:'center', behavior:'smooth'}); history.replaceState(null, '', location.pathname); }
+        }
         if (window.applyIcons) window.applyIcons(el);
         if (selectMode) el.classList.add('select-mode');
 
@@ -717,7 +761,7 @@ async function loadHistory() {
             }
         });
     } catch(e) { console.error(e); el.innerHTML = '<div class="empty-history">❌ Ошибка соединения</div>'; }
-    finally { isHistLoading = false; }
+    finally { isHistLoading = false; if (historyReload) { historyReload = false; loadHistory(); } }
 }
 
 function toggleSelectMode() {
@@ -753,10 +797,15 @@ function onCbChange(cb) {
 }
 
 function removeItemDom(id) {
+    if (comparisonTasks.has(id)) {
+        comparisonTasks.clear();
+        document.getElementById('comparisonPanel').hidden = true;
+        document.getElementById('comparisonPanel').textContent = '';
+    }
     const el = document.querySelector(`.history-item[data-task-id="${id}"]`);
     if (!el) return;
     el.classList.add('deleting');
-    setTimeout(() => { el.remove(); if (!document.querySelector('.history-item')) { document.getElementById('historyList').innerHTML='<div class="empty-history">📭 История обработок пуста</div>'; document.getElementById('btnDeleteAll').style.display='none'; document.getElementById('statsGrid').style.display='none'; } }, 270);
+    setTimeout(() => { el.remove(); if (!document.querySelector('.history-item')) { document.getElementById('historyList').innerHTML='<div class="empty-history">Нет доступных записей для выбранных фильтров</div>'; document.getElementById('btnDeleteAll').style.display='none'; document.getElementById('statsGrid').style.display='none'; } }, 270);
 }
 
 // renderUnavailableBanners показывает баннер для задач, чью обработку не удалось
@@ -822,18 +871,21 @@ function confirmDeleteSelected() {
 
 async function downloadResult(taskId, event) {
     event.stopPropagation();
-    const btn = event.target; const orig = btn.textContent;
+    const btn = event.currentTarget; const orig = btn.innerHTML;
     btn.disabled = true; btn.textContent = '⏳';
     try {
         const r = await fetch(`/api/measurements/download?id=${taskId}`, { headers:{ 'Authorization':`Bearer ${getToken()}` } });
         if (r.ok) {
             const blob = await r.blob(); const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `${taskId}.pos`;
+            const a = document.createElement('a'); a.href = url; a.download = r.headers.get('Content-Disposition')?.match(/filename=([^;]+)/)?.[1]?.replace(/^"|"$/g, '') || `${taskId}.pos`;
             document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); document.body.removeChild(a);
+            const t = window._histTasks?.[taskId]; if (t) t.hasResultFile = false;
+            btn.remove();
+            showToast('Файл скачан и удалён с сервера');
         } else if (r.status===401) { window.location.href='/login'; }
         else { showToast('Файл недоступен', 'err'); }
     } catch { showToast('Ошибка', 'err'); }
-    finally { btn.disabled = false; btn.textContent = orig; }
+    finally { btn.disabled = false; btn.innerHTML = orig; }
 }
 
 /* ════════════════════════════════════════════
@@ -1366,3 +1418,54 @@ async function confirmDeleteAccount() {
         btn.textContent = 'Удалить навсегда';
     }
 }
+function resetHistoryPage() { historyOffset = 0; loadHistory(); }
+function changeHistoryPage(direction) { historyOffset = Math.max(0, historyOffset + direction * 50); loadHistory(); }
+function copyResultCoords(id) {
+    const r = window._histTasks?.[id]?.result;
+    if (r) copyClip(`${r.latitude.toFixed(8)}\t${r.longitude.toFixed(8)}\t${r.height.toFixed(4)}`);
+}
+function compareResult(id) {
+    const task = window._histTasks?.[id];
+    if (!task?.result) return;
+    if (comparisonTasks.has(id)) comparisonTasks.delete(id);
+    else {
+        if (comparisonTasks.size === 2) comparisonTasks.clear();
+        // This comparison exists only in page memory.
+        comparisonTasks.set(id, task);
+    }
+    const panel = document.getElementById('comparisonPanel');
+    panel.hidden = comparisonTasks.size === 0;
+    const tasks = [...comparisonTasks.values()];
+    panel.innerHTML = '<h3>Сравнение результатов</h3><p>' + tasks.map(t => escHtml(t.filename)).join(' ↔ ') + '</p>';
+    if (tasks.length === 1) panel.innerHTML += '<p>Нажмите «Сравнить» у второго результата.</p>';
+    if (tasks.length === 2) {
+        const [a,b] = tasks.map(t => t.result);
+        panel.innerHTML += `<p>Второй минус первый: ΔB ${(b.latitude-a.latitude).toFixed(8)}°, ΔL ${(b.longitude-a.longitude).toFixed(8)}°, ΔH ${(b.height-a.height).toFixed(4)} м.</p>
+          <p>FIX: ${Number(a.fixRate).toFixed(1)}% → ${Number(b.fixRate).toFixed(1)}%.</p>
+          <p class="workflow-note">Сопоставляйте одну точку, одну систему координат и эпоху. Разность решений сама по себе не является оценкой точности. Для кинематики здесь сравниваются сводные координаты, а не все эпохи траекторий.</p>`;
+    }
+    panel.innerHTML += '<button class="workflow-button" onclick="comparisonTasks.clear(); document.getElementById(\'comparisonPanel\').hidden=true">Очистить сравнение</button>';
+    panel.scrollIntoView({block:'center', behavior:'smooth'});
+}
+function repeatSettings(id) {
+    const config = window._histTasks?.[id]?.config;
+    if (!config) return;
+    const child = window.open('/measurements', '_blank');
+    if (!child) { showToast('Разрешите открытие вкладки для повторного запуска', 'err'); return; }
+    const listener = event => {
+        if (event.origin !== location.origin || event.source !== child || event.data?.type !== 'processing-ready') return;
+        child.postMessage({type:'processing-settings', config}, location.origin);
+        window.removeEventListener('message', listener);
+    };
+    window.addEventListener('message', listener);
+    setTimeout(() => window.removeEventListener('message', listener), 30000);
+}
+
+// Do not retain comparison data after its existing result expiry.
+setInterval(() => {
+    if ([...comparisonTasks.values()].some(t => new Date(t.resultExpiresAt).getTime() <= Date.now())) {
+        comparisonTasks.clear();
+        const panel = document.getElementById('comparisonPanel');
+        panel.textContent = ''; panel.hidden = true;
+    }
+}, 30000);

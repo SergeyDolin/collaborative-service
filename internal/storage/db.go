@@ -3,12 +3,15 @@ package storage
 import (
 	"collaborative/internal/model"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrUserNotFound = errors.New("user not found")
 
 type DBStorage struct {
 	pool *pgxpool.Pool
@@ -88,7 +91,7 @@ func (stor *DBStorage) GetUser(login string) (*model.User, error) {
 	err := stor.pool.QueryRow(context.Background(), query, login).Scan(&user.Login, &user.Password)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("User %s not found", login)
+			return nil, fmt.Errorf("get user %s: %w", login, ErrUserNotFound)
 		}
 		return nil, fmt.Errorf("Get user %s: %w", login, err)
 	}

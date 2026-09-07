@@ -428,7 +428,9 @@ func (s *TaskStorage) GetResultByTaskID(taskID string) (*model.ProcessingResult,
 }
 
 // GetUserTasksWithResults возвращает задачи пользователя с результатами
-func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset int) ([]map[string]interface{}, error) {
+type TaskFilter struct{ Query, Status, Method, From, To string }
+
+func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset int, filters ...TaskFilter) ([]map[string]interface{}, error) {
 	query := `
 		SELECT t.id, t.user_login, t.config, t.filename, t.status,
 		       COALESCE(t.error_message, ''), t.created_at, t.completed_at, t.processing_sec,
@@ -448,11 +450,20 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		    t.status IN ('pending', 'processing')
 		    OR (r.task_id IS NOT NULL AND r.expires_at > NOW())
 		  )
-		ORDER BY t.created_at DESC
+        AND ($4 = '' OR strpos(lower(t.filename), lower($4)) > 0)
+        AND ($5 = '' OR t.status = $5)
+        AND ($6 = '' OR t.config->>'method' = $6)
+        AND ($7 = '' OR t.created_at >= NULLIF($7, '')::date)
+        AND ($8 = '' OR t.created_at < NULLIF($8, '')::date + INTERVAL '1 day')
+		ORDER BY t.created_at DESC, t.id DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := s.pool.Query(context.Background(), query, userLogin, limit, offset)
+	var filter TaskFilter
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
+	rows, err := s.pool.Query(context.Background(), query, userLogin, limit, offset, filter.Query, filter.Status, filter.Method, filter.From, filter.To)
 	if err != nil {
 		return nil, fmt.Errorf("query tasks with results: %w", err)
 	}
@@ -535,7 +546,7 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 func (s *TaskStorage) GetSystemStats() (map[string]interface{}, error) {
 	query := `
 		SELECT 
-			(SELECT COUNT(DISTINCT user_login) FROM processing_tasks) as total_users,
+			(SELECT COUNT(*) FROM users) as total_users,
 			(SELECT COUNT(*) FROM processing_tasks WHERE DATE(created_at) = CURRENT_DATE) as today_tasks
 	`
 

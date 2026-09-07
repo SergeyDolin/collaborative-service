@@ -4,6 +4,7 @@ import (
 	"collaborative/internal/model"
 	"collaborative/internal/parsers"
 	"collaborative/internal/storage"
+	"collaborative/internal/telemetry"
 	"context"
 	"fmt"
 	"os"
@@ -64,6 +65,9 @@ func (s *MeasurementService) ProcessMeasurement(
 	fileData []byte,
 	filename string,
 ) error {
+	telemetry.Default.SetStage(taskID, "checking")
+	defer telemetry.Default.Forget(taskID)
+
 	s.logger.Infof("Processing measurement: task=%s, method=%s, mode=%s, size=%.2f MB",
 		taskID, config.Method, config.Mode, float64(len(fileData))/(1024*1024))
 
@@ -106,6 +110,7 @@ func (s *MeasurementService) ProcessMeasurement(
 
 	s.logger.Infof("File saved: %s (size: %.2f MB)", obsPath, float64(len(fileData))/(1024*1024))
 
+	telemetry.Default.SetStage(taskID, "converting")
 	// Конвертируем если нужно
 	convertedPath, err := s.converter.ConvertFile(obsPath, workDir)
 	if err != nil {
@@ -131,6 +136,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		s.logger.Infof("Saved observation date for task %s: %s", taskID, date.Format("2006-01-02"))
 	}
 
+	telemetry.Default.SetStage(taskID, "products")
 	files := &ProcessingFiles{}
 	files.NavigationFile, _ = s.downloader.DownloadBroadcastEphemeris(date, taskID)
 
@@ -170,12 +176,14 @@ func (s *MeasurementService) ProcessMeasurement(
 		}
 
 		// ← obsPath передаётся как источник для чтения антенны
+		telemetry.Default.SetStage(taskID, "configuring")
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
 		}
 
+		telemetry.Default.SetStage(taskID, "calculating")
 		outputPath, procErr = s.rtk.ProcessPPP(
 			rinexPath, files.NavigationFile,
 			files.EphemerisFile, files.ClockFile,
@@ -185,12 +193,14 @@ func (s *MeasurementService) ProcessMeasurement(
 		s.logger.Infof("Using Relative method for task: %s", taskID)
 
 		// ← obsPath передаётся как источник для чтения антенны
+		telemetry.Default.SetStage(taskID, "configuring")
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
 		}
 
+		telemetry.Default.SetStage(taskID, "calculating")
 		outputPath, procErr = s.rtk.ProcessRelative(
 			rinexPath, "", files.NavigationFile, configPath, taskID, config.DeviceType,
 		)
@@ -199,12 +209,14 @@ func (s *MeasurementService) ProcessMeasurement(
 		s.logger.Infof("Using Single Point Positioning for task: %s", taskID)
 
 		// ← obsPath передаётся как источник для чтения антенны
+		telemetry.Default.SetStage(taskID, "configuring")
 		configPath, cfgErr := s.configGen.GenerateConfig(*config, taskID, date, files, rinexPath, obsPath)
 		if cfgErr != nil {
 			s.handleError(taskID, login, fmt.Sprintf("Config generation failed: %v", cfgErr))
 			return cfgErr
 		}
 
+		telemetry.Default.SetStage(taskID, "calculating")
 		outputPath, procErr = s.rtk.ProcessAbsolute(
 			rinexPath, files.NavigationFile, configPath, taskID, config.DeviceType,
 		)
@@ -215,6 +227,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		return procErr
 	}
 
+	telemetry.Default.SetStage(taskID, "saving")
 	outputData, err := os.ReadFile(outputPath)
 	if err != nil {
 		s.logger.Warnf("Failed to read output file: %v", err)
@@ -234,7 +247,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	}
 
 	if err := s.taskStorage.SaveResult(result); err != nil {
-		s.logger.Errorf("Failed to save result: %v", err)
+		s.handleError(taskID, login, fmt.Sprintf("Failed to save result: %v", err))
 		return err
 	}
 
@@ -249,7 +262,9 @@ func (s *MeasurementService) ProcessMeasurement(
 		CompletedAt:   &completedAt,
 		ProcessingSec: completedAt.Sub(now).Seconds(),
 	}
-	s.taskStorage.UpdateTask(task)
+	if err := s.taskStorage.UpdateTask(task); err != nil {
+		return fmt.Errorf("complete task: %w", err)
+	}
 
 	s.logger.Infof("Task completed: %s in %.2fs", taskID, task.ProcessingSec)
 	return nil

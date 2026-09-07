@@ -183,12 +183,12 @@ func (s *DBStorage) UpsertCollaborativePosition(pos *model.CollaborativePosition
 
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO collaborative_positions (session_id, lat, lon, height, pdop, nsat, quality, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		ON CONFLICT (session_id) DO UPDATE SET
 			lat=EXCLUDED.lat, lon=EXCLUDED.lon, height=EXCLUDED.height,
 			pdop=EXCLUDED.pdop, nsat=EXCLUDED.nsat, quality=EXCLUDED.quality,
 			updated_at=EXCLUDED.updated_at`,
-		pos.SessionID, pos.Lat, pos.Lon, pos.Height, pos.PDOP, pos.NSat, pos.Quality,
+		pos.SessionID, pos.Lat, pos.Lon, pos.Height, pos.PDOP, pos.NSat, pos.Quality, pos.UpdatedAt,
 	)
 	return err
 }

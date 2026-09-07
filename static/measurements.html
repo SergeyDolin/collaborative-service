@@ -190,6 +190,7 @@
     .enu-grid        { grid-template-columns:1fr; }
 }
 </style>
+<link rel="stylesheet" href="/css/workflow.css">
 </head>
 <body class="bg-grid">
 <header class="header">
@@ -232,7 +233,14 @@
         </div>
 
         <div class="device-section" id="deviceSection" style="display:none">
-            <div class="device-section-label"><span style="color:var(--ink-faint);font-weight:500;">02</span> Тип устройства</div>
+            <div class="workflow-panel">
+ <label for="savedDevice">Устройство из профиля</label>
+ <select id="savedDevice" onchange="applySavedDevice()"><option value="">Указать вручную / антенна из RINEX</option></select>
+ <p id="deviceSource" class="workflow-note">Для приёмника антенна берётся из RINEX. Для мобильного устройства задайте смещения ENU.</p>
+ <p id="deviceValidity" class="workflow-note"></p>
+ <a href="/profile">Управление устройствами</a> · <a href="/calibration">Калибровка антенны</a>
+</div>
+<div class="device-section-label"><span style="color:var(--ink-faint);font-weight:500;">02</span> Тип устройства</div>
             <div class="device-selector">
                 <div class="device-option" data-device="gnss" onclick="selectDeviceType('gnss')">
                     <div class="device-option-icon" data-icon="gnss_receiver" data-icon-size="28"></div>
@@ -293,7 +301,9 @@
 <div class="file-info" id="fileInfo">RINEX (.obs, .rnx, .crx, .YYo, .YYd), сжатые (.gz)</div>
             <input type="file" id="fileInput" style="display:none" accept=".obs,.rnx,.crx,.20d,.21d,.22d,.23d,.24d,.25d,.26d,.27d,.28d,.29d,.99D,.20o,.21o,.22o,.23o,.24o,.25o,.26o,.27o,.28o,.29o,.99O,.gz,.o">
         </div>
-        <button id="processBtn" onclick="startProcessing()" disabled>
+        <section class="workflow-panel" id="filePreview" hidden aria-live="polite"></section>
+<p id="preflightAdvice" class="workflow-note workflow-warning" hidden></p>
+<button id="processBtn" onclick="startProcessing()" disabled>
             <span class="upload-progress" id="uploadProgress"></span>
             <span id="processBtnText">Выберите метод и файл</span>
         </button>
@@ -302,6 +312,7 @@
 </main>
 <script src="/js/icons.js"></script>
 <script src="/js/chrome.js"></script>
+<script src="/js/workflow.js"></script>
 <script src="/js/measurements.js?v=2"></script>
 </body>
 </html>

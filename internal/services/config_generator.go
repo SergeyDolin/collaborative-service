@@ -130,7 +130,7 @@ func (g *ConfigGenerator) GenerateConfig(
 	}
 
 	// Мобильное устройство: переопределяем антенну из пользовательского ввода
-	if config.DeviceType == "mobile" {
+	if config.DeviceType == "mobile" || config.AntennaSource == "profile" {
 		antType := strings.TrimSpace(config.AntennaType)
 		if antType == "" {
 			antType = "UNKNOWN"

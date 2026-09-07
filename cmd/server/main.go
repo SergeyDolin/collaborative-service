@@ -57,7 +57,13 @@ type Application struct {
 func main() {
 	cfg := config.LoadConfig()
 
-	logger, err := zap.NewDevelopment()
+	logConfig := zap.NewProductionConfig()
+	// Preserve every account lifecycle event, including bursts of registrations.
+	logConfig.Sampling = nil
+	if err := logConfig.Level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
+		panic("invalid log level: " + cfg.LogLevel)
+	}
+	logger, err := logConfig.Build()
 	if err != nil {
 		panic("cannot initialize zap")
 	}
@@ -130,7 +136,7 @@ func (app *Application) initStorage(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	app.logger.Infof("Connected to database: %s", cfg.DSN)
+	app.logger.Info("Connected to database")
 
 	app.dbStorage = dbStor
 	app.taskStorage = storage.NewTaskStorage(dbStor.Pool())
@@ -261,7 +267,7 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 
 			// Collaborative positioning
 			if app.dbStorage != nil {
-				collabHandler := handlers.NewCollaborativeHandler(app.dbStorage, app.logger)
+				collabHandler := handlers.NewCollaborativeHandler(app.dbStorage, app.logger, app.posWorker.Diagnostics)
 				r.Post("/api/collaborative/sessions", collabHandler.CreateSession)
 				r.Get("/api/collaborative/sessions", collabHandler.ListSessions)
 				r.Delete("/api/collaborative/sessions/{id}", collabHandler.DeleteSession)

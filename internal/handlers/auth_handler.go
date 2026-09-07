@@ -7,6 +7,7 @@ import (
 	"collaborative/internal/storage"
 	"collaborative/internal/validators"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -166,8 +167,13 @@ func LoginHandler(
 
 		user, err := dbStor.GetUser(authReq.Login)
 		if err != nil {
-			logger.Warnf("Login attempt for non-existent user: %s", authReq.Login)
-			SendJSONError(w, "Invalid credentials", http.StatusUnauthorized, logger)
+			if errors.Is(err, storage.ErrUserNotFound) {
+				logger.Warnw("Login failed", "login", authReq.Login, "reason", "user_not_found")
+				SendJSONError(w, "Invalid credentials", http.StatusUnauthorized, logger)
+			} else {
+				logger.Errorw("Login database lookup failed", "login", authReq.Login, "error", err)
+				SendJSONError(w, "Internal server error", http.StatusInternalServerError, logger)
+			}
 			return
 		}
 
@@ -408,7 +414,12 @@ func DeleteAccountHandler(dbStor *storage.DBStorage, logger *zap.SugaredLogger) 
 
 		user, err := dbStor.GetUser(login)
 		if err != nil {
-			SendJSONError(w, "User not found", http.StatusNotFound, logger)
+			if errors.Is(err, storage.ErrUserNotFound) {
+				SendJSONError(w, "User not found", http.StatusNotFound, logger)
+			} else {
+				logger.Errorw("Delete account database lookup failed", "login", login, "error", err)
+				SendJSONError(w, "Internal server error", http.StatusInternalServerError, logger)
+			}
 			return
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {

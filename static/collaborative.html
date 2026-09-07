@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Коллаборативное позиционирование — CPS</title>
-<script>window.location.replace('/');</script>
+<script src="/js/connection-diagnostics.js"></script>
 <link rel="stylesheet" href="css/theme.css">
 <style>
 .main-content { max-width:1000px; }
@@ -176,6 +176,7 @@ input:checked + .toggle-slider::before { transform:translateX(16px); background:
 .pos-offer-text { font-size:0.88rem; color:var(--ink); }
 .pos-offer-actions { display:flex; gap:8px; }
 </style>
+<link rel="stylesheet" href="/css/workflow.css">
 </head>
 <body class="bg-grid">
 <header class="header">
@@ -429,12 +430,20 @@ async function submitConnect() {
         if (!rc.ok) { showToast(session.error || 'Ошибка создания сессии', 'err'); btn.disabled = false; btn.textContent = '▶ Старт'; return; }
 
         // 2. Включаем позиционирование
-        await fetch(`/api/collaborative/sessions/${session.id}/positioning`, {
+        const startResponse = await fetch(`/api/collaborative/sessions/${session.id}/positioning`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ enabled: true }),
         });
 
+        if (!startResponse.ok) {
+            const error = await startResponse.json().catch(() => ({}));
+            closeModal();
+            await loadSessions();
+            showToast(error.error || 'Подключение сохранено, но расчёт не удалось запустить', 'err');
+            btn.disabled = false; btn.textContent = '▶ Старт';
+            return;
+        }
         // 3. Переходим на страницу карты
         window.location.href = `/positioning?deviceId=${deviceId}`;
     } catch {
@@ -511,24 +520,25 @@ function renderSessions(sessions) {
                 </div>
             </div>
 
-            <div class="session-cmd">
+            ${renderConnectionDiagnostics(s)}
+            <details class="session-cmd"><summary>Команда подключения</summary>
                 <div class="cmd-label">str2str команда</div>
                 ${escHtml(s.str2strCmd)}
                 <button class="copy-btn" onclick="copyCmd('${escHtml(s.str2strCmd).replace(/'/g,"\\'")}')">Копировать</button>
-            </div>
+            </details>
 
             <div class="positioning-toggle">
                 <span class="toggle-label">Определять местоположение на сервере (rtkrcv, каждые 30 с)</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="pos-toggle-${s.id}"
-                        ${s.enablePositioning ? 'checked' : ''}
+                        ${s.enablePositioning ? 'checked' : ''} ${s.diagnostics && !s.diagnostics.workerEnabled && !s.enablePositioning ? 'disabled' : ''}
                         onchange="togglePositioning(${s.id}, this.checked)">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
 
             ${s.enablePositioning && s.latestPosition ? renderPosition(s.latestPosition) : ''}
-            ${s.enablePositioning && !s.latestPosition ? `<div class="session-meta">Ожидание первого решения…</div>` : ''}
+            ${s.enablePositioning && s.diagnostics?.workerEnabled && !s.latestPosition ? `<div class="session-meta">Ожидание первого решения…</div>` : ''}
 
             <div class="session-footer">
                 <button class="btn-delete-session" onclick="deleteSession(${s.id})">Удалить</button>
@@ -569,10 +579,10 @@ async function togglePositioning(id, enabled) {
             body: JSON.stringify({ enabled }),
         });
         const data = await r.json();
-        if (!r.ok) { showToast(data.error || 'Ошибка', 'err'); return; }
+        if (!r.ok) { showToast(data.error || 'Ошибка', 'err'); await loadSessions(); return; }
         showToast(data.message, 'ok');
         setTimeout(loadSessions, 500);
-    } catch { showToast('Ошибка соединения', 'err'); }
+    } catch { showToast('Ошибка соединения', 'err'); loadSessions(); }
 }
 
 function copyCmd(cmd) {

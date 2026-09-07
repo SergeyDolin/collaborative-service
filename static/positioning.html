@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Позиционирование — CPS</title>
-<script>window.location.replace('/');</script>
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://tile0.maps.2gis.com">
@@ -99,6 +98,7 @@ body { display:flex; flex-direction:column; }
 .pos-dot-float  { background:#f5a623; }
 .pos-dot-single { background:#e74c3c; }
 </style>
+<link rel="stylesheet" href="/css/workflow.css">
 </head>
 <body class="bg-grid">
 
@@ -150,10 +150,12 @@ body { display:flex; flex-direction:column; }
     <button class="btn btn-primary"   id="btnStart" onclick="startPositioning()">▶ Старт</button>
 </div>
 
+<details id="connectionDiagnostics" style="flex-shrink:0;max-height:35vh;overflow:auto;position:relative;z-index:500;padding:8px 16px"><summary>Диагностика подключения</summary></details>
 <div class="toast" id="toast"></div>
 <script src="js/icons.js"></script>
 <script src="js/chrome.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/connection-diagnostics.js"></script>
 <script>
 // ── Auth ─────────────────────────────────────────────────────────────────────
 function getToken() { return localStorage.getItem('token'); }
@@ -256,10 +258,13 @@ function updateInfoOverlay(pos) {
 async function loadSession() {
     try {
         const r = await fetch('/api/collaborative/sessions', { headers: { 'Authorization': `Bearer ${getToken()}` } });
-        if (!r.ok) return null;
+        if (!r.ok) throw new Error('Не удалось обновить подключение');
         const list = await r.json();
         return (list || []).find(s => s.deviceId === deviceId) || null;
-    } catch { return null; }
+    } catch {
+        document.getElementById('controlHint').textContent = 'Связь с сервером потеряна. Повторяем проверку; показано последнее известное состояние.';
+        return undefined;
+    }
 }
 
 async function loadDevice() {
@@ -278,6 +283,8 @@ async function loadDevice() {
 
 // ── UI state ──────────────────────────────────────────────────────────────────
 function applySessionState(sess) {
+    if (sess === undefined) return;
+    document.getElementById('connectionDiagnostics').innerHTML = '<summary>Диагностика подключения</summary>' + renderConnectionDiagnostics(sess);
     currentSession = sess;
     const badge    = document.getElementById('statusBadge');
     const btnStart = document.getElementById('btnStart');
@@ -295,9 +302,16 @@ function applySessionState(sess) {
         return;
     }
 
+    if (sess.diagnostics && !sess.diagnostics.workerEnabled) {
+        badge.className = 'pos-status-badge status-stopped';
+        badge.textContent = 'Расчёт недоступен';
+        btnStart.style.display = 'none'; btnStop.style.display = sess.enablePositioning ? '' : 'none';
+        hint.textContent = 'Серверное позиционирование отключено оператором.';
+        waitOvl.classList.add('hidden'); updateInfoOverlay(null); return;
+    }
     if (sess.enablePositioning) {
         badge.className = 'pos-status-badge status-running';
-        badge.innerHTML = '<div class="pulse"></div><span>Идёт позиционирование</span>';
+        badge.textContent = sess.diagnostics?.solutionState === 'stale' ? 'Решение устарело' : 'Идёт позиционирование';
         btnStart.style.display = 'none'; btnStop.style.display = '';
         if (sess.latestPosition) {
             waitOvl.classList.add('hidden');
@@ -376,7 +390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadDevice();
     const sess = await loadSession();
     applySessionState(sess);
-    if (sess && sess.enablePositioning) startPoll();
+    startPoll();
 });
 </script>
 </body>

@@ -29,6 +29,7 @@ type CollaborativeSession struct {
 	Str2strCmd        string    `json:"str2strCmd" db:"str2str_cmd"`
 	CreatedAt         time.Time `json:"createdAt" db:"created_at"`
 	// LatestPosition подтягивается JOIN-ом, не хранится в таблице сессий
+	Diagnostics    *SessionDiagnostics    `json:"diagnostics,omitempty"`
 	LatestPosition *CollaborativePosition `json:"latestPosition,omitempty" db:"-"`
 }
 
@@ -43,4 +44,14 @@ type CollaborativePosition struct {
 	NSat      int       `json:"nsat"`
 	Quality   int       `json:"quality"` // 1=fix,2=float,5=single
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// SessionDiagnostics reports observed state, never infers stream health from a toggle.
+type SessionDiagnostics struct {
+	WorkerEnabled    bool       `json:"workerEnabled"`
+	ProcessState     string     `json:"processState"`
+	InputState       string     `json:"inputState"`
+	CorrectionsState string     `json:"correctionsState"`
+	SolutionState    string     `json:"solutionState"`
+	LastSolutionAt   *time.Time `json:"lastSolutionAt,omitempty"`
 }

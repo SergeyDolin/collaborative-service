@@ -1,3 +1,5 @@
+let preflightBusy = false, preflightBlocked = false, inspectedHeader = null;
+let savedDevices = [], selectedProfileDevice = null;
 let selectedMethod = null;
 let selectedFile = null;
 let selectedDeviceType = null;
@@ -118,6 +120,12 @@ function selectMethod(method) {
 }
 
 function selectDeviceType(type) {
+    if (selectedProfileDevice && (selectedProfileDevice.deviceType === 'gnss_receiver' ? 'gnss' : 'mobile') !== type) {
+        selectedProfileDevice = null;
+        document.getElementById('savedDevice').value = '';
+        document.getElementById('deviceSource').textContent = 'Источник: ручные параметры или заголовок RINEX.';
+        document.getElementById('deviceValidity').textContent = '';
+    }
     selectedDeviceType = type;
     document.querySelectorAll('.device-option').forEach(el => el.classList.remove('selected'));
     document.querySelector(`.device-option[data-device="${type}"]`).classList.add('selected');
@@ -149,6 +157,14 @@ function setBtnProgress(pct) {
 
 function updateButtonState() {
     const btn = document.getElementById('processBtn');
+    const advice = Workflow.preflightAdvice(inspectedHeader, selectedMethod);
+    document.getElementById('preflightAdvice').textContent = advice;
+    document.getElementById('preflightAdvice').hidden = !advice;
+    if (preflightBusy || preflightBlocked) {
+        btn.disabled = true;
+        setBtnText(preflightBusy ? 'Проверка файла…' : 'Выберите корректный файл наблюдений');
+        return;
+    }
     const ready = selectedMethod && selectedFile && selectedDeviceType;
     if (ready) {
         btn.disabled = false;
@@ -196,11 +212,16 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 function handleFile(file) {
     const maxSize = 1 * 1024 * 1024 * 1024; // 1 GB
     
-    if (file.size > maxSize) {
+    if (file.size === 0 || file.size > maxSize) {
+        selectedFile = null;
+        preflightBusy = false; preflightBlocked = false;
+        document.getElementById('filePreview').hidden = true;
+        document.getElementById('fileInfo').textContent = 'Файл не выбран';
+        updateButtonState();
         const statusDiv = document.getElementById('status');
         statusDiv.className = 'status-message status-error';
         statusDiv.style.display = 'block';
-        statusDiv.textContent = `❌ Файл слишком большой. Максимальный размер: 1 GB. Ваш файл: ${(file.size / (1024*1024*1024)).toFixed(2)} GB`;
+        statusDiv.textContent = file.size === 0 ? "Файл пуст. Выберите файл с наблюдениями." : `❌ Файл слишком большой. Максимальный размер: 1 GB. Ваш файл: ${(file.size / (1024*1024*1024)).toFixed(2)} GB`;
         
         document.getElementById('fileInput').value = '';
         return;
@@ -212,13 +233,16 @@ function handleFile(file) {
     const sizeGB = (file.size / (1024*1024*1024)).toFixed(2);
     const sizeStr = file.size > 1024 * 1024 * 1024 ? `${sizeGB} GB` : `${sizeMB} MB`;
     
-    fileInfo.innerHTML = `✅ ${file.name} (${sizeStr})`;
-    fileInfo.style.color = '#2e7d32';
-    updateButtonState();
+    fileInfo.textContent = `${file.name} (${sizeStr})`;
+    fileInfo.style.color = 'var(--ok)';
+    inspectFile(file);
 }
 
 async function startProcessing() {
-    if (!selectedMethod || !selectedFile || !selectedDeviceType) return;
+    if (!selectedMethod || !selectedFile || !selectedDeviceType || preflightBusy || preflightBlocked) return;
+    if (selectedProfileDevice?.phaseCenterValidUntil && new Date(selectedProfileDevice.phaseCenterValidUntil) <= new Date()) {
+        applySavedDevice(); return;
+    }
     
     const token = localStorage.getItem('token');
     if (!token) {
@@ -236,18 +260,16 @@ async function startProcessing() {
     setBtnProgress(0);
     setBtnText('Загрузка 0%');
 
-    // Fallback-анимация если onprogress не стреляет (быстрые соединения / малые файлы)
-    let realProgress = false;
-    let fallbackProg = 0;
-    const fallback = setInterval(() => {
-        if (realProgress) { clearInterval(fallback); return; }
-        const step = fallbackProg < 30 ? 3 : fallbackProg < 60 ? 1.5 : 0.4;
-        fallbackProg = Math.min(fallbackProg + step, 75);
-        setBtnProgress(fallbackProg);
-        setBtnText(`Загрузка ${Math.round(fallbackProg)}%`);
-    }, 120);
-
+    // Without a browser byte count, show an indeterminate state, never invented percentages.
+    setBtnText('Загрузка файла…');
     const config = { ...methodDetails[selectedMethod].config, deviceType: selectedDeviceType };
+    if (selectedProfileDevice && selectedDeviceType === 'gnss') {
+        config.antennaSource = 'profile';
+        config.antennaType = selectedProfileDevice.antennaName;
+        config.antennaDeltaE = selectedProfileDevice.antennaE;
+        config.antennaDeltaN = selectedProfileDevice.antennaN;
+        config.antennaDeltaU = selectedProfileDevice.antennaU;
+    }
     if (selectedDeviceType === 'mobile') {
         config.antennaType = document.getElementById('mobileAntennaType').value.trim();
         config.antennaDeltaE = parseFloat(document.getElementById('mobileE').value) || 0;
@@ -264,15 +286,12 @@ async function startProcessing() {
 
         xhr.upload.onprogress = (e) => {
             if (!e.lengthComputable) return;
-            realProgress = true;
-            clearInterval(fallback);
             const pct = Math.round((e.loaded / e.total) * 100);
             setBtnProgress(pct);
             setBtnText(`Загрузка ${pct}%`);
         };
 
         xhr.onload = () => {
-            clearInterval(fallback);
             setBtnProgress(100);
             btn.classList.remove('uploading');
             let data = {};
@@ -284,10 +303,15 @@ async function startProcessing() {
                 statusDiv.style.display = 'block';
                 statusDiv.innerHTML = `
                     ✅ Обработка запущена!<br>
-                    ID задачи: <strong>${data.taskId}</strong><br>
-                    Результат появится в истории личного кабинета.
+                    <a href="/profile#task-${encodeURIComponent(data.taskId)}">Открыть состояние обработки →</a><br>
+                    Можно закрыть страницу — обработка продолжится на сервере.
                 `;
                 selectedFile = null;
+                inspectedHeader = null;
+                document.getElementById('filePreview').hidden = true;
+                document.getElementById('fileInput').value = '';
+                selectedProfileDevice = null;
+                document.getElementById('savedDevice').value = '';
                 selectedMethod = null;
                 selectedDeviceType = null;
                 document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYo, .YYd), сжатые (.gz)';
@@ -301,7 +325,7 @@ async function startProcessing() {
                 document.getElementById('deviceSection').style.display = 'none';
                 document.getElementById('mobileAntennaSection').style.display = 'none';
                 updateButtonState();
-                setTimeout(() => { window.location.href = '/profile'; }, 3000);
+                setTimeout(() => { window.location.href = '/profile#task-' + encodeURIComponent(data.taskId); }, 1200);
             } else {
                 setBtnProgress(0);
                 statusDiv.className = 'status-message status-error';
@@ -314,7 +338,6 @@ async function startProcessing() {
         };
 
         xhr.onerror = () => {
-            clearInterval(fallback);
             btn.classList.remove('uploading');
             setBtnProgress(0);
             statusDiv.className = 'status-message status-error';
@@ -333,3 +356,133 @@ async function startProcessing() {
 
 // Инициализация
 checkAuth();
+// Only header bytes are inspected, in this tab; no extra server copy is created.
+async function readHeader(file) {
+    if (!file.name.toLowerCase().endsWith('.gz')) return file.slice(0, 256 * 1024).text();
+    if (typeof DecompressionStream === 'undefined') return null;
+    const reader = file.stream().pipeThrough(new DecompressionStream('gzip')).getReader();
+    const decoder = new TextDecoder();
+    let text = '', bytes = 0;
+    try {
+        while (bytes < 256 * 1024) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            text += decoder.decode(value.subarray(0, 256 * 1024 - bytes), {stream:true});
+            bytes += value.byteLength;
+            if (text.includes('END OF HEADER')) break;
+        }
+        return text;
+    } finally { await reader.cancel().catch(() => {}); }
+}
+
+async function inspectFile(file) {
+    const panel = document.getElementById('filePreview');
+    panel.hidden = false;
+    panel.textContent = 'Проверяем заголовок файла в браузере…';
+    preflightBusy = true; preflightBlocked = false; inspectedHeader = null;
+    updateButtonState();
+    try {
+        const text = await readHeader(file);
+        if (selectedFile !== file) return;
+        if (text === null) {
+            panel.textContent = 'Этот браузер не поддерживает проверку gzip до загрузки. Формат будет проверен на сервере.';
+            return;
+        }
+        const info = Workflow.parseRinexHeader(text);
+        inspectedHeader = info;
+        if (!info.valid) {
+            preflightBlocked = true;
+            panel.textContent = 'Не найден заголовок RINEX наблюдений. Выберите файл наблюдений (.obs, .rnx, .crx, .YYo, .YYd), а не навигационный файл.';
+            return;
+        }
+        const duration = info.first && info.last ? info.last.seconds - info.first.seconds : null;
+        panel.innerHTML = `<h3>Файл проверен: RINEX ${Workflow.escape(info.version)}</h3>
+          <div class="workflow-grid">
+           <div>Начало<br><strong>${Workflow.escape(info.first?.text || 'Не указано в заголовке')}</strong></div>
+           <div>Конец<br><strong>${Workflow.escape(info.last?.text || 'Не указан в заголовке')}</strong></div>
+           <div>Длительность<br><strong>${duration !== null && duration >= 0 ? (duration/60).toFixed(1) + ' мин' : 'Уточнится при обработке'}</strong></div>
+           <div>Антенна<br><strong>${Workflow.escape(info.antenna || 'Не указана')}</strong></div>
+          </div>
+          <p>Диапазоны наблюдений: ${Workflow.escape(info.bands.join(', ') || 'не определены')}. Шкала времени: ${Workflow.escape(info.first?.system || 'не указана')}.</p>
+          <p class="workflow-note">Это проверка заголовка, а не качества всех наблюдений. ${info.complete ? '' : 'Заголовок больше лимита предпросмотра; проверка частичная.'}</p>`;
+    } catch {
+        if (selectedFile !== file) return;
+        preflightBlocked = true;
+        panel.textContent = 'Не удалось прочитать файл. Проверьте, что архив gzip не повреждён, или выберите распакованный RINEX.';
+    } finally {
+        if (selectedFile === file) { preflightBusy = false; updateButtonState(); }
+    }
+}
+
+async function loadSavedDevices() {
+    try {
+        const r = await fetch('/api/devices', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
+        if (!r.ok) throw new Error();
+        const devices = await r.json();
+        // Keep only processing settings in this tab, not connection credentials.
+        savedDevices = devices.map(d => ({ id:d.id, name:d.name, deviceType:d.deviceType, antennaName:d.antennaName, antennaE:d.antennaE, antennaN:d.antennaN, antennaU:d.antennaU, phaseCenterValidUntil:d.phaseCenterValidUntil, phaseCenterMethod:d.phaseCenterMethod }));
+        const select = document.getElementById('savedDevice');
+        savedDevices.forEach(d => select.add(new Option(d.name, String(d.id))));
+    } catch { document.getElementById('deviceSource').textContent = 'Устройства не удалось загрузить. Можно указать параметры вручную.'; }
+}
+
+function applySavedDevice() {
+    const device = savedDevices.find(d => String(d.id) === document.getElementById('savedDevice').value);
+    selectedProfileDevice = null;
+    document.getElementById('deviceValidity').textContent = '';
+    if (!device) {
+        document.getElementById('deviceSource').textContent = 'Источник: ручные параметры для мобильного устройства или заголовок RINEX для приёмника.';
+        updateButtonState(); return;
+    }
+    selectDeviceType(device.deviceType === 'gnss_receiver' ? 'gnss' : 'mobile');
+    const expired = device.phaseCenterValidUntil && new Date(device.phaseCenterValidUntil).getTime() <= Date.now();
+    if (expired) {
+        document.getElementById('deviceValidity').textContent = 'Срок калибровки истёк. Старые поправки не подставлены: выполните калибровку или задайте актуальные ENU вручную.';
+        ['E','N','U'].forEach(axis => document.getElementById('mobile'+axis).value = '');
+        document.getElementById('mobileAntennaType').value = '';
+        document.getElementById('deviceSource').textContent = 'Источник: ручной ввод, калибровка устройства просрочена.';
+        checkMobileWarning(); updateButtonState(); return;
+    }
+    selectedProfileDevice = device;
+    document.getElementById('mobileAntennaType').value = device.antennaName || '';
+    ['E','N','U'].forEach(axis => document.getElementById('mobile'+axis).value = device['antenna'+axis] || 0);
+    document.getElementById('deviceSource').textContent = `Источник: профиль «${device.name}». Антенна: ${device.antennaName || 'UNKNOWN'}. E: ${device.antennaE || 0}, N: ${device.antennaN || 0}, U: ${device.antennaU || 0} м.`;
+    if (device.phaseCenterValidUntil) document.getElementById('deviceValidity').textContent = 'Параметры действительны до ' + new Date(device.phaseCenterValidUntil).toLocaleString('ru-RU') + '. Учитывайте ориентацию устройства при калибровке.';
+    checkMobileWarning(); updateButtonState();
+}
+loadSavedDevices();
+
+// Transfer only settings from the originating tab, without storing task history.
+if (window.opener) {
+    const receiveSettings = event => {
+        if (event.origin !== location.origin || event.source !== window.opener || event.data?.type !== 'processing-settings') return;
+        const c = event.data.config || {};
+        const method = c.method === 'ppp' ? (c.mode === 'static' ? 'ppp-static' : 'ppp-kinematic') : c.method === 'single' ? 'single' : null;
+        if (!method) return;
+        selectMethod(method);
+        selectDeviceType(c.deviceType === 'mobile' ? 'mobile' : 'gnss');
+        // Keep all supported numeric/enum solver settings, without IDs or file paths.
+        for (const key of Object.keys(methodDetails[method].config)) {
+            if (typeof c[key] === typeof methodDetails[method].config[key]) methodDetails[method].config[key] = c[key];
+        }
+        document.getElementById('mobileAntennaType').value = c.antennaType || '';
+        ['E','N','U'].forEach(axis => document.getElementById('mobile'+axis).value = Number(c['antennaDelta'+axis]) || 0);
+        if (c.antennaSource === 'profile' && c.deviceType !== 'mobile') {
+            selectedProfileDevice = {name:'Параметры предыдущего расчёта', deviceType:'gnss_receiver', antennaName:c.antennaType, antennaE:c.antennaDeltaE, antennaN:c.antennaDeltaN, antennaU:c.antennaDeltaU};
+        }
+        document.getElementById('deviceSource').textContent = 'Настройки перенесены из предыдущего расчёта. Проверьте их актуальность и выберите файл заново.';
+        checkMobileWarning(); updateButtonState();
+        window.removeEventListener('message', receiveSettings);
+    };
+    window.addEventListener('message', receiveSettings);
+    window.opener.postMessage({type:'processing-ready'}, location.origin);
+}
+
+['mobileAntennaType','mobileE','mobileN','mobileU'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+        selectedProfileDevice = null;
+        document.getElementById('savedDevice').value = '';
+        document.getElementById('deviceSource').textContent = 'Источник: ручной ввод параметров ENU.';
+        document.getElementById('deviceValidity').textContent = '';
+    });
+});

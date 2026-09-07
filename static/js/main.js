@@ -145,13 +145,20 @@ function animateValue(el, end, duration) {
 async function loadStats() {
     try {
         const r = await fetch('/api/stats');
-        if (r.ok) {
-            const s = await r.json();
-            animateValue(document.getElementById('activeUsers'),        s.activeUsers        || 0, 900);
-            animateValue(document.getElementById('measurementsToday'),  s.measurementsToday  || 0, 900);
-            animateValue(document.getElementById('onlineParticipants'), s.onlineParticipants || 0, 900);
-        }
-    } catch { /* тихо */ }
+        if (!r.ok) throw new Error('Statistics unavailable');
+        const s = await r.json();
+        animateValue(document.getElementById('activeUsers'),        s.activeUsers        || 0, 900);
+        animateValue(document.getElementById('measurementsToday'),  s.measurementsToday  || 0, 900);
+        animateValue(document.getElementById('onlineParticipants'), s.onlineParticipants || 0, 900);
+    } catch {
+        ['activeUsers', 'measurementsToday', 'onlineParticipants'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = '—';
+                el.title = 'Статистика временно недоступна';
+            }
+        });
+    }
 }
 
 /* ════════════════════════════════════════

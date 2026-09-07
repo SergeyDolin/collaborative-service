@@ -6,6 +6,7 @@ import (
 	"collaborative/internal/model"
 	"collaborative/internal/services"
 	"collaborative/internal/storage"
+	"collaborative/internal/telemetry"
 	"collaborative/internal/validators"
 	"context"
 	"encoding/json"
@@ -174,8 +175,21 @@ func (h *MeasurementHandler) GetHistoryHandler(w http.ResponseWriter, r *http.Re
 	paginationValidator := validators.NewPaginationValidator(100, 1000000)
 	limit, offset, _ = paginationValidator.ValidateLimitOffset(limit, offset)
 
-	// Пытаемся получить из кэша
-	cacheKey := fmt.Sprintf("%s:%d:%d", login, limit, offset)
+	filter := storage.TaskFilter{Query: r.URL.Query().Get("q"), Status: r.URL.Query().Get("status"), Method: r.URL.Query().Get("method"), From: r.URL.Query().Get("from"), To: r.URL.Query().Get("to")}
+	for _, date := range []string{filter.From, filter.To} {
+		if date != "" {
+			if _, err := time.Parse("2006-01-02", date); err != nil {
+				SendJSONError(w, "Неверная дата фильтра", http.StatusBadRequest, h.logger)
+				return
+			}
+		}
+	}
+	if len(filter.Query) > 255 || (filter.From != "" && filter.To != "" && filter.From > filter.To) {
+		SendJSONError(w, "Проверьте фильтры", http.StatusBadRequest, h.logger)
+		return
+	}
+	// Include all filters; cached entries obey the existing retention rules.
+	cacheKey := fmt.Sprintf("%s:%d:%d:%s", login, limit, offset, r.URL.Query().Encode())
 	if cachedData, found := h.historyCache.Get(cacheKey); found {
 		h.logger.Debugf("Cache hit for user: %s", login)
 		SendJSONResponse(w, http.StatusOK, cachedData, h.logger)
@@ -185,10 +199,10 @@ func (h *MeasurementHandler) GetHistoryHandler(w http.ResponseWriter, r *http.Re
 	h.logger.Debugf("Cache miss for user: %s, loading from database", login)
 
 	// Загружаем из БД
-	tasks, err := h.taskStorage.GetUserTasksWithResults(login, limit, offset)
+	tasks, err := h.taskStorage.GetUserTasksWithResults(login, limit, offset, filter)
 	if err != nil {
 		h.logger.Errorf("Failed to get history: %v", err)
-		SendJSONResponse(w, http.StatusOK, []interface{}{}, h.logger)
+		SendJSONError(w, "История временно недоступна. Попробуйте ещё раз.", http.StatusServiceUnavailable, h.logger)
 		return
 	}
 
@@ -222,6 +236,16 @@ func (h *MeasurementHandler) GetTaskStatusHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	login, ok := GetUserFromContext(r)
+	if !ok {
+		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+		return
+	}
+	if task.UserLogin != login {
+		SendJSONError(w, "Task not found", http.StatusNotFound, h.logger)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	response := map[string]interface{}{
 		"taskId":        task.ID,
 		"status":        task.Status,
@@ -230,6 +254,13 @@ func (h *MeasurementHandler) GetTaskStatusHandler(w http.ResponseWriter, r *http
 		"processingSec": task.ProcessingSec,
 	}
 
+	if stage, ok := telemetry.Default.Stage(task.ID); ok {
+		response["stage"] = stage.Name
+		response["stageUpdatedAt"] = stage.UpdatedAt
+		response["startedAt"] = stage.StartedAt
+		response["processingSec"] = time.Since(stage.StartedAt).Seconds()
+	}
+	response["checkedAt"] = time.Now()
 	if task.CompletedAt != nil {
 		response["completedAt"] = task.CompletedAt
 	}
@@ -300,34 +331,31 @@ func (h *MeasurementHandler) DownloadResultHandler(w http.ResponseWriter, r *htt
 	if err := h.taskStorage.ClearResultFile(taskID); err != nil {
 		h.logger.Warnf("Failed to clear result file for task %s: %v", taskID, err)
 	}
+	h.historyCache.Invalidate(login)
 }
 
 // GetSystemStatsHandler возвращает системную статистику
 func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *http.Request) {
 	if h.taskStorage == nil {
-		SendJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"activeUsers":        0,
-			"measurementsToday":  0,
-			"onlineParticipants": 0,
-		}, h.logger)
+		SendJSONError(w, "Statistics unavailable", http.StatusServiceUnavailable, h.logger)
 		return
 	}
 
 	stats, err := h.taskStorage.GetSystemStats()
 	if err != nil {
 		h.logger.Errorf("Failed to get system stats: %v", err)
-		SendJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"activeUsers":        0,
-			"measurementsToday":  0,
-			"onlineParticipants": 0,
-		}, h.logger)
+		SendJSONError(w, "Statistics unavailable", http.StatusServiceUnavailable, h.logger)
 		return
 	}
 
 	if h.dbStorage != nil {
-		if n, err := h.dbStorage.CountOnlineSessions(); err == nil {
-			stats["onlineParticipants"] = n
+		n, err := h.dbStorage.CountOnlineSessions()
+		if err != nil {
+			h.logger.Errorf("Failed to count online sessions: %v", err)
+			SendJSONError(w, "Statistics unavailable", http.StatusServiceUnavailable, h.logger)
+			return
 		}
+		stats["onlineParticipants"] = n
 	}
 
 	SendJSONResponse(w, http.StatusOK, stats, h.logger)

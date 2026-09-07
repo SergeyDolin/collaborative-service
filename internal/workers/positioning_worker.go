@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"collaborative/internal/model"
@@ -28,6 +29,7 @@ type processEntry struct {
 	cmd     *exec.Cmd
 	solFile string
 	cancel  context.CancelFunc
+	done    chan struct{}
 }
 
 // PositioningWorker управляет процессами rtkrcv и периодически читает их решения
@@ -40,6 +42,7 @@ type PositioningWorker struct {
 	rtkrcvPath string // абсолютный путь к бинарю rtkrcv
 	procs      map[int64]*processEntry
 	mu         sync.Mutex
+	enabled    atomic.Bool
 }
 
 // NewPositioningWorker создаёт воркер позиционирования
@@ -64,10 +67,12 @@ func NewPositioningWorker(
 
 // Start запускает воркер; завершается при отмене ctx
 func (pw *PositioningWorker) Start(ctx context.Context) {
+	pw.enabled.Store(true)
 	go pw.run(ctx)
 }
 
 func (pw *PositioningWorker) run(ctx context.Context) {
+	defer pw.enabled.Store(false)
 	ticker := time.NewTicker(positioningInterval)
 	defer ticker.Stop()
 
@@ -114,6 +119,13 @@ func (pw *PositioningWorker) tick(ctx context.Context) {
 
 	// Запускаем/обновляем процессы для активных сессий
 	for _, sess := range sessions {
+		if entry, ok := pw.procs[sess.ID]; ok {
+			select {
+			case <-entry.done:
+				pw.stopProcess(sess.ID, entry)
+			default:
+			}
+		}
 		if _, running := pw.procs[sess.ID]; !running {
 			if err := pw.startProcess(ctx, sess); err != nil {
 				pw.logger.Warnf("PositioningWorker: start rtkrcv for session %d: %v", sess.ID, err)
@@ -144,11 +156,14 @@ func (pw *PositioningWorker) startProcess(ctx context.Context, sess model.Collab
 		return fmt.Errorf("start rtkrcv: %w", err)
 	}
 
+	done := make(chan struct{})
 	pw.procs[sess.ID] = &processEntry{
+		done:    done,
 		cmd:     cmd,
 		solFile: solFile,
 		cancel:  cancel,
 	}
+	go func() { _ = cmd.Wait(); close(done) }()
 	pw.logger.Infof("PositioningWorker: started rtkrcv pid=%d session=%d port=%d",
 		cmd.Process.Pid, sess.ID, sess.AssignedPort)
 	return nil
@@ -242,12 +257,17 @@ func (pw *PositioningWorker) readAndStorePosition(sessionID int64) {
 		return
 	}
 
+	info, err := os.Stat(entry.solFile)
+	if err != nil {
+		return
+	}
 	pos, err := parseLastPosition(entry.solFile, sessionID)
 	if err != nil {
 		// Файл может быть ещё пустым — не логируем как ошибку
 		return
 	}
 
+	pos.UpdatedAt = info.ModTime().UTC()
 	if err := pw.db.UpsertCollaborativePosition(pos); err != nil {
 		pw.logger.Warnf("PositioningWorker: upsert position for session %d: %v", sessionID, err)
 	}
@@ -314,4 +334,38 @@ func parseLastPosition(solFile string, sessionID int64) (*model.CollaborativePos
 		NSat:      nsat,
 		PDOP:      pdop,
 	}, nil
+}
+
+// Diagnostics makes absent stream telemetry explicit instead of reporting success.
+func (pw *PositioningWorker) Diagnostics(sess model.CollaborativeSession) model.SessionDiagnostics {
+	d := model.SessionDiagnostics{InputState: "unknown", CorrectionsState: "unknown", ProcessState: "disabled", SolutionState: "missing"}
+	if pw == nil {
+		return d
+	}
+	d.WorkerEnabled = pw.enabled.Load()
+	if d.WorkerEnabled {
+		d.ProcessState = "stopped"
+		if sess.EnablePositioning {
+			d.ProcessState = "waiting"
+			pw.mu.Lock()
+			if p, ok := pw.procs[sess.ID]; ok {
+				d.ProcessState = "running"
+				select {
+				case <-p.done:
+					d.ProcessState = "exited"
+				default:
+				}
+			}
+			pw.mu.Unlock()
+		}
+	}
+	if p := sess.LatestPosition; p != nil {
+		t := p.UpdatedAt
+		d.LastSolutionAt = &t
+		d.SolutionState = "stale"
+		if p.Quality > 0 && time.Since(t) >= 0 && time.Since(t) <= 2*time.Minute {
+			d.SolutionState = "fresh"
+		}
+	}
+	return d
 }

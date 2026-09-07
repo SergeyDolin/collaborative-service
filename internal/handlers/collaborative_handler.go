@@ -15,12 +15,13 @@ import (
 
 // CollaborativeHandler обрабатывает запросы коллаборативного позиционирования
 type CollaborativeHandler struct {
-	db     *storage.DBStorage
-	logger *zap.SugaredLogger
+	db          *storage.DBStorage
+	logger      *zap.SugaredLogger
+	diagnostics func(model.CollaborativeSession) model.SessionDiagnostics
 }
 
-func NewCollaborativeHandler(db *storage.DBStorage, logger *zap.SugaredLogger) *CollaborativeHandler {
-	return &CollaborativeHandler{db: db, logger: logger}
+func NewCollaborativeHandler(db *storage.DBStorage, logger *zap.SugaredLogger, diagnostics func(model.CollaborativeSession) model.SessionDiagnostics) *CollaborativeHandler {
+	return &CollaborativeHandler{db: db, logger: logger, diagnostics: diagnostics}
 }
 
 // createSessionRequest — тело запроса на создание сессии
@@ -134,6 +135,13 @@ func (h *CollaborativeHandler) ListSessions(w http.ResponseWriter, r *http.Reque
 	if sessions == nil {
 		sessions = []model.CollaborativeSession{}
 	}
+	for i := range sessions {
+		if h.diagnostics != nil {
+			d := h.diagnostics(sessions[i])
+			sessions[i].Diagnostics = &d
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	SendJSONResponse(w, http.StatusOK, sessions, h.logger)
 }
 
@@ -182,6 +190,10 @@ func (h *CollaborativeHandler) SetPositioning(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if body.Enabled && (h.diagnostics == nil || !h.diagnostics(model.CollaborativeSession{}).WorkerEnabled) {
+		SendJSONError(w, "Серверное позиционирование отключено оператором. Подключение можно сохранить, но расчёт пока недоступен.", http.StatusServiceUnavailable, h.logger)
+		return
+	}
 	if err := h.db.UpdateSessionPositioning(id, login, body.Enabled); err != nil {
 		SendJSONError(w, err.Error(), http.StatusNotFound, h.logger)
 		return

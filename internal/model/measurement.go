@@ -82,11 +82,12 @@ type UserProcessingConfig struct {
 
 	// Тип устройства и переопределение антенны (для мобильных устройств)
 	// DeviceType: "gnss" — читать антенну из RINEX, "mobile" — использовать значения ниже
+	AntennaSource string  `json:"antennaSource,omitempty"` // profile explicitly overrides the RINEX antenna
 	DeviceType    string  `json:"deviceType,omitempty"`
-	AntennaType   string  `json:"antennaType,omitempty"`  // RINEX-формат; пусто → "UNKNOWN"
-	AntennaDeltaU float64 `json:"antennaDeltaU"`           // смещение вверх (U), метры
-	AntennaDeltaE float64 `json:"antennaDeltaE"`           // смещение восток (E), метры
-	AntennaDeltaN float64 `json:"antennaDeltaN"`           // смещение север (N), метры
+	AntennaType   string  `json:"antennaType,omitempty"` // RINEX-формат; пусто → "UNKNOWN"
+	AntennaDeltaU float64 `json:"antennaDeltaU"`         // смещение вверх (U), метры
+	AntennaDeltaE float64 `json:"antennaDeltaE"`         // смещение восток (E), метры
+	AntennaDeltaN float64 `json:"antennaDeltaN"`         // смещение север (N), метры
 }
 
 // DefaultConfig return config

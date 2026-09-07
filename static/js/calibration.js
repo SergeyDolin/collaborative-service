@@ -271,10 +271,13 @@ function startPolling() {
     pollStatus();
 }
 
+let calibrationPollBusy = false;
 async function pollStatus() {
-    if (!state.taskId) return;
+    if (!state.taskId || calibrationPollBusy || document.hidden) return;
+    calibrationPollBusy = true;
+    try {
     const res = await apiFetch('/api/calibration/' + state.taskId + '/status');
-    if (!res || !res.ok) return;
+    if (!res || !res.ok) throw new Error('status unavailable');
     const task = await res.json();
 
     const sessions = task.sessions || [];
@@ -301,6 +304,9 @@ async function pollStatus() {
         document.getElementById('pollStatus').textContent =
             ({ pending: 'Ожидание…', processing: 'Обработка сеансов PPP…' })[task.status] || 'Обработка…';
     }
+    } catch {
+        document.getElementById('pollStatus').textContent = 'Не удалось обновить статус. Повторяем проверку соединения…';
+    } finally { calibrationPollBusy = false; }
 }
 
 function showResult(r) {

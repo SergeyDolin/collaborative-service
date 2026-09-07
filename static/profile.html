@@ -315,6 +315,7 @@
     .btn-edit-profile,.btn-new-meas{flex:1;text-align:center;}
 }
 </style>
+<link rel="stylesheet" href="/css/workflow.css">
 </head>
 <body class="bg-grid">
 <header class="header">
@@ -362,6 +363,7 @@
     <div class="card" id="devicesCard">
         <div class="card-header">
             <div class="card-title">Мои устройства</div>
+<a href="/collaborative" class="workflow-note">Подключения и диагностика</a>
             <button class="btn btn-primary" onclick="openAddDevice()"><span data-icon="plus" data-icon-size="14"></span> Добавить</button>
         </div>
         <div id="devicesContent"><div class="loading-hist">Загрузка…</div></div>
@@ -381,9 +383,26 @@
             <button class="btn-sm btn-sm-err" onclick="confirmDeleteSelected()"><span data-icon="trash" data-icon-size="12"></span> Удалить выбранные</button>
             <button class="btn-sm btn-sm-ghost" onclick="toggleSelectMode()">Отмена</button>
         </div>
-        <div id="historyBanners"></div>
+        <form id="historyFilters" class="workflow-panel" onsubmit="event.preventDefault(); resetHistoryPage()">
+ <div class="workflow-grid">
+  <label>Имя файла<input name="q" type="search" maxlength="255" placeholder="Найти измерение"></label>
+  <label>Статус<select name="status"><option value="">Все доступные</option><option value="pending">В очереди</option><option value="processing">Обрабатываются</option><option value="completed">Завершены</option></select></label>
+  <label>Метод<select name="method"><option value="">Все методы</option><option value="single">SPP</option><option value="ppp">PPP</option><option value="relative">Относительный</option></select></label>
+  <label>С даты<input type="date" name="from"></label><label>По дату<input type="date" name="to"></label>
+ </div>
+ <div class="workflow-actions"><button type="submit">Найти</button><button type="button" onclick="document.getElementById('historyFilters').reset(); resetHistoryPage()">Сбросить</button></div>
+ <p class="workflow-note">Поиск только по ещё доступным записям. Сроки хранения прежние; скачивание удаляет файл с сервера. Показатели выше рассчитаны по текущей странице.</p>
+</form>
+<div id="taskNotice" class="workflow-panel" hidden role="status"></div>
+<div id="comparisonPanel" class="workflow-panel" hidden></div>
+<div id="historyBanners"></div>
         <div id="historyList" class="history-list">
             <div class="empty-history">Нажмите «Обновить» для загрузки истории</div>
+        </div>
+        <div class="workflow-actions" aria-label="Страницы истории">
+         <button id="historyPrev" onclick="changeHistoryPage(-1)" disabled>← Назад</button>
+         <span id="historyPage" aria-live="polite">Страница 1</span>
+         <button id="historyNext" onclick="changeHistoryPage(1)" disabled>Далее →</button>
         </div>
     </div>
 
@@ -603,6 +622,7 @@
 <div class="toast" id="toast"></div>
 <script src="js/chrome.js"></script>
 <script src="js/icons.js"></script>
+<script src="/js/workflow.js"></script>
 <script src="js/profile.js?v=3"></script>
 </body>
 </html>

@@ -15,6 +15,7 @@ func ServeStaticFile(filename string, logger *zap.SugaredLogger) http.HandlerFun
 			return
 		}
 
+		w.Header().Set("Cache-Control", "no-cache")
 		filePath := filepath.Join("static", filename)
 		http.ServeFile(w, r, filePath)
 	}

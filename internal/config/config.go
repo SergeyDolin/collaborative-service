@@ -10,10 +10,12 @@ type Config struct {
 	DSN         string
 	JWTSecret   string
 	TokenExpiry int // hours
+	LogLevel    string
 }
 
 func LoadConfig() *Config {
 	var cfg Config
+	flag.StringVar(&cfg.LogLevel, "log-level", "info", "log level: debug, info, warn, error")
 
 	// Server flags
 	flag.StringVar(&cfg.RunAddr, "a", "localhost:8000", "address and port to run server")
@@ -28,6 +30,9 @@ func LoadConfig() *Config {
 	flag.Parse()
 
 	// Override with environment variables
+	if level := os.Getenv("LOG_LEVEL"); level != "" {
+		cfg.LogLevel = level
+	}
 	if address := os.Getenv("ADDRESS"); address != "" {
 		cfg.RunAddr = address
 	}
