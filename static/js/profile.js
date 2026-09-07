@@ -714,13 +714,12 @@ async function loadHistory() {
                 const repBtn = `<button class="btn-report" onclick="generateReport('${task.id}', _histTasks['${task.id}'])"><span data-icon="file" data-icon-size="14"></span> Отчёт</button>`;
                 resultHtml = `<div class="result-block">
                     <div class="stats-info">${getSolutionStatus(r.q)}${fixRate?` <span>(${fixRate}%)</span>`:''} ${r.nSat?`<span><span data-icon="satellite" data-icon-size="12"></span> ${r.nSat}</span>`:''}</div>
-                    <p class="workflow-note">${Workflow.escape(Workflow.qualityText(r.q, r.fixRate))} Завершение расчёта не гарантирует заданную точность.</p>
                     ${coordsHtml}
                     <p class="workflow-note">B, L — градусы; H — высота над эллипсоидом. Реализация системы координат и эпоха требуют проверки по исходным продуктам перед пересчётом.</p>
                     <div class="action-buttons">${dlBtn}${trBtn}${repBtn}</div>
-                    <div class="workflow-actions">
-                     ${hasCoords ? `<button onclick="copyResultCoords('${task.id}')">Скопировать B, L, H</button><button onclick="compareResult('${task.id}')">Сравнить</button>` : ''}
-                     <button onclick="repeatSettings('${task.id}')">Повторить с этими настройками</button>
+                    <div class="action-buttons">
+                     ${hasCoords ? `<button class="btn-report" onclick="copyResultCoords('${task.id}')">Скопировать B, L, H</button><button class="btn-report" onclick="compareResult('${task.id}')">Сравнить</button>` : ''}
+                     <button class="btn-report" onclick="repeatSettings('${task.id}')">Повторить с этими настройками</button>
                     </div>
                     <p class="workflow-note">Доступен до ${escHtml(new Date(task.resultExpiresAt).toLocaleString('ru-RU'))}. ${task.hasResultFile ? 'Файл удаляется с сервера после скачивания.' : 'Файл уже недоступен для скачивания.'}</p>
                 </div>`;
@@ -893,373 +892,45 @@ async function downloadResult(taskId, event) {
 ════════════════════════════════════════════ */
 
 async function generateReport(taskId, task) {
-    const r = task.result;
-    if (!r) return;
-
-    // --- координаты ---
-    let lat = r.latitude, lon = r.longitude, h = r.height || 0;
-    let sN = 0, sE = 0, sU = 0;
-    const isKinOrAbs = task.config?.mode === 'kinematic' || task.config?.method === 'single';
-    if (r.lastSolutionLine) {
-        const f = r.lastSolutionLine.trim().split(/\s+/);
-        if (f[2]) lat = parseFloat(f[2]);
-        if (f[3]) lon = parseFloat(f[3]);
-        if (f[4]) h   = parseFloat(f[4]);
-        if (f[7]) sN  = parseFloat(f[7]);
-        if (f[8]) sE  = parseFloat(f[8]);
-        if (f[9]) sU  = parseFloat(f[9]);
-    }
-    if (isKinOrAbs && r.sdx > 0 && r.sdy > 0 && r.sdz > 0) {
-        sN = r.sdx; sE = r.sdy; sU = r.sdz;
-    }
-    const xyz  = blhToECEF(lat, lon, h);
-    const sXYZ = (sN > 0 && sE > 0 && sU > 0) ? enuSigmaToECEF(lat, lon, sE, sN, sU) : null;
-
-    // --- дата наблюдений ---
-    let obsDate = '—';
-    try {
-        const od = await fetch(`/api/measurements/observation-date?task_id=${taskId}`, {
-            headers: { 'Authorization': `Bearer ${getToken()}` }
-        });
-        if (od.ok) { const d = await od.json(); obsDate = d.date || '—'; }
-    } catch {}
-
-    // --- траектория ---
-    let trajSvg = '', qTimelineSvg = '', heightSvg = '', qBarSvg = '';
-    let trajDebug = '';
-    if (isKinOrAbs) {
-        try {
-            const tr = await fetch(`/api/measurements/trajectory?id=${taskId}`, {
-                headers: { 'Authorization': `Bearer ${getToken()}` }
-            });
-            trajDebug += `HTTP ${tr.status}; `;
-            if (tr.ok) {
-                const td = await tr.json();
-                trajDebug += `points=${td.points?.length ?? 0}; `;
-                trajSvg      = buildTrajectorySvg(td);
-                qTimelineSvg = buildQTimelineSvg(td.points);
-                heightSvg    = buildHeightProfileSvg(td.points);
-                qBarSvg      = buildQBarSvg(td.points);
-                trajDebug += `svg=${trajSvg ? 'ok' : 'empty'}`;
-            } else {
-                const txt = await tr.text();
-                trajDebug += `error: ${txt}`;
-            }
-        } catch(e) {
-            trajDebug += `exception: ${e.message}`;
-        }
-    } else {
-        trajDebug = `isKinOrAbs=false (mode=${task.config?.mode}, method=${task.config?.method})`;
-    }
-
-    // --- тип продуктов по дате ---
-    // obsDate из RINEX-заголовка, fallback — дата создания задачи
-    const productDate = (obsDate && obsDate !== '—') ? obsDate : task.createdAt;
-    const products = getProductType(productDate, task.config?.method);
-
-    // --- рендер ---
-    const method = getMethodName(task.config?.method);
-    const mode   = isKinOrAbs ? 'Кинематика' : 'Статика';
-    const q      = r.q === 1 ? 'FIX' : r.q === 6 ? 'FLOAT' : r.q ? `Q=${r.q}` : '—';
-    const fixStr = (r.fixRate != null && isKinOrAbs) ? `${r.fixRate.toFixed(1)} %` : '—';
-    const createdStr = new Date(task.createdAt).toLocaleString('ru');
-    const fmtDeg = v => Number(v).toFixed(8) + '°';
-    const fmtM   = v => Number(v).toFixed(4) + ' м';
-    const fmtS   = v => v > 0 ? `σ ${v.toFixed(4)} м` : '—';
-
-    const sigmaRows = sXYZ ? `
-        <tr><td>σX</td><td>${fmtS(sXYZ.x)}</td></tr>
-        <tr><td>σY</td><td>${fmtS(sXYZ.y)}</td></tr>
-        <tr><td>σZ</td><td>${fmtS(sXYZ.z)}</td></tr>` : '';
-
-    const sigmaNote = sXYZ
-        ? `<p class="rp-note">σ — стандартное отклонение по внутренней сходимости${isKinOrAbs ? ', среднее по эпохам' : ''}.</p>`
-        : '';
-
-    const html = `<!DOCTYPE html><html lang="ru"><head>
-<meta charset="UTF-8">
-<title>Отчёт об обработке — ${taskId.slice(0,8)}</title>
-<style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Segoe UI',Arial,sans-serif; font-size:11pt; color:#111; background:#fff; padding:20mm 18mm; }
-  h1 { font-size:17pt; font-weight:300; letter-spacing:-0.01em; margin-bottom:4px; }
-  h2 { font-size:10pt; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:#555;
-       margin:20px 0 8px; border-bottom:1px solid #ddd; padding-bottom:4px; }
-  .meta { font-size:9pt; color:#777; margin-bottom:18px; font-family:monospace; }
-  table { width:100%; border-collapse:collapse; margin-bottom:6px; }
-  td { padding:4px 8px; font-size:10pt; vertical-align:top; }
-  td:first-child { width:44%; color:#555; font-size:9.5pt; }
-  tr:nth-child(odd) td { background:#f8f8f8; }
-  .mono { font-family:'Courier New',monospace; font-size:10pt; }
-  .rp-note { font-size:8.5pt; color:#888; margin-top:6px; font-style:italic; }
-  .traj-wrap { margin:10px 0; text-align:center; }
-  .traj-wrap svg { max-width:100%; border:1px solid #e0e0e0; border-radius:4px; }
-  .legend { display:flex; gap:16px; justify-content:center; margin-top:6px; font-size:8.5pt; color:#555; }
-  .legend span { display:inline-flex; align-items:center; gap:4px; }
-  .leg-dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
-  .footer { margin-top:28px; border-top:1px solid #ddd; padding-top:8px;
-            font-size:8pt; color:#aaa; text-align:right; font-family:monospace; }
-  @media print { body { padding:15mm 12mm; } }
-</style></head><body>
-<h1>Отчёт об обработке ГНСС-наблюдений</h1>
-<div class="meta">ID задачи: ${taskId} &nbsp;·&nbsp; Сформирован: ${new Date().toLocaleString('ru')}</div>
-
-<h2>Общая информация</h2>
-<table>
-  <tr><td>Файл наблюдений</td><td class="mono">${escHtml(task.filename || '—')}</td></tr>
-  <tr><td>Дата наблюдений</td><td class="mono">${obsDate}</td></tr>
-  <tr><td>Дата обработки</td><td>${createdStr}</td></tr>
-  <tr><td>Метод</td><td>${method}</td></tr>
-  <tr><td>Режим</td><td>${mode}</td></tr>
-</table>
-
-<h2>Результат позиционирования</h2>
-<table>
-  <tr><td>Система координат</td><td>ITRF2020</td></tr>
-  <tr><td>Эпоха</td><td class="mono">${obsDate}</td></tr>
-  <tr><td>B (широта)</td><td class="mono">${fmtDeg(lat)}</td></tr>
-  <tr><td>L (долгота)</td><td class="mono">${fmtDeg(lon)}</td></tr>
-  <tr><td>H (высота)</td><td class="mono">${fmtM(h)}</td></tr>
-  <tr><td>X</td><td class="mono">${fmtM(xyz.x)}</td></tr>
-  <tr><td>Y</td><td class="mono">${fmtM(xyz.y)}</td></tr>
-  <tr><td>Z</td><td class="mono">${fmtM(xyz.z)}</td></tr>
-  ${sigmaRows}
-</table>
-${sigmaNote}
-
-<h2>Качество решения</h2>
-<table>
-  <tr><td>Тип решения</td><td>${q}</td></tr>
-  ${isKinOrAbs ? `<tr><td>Доля FIX-эпох</td><td>${fixStr}</td></tr>` : ''}
-  <tr><td>Макс. кол-во спутников</td><td>${r.nSat || '—'}</td></tr>
-</table>
-
-${products.sp3 ? `
-<h2>Использованные продукты</h2>
-<table>
-  <tr><td>Эфемериды SP3</td><td>${products.sp3}</td></tr>
-  <tr><td>Часы CLK</td><td>${products.clk}</td></tr>
-  <tr><td>DCB / OSB</td><td>${products.dcb}</td></tr>
-  <tr><td>ERP</td><td>${products.erp}</td></tr>
-</table>` : ''}
-
-${isKinOrAbs ? `
-<h2>Траектория</h2>
-${trajSvg
-    ? `<div class="traj-wrap">${trajSvg}</div>
-       <div class="legend">
-         <span><span class="leg-dot" style="background:#22c55e"></span>FIX</span>
-         <span><span class="leg-dot" style="background:#f59e0b"></span>FLOAT</span>
-       </div>`
-    : `<p style="color:#999;font-size:9pt;font-family:monospace">Траектория недоступна: ${trajDebug}</p>`
-}` : ''}
-
-${(qTimelineSvg || heightSvg) ? `
-<h2>Статистика обработки</h2>
-${qTimelineSvg ? `
-<p style="font-size:9pt;color:#555;margin-bottom:4px;">Качество решения по эпохам</p>
-<div style="margin-bottom:14px;">${qTimelineSvg}</div>` : ''}
-<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
-${heightSvg ? `<div><p style="font-size:9pt;color:#555;margin-bottom:4px;">Профиль высоты, м</p>${heightSvg}</div>` : ''}
-${qBarSvg   ? `<div><p style="font-size:9pt;color:#555;margin-bottom:4px;">Распределение эпох</p>${qBarSvg}</div>` : ''}
-</div>` : ''}
-
-<div class="footer">CPS · ${window.location.hostname} · ${new Date().toLocaleDateString('ru')}</div>
-<script>window.onload = () => window.print();<\/script>
-</body></html>`;
-
+    if (!task?.result) { showToast('Результат недоступен. Обновите список обработок.', 'err'); return; }
     const w = window.open('', '_blank');
-    w.document.write(html);
+    if (!w) { showToast('Разрешите открытие новой вкладки для отчёта', 'err'); return; }
+    w.document.write('<!doctype html><meta charset="utf-8"><p>Подготовка отчёта…</p>');
     w.document.close();
-}
-
-// Тип продуктов IGS по дате наблюдений (final доступен через ~2 нед, rapid ~1 сут)
-function getProductType(obsDateStr, method) {
-    if (!method || method.toLowerCase() !== 'ppp') return {};
-    if (!obsDateStr || obsDateStr === '—') return { sp3:'—', clk:'—', dcb:'—', erp:'—' };
-    const days = (new Date() - new Date(obsDateStr)) / 86400000;
-    const type = days > 14 ? 'Final (IGS/CODE)' : days > 1 ? 'Rapid (IGS/CODE)' : 'Ultra-rapid (IGS)';
-    return { sp3: type, clk: type, dcb: days > 14 ? 'Final (CODE MGEX)' : 'Rapid (CAS/CODE)', erp: type };
-}
-
-// Строит SVG траектории из данных /api/measurements/trajectory
-function buildTrajectorySvg(td) {
-    const pts = td.points;
-    if (!pts || pts.length === 0) return '';
-
-    const W = 700, H = 340, PAD = 28;
-    const dLat = td.maxLat - td.minLat || 0.0001;
-    const dLon = td.maxLon - td.minLon || 0.0001;
-    const scale = Math.min((W - PAD*2) / dLon, (H - PAD*2) / dLat);
-    const offX  = (W - dLon * scale) / 2;
-    const offY  = (H - dLat * scale) / 2;
-
-    const px = p => offX + (p.lon - td.minLon) * scale;
-    const py = p => H - offY - (p.lat - td.minLat) * scale;
-    const qColor = q => q === 1 ? '#22c55e' : '#f59e0b';
-
-    let path = `M${px(pts[0]).toFixed(1)},${py(pts[0]).toFixed(1)}`;
-    for (let i = 1; i < pts.length; i++) path += ` L${px(pts[i]).toFixed(1)},${py(pts[i]).toFixed(1)}`;
-
-    const step = Math.max(1, Math.floor(pts.length / 1200));
-    let circles = '';
-    for (let i = 0; i < pts.length; i += step) {
-        const p = pts[i];
-        circles += `<circle cx="${px(p).toFixed(1)}" cy="${py(p).toFixed(1)}" r="2.5" fill="${qColor(p.q)}"/>`;
+    try {
+        if (typeof GNSSReport === 'undefined' || typeof GNSSReport.render !== 'function') {
+            throw new Error('Не загружен модуль отчёта report.js. Обновите файлы static/js/report.js и static/profile.html на сервере, затем перезагрузите страницу профиля.');
+        }
+        let data = null, unavailable = '';
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 30000);
+        try {
+            const response = await fetch(`/api/measurements/trajectory?id=${encodeURIComponent(taskId)}`, {
+                headers: {Authorization: `Bearer ${getToken()}`}, cache: 'no-store', signal: controller.signal
+            });
+            if (response.ok) data = await response.json();
+            else if (response.status === 401) unavailable = 'Сессия истекла. Войдите заново для получения статистики.';
+            else if (response.status === 404) unavailable = 'Данные эпох недоступны или уже удалены.';
+            else unavailable = 'Не удалось получить данные эпох. Повторите формирование отчёта позже.';
+        } catch { unavailable = 'Не удалось загрузить данные эпох: проверьте соединение и повторите попытку.'; }
+        finally { clearTimeout(timer); }
+        if (!w.closed) {
+            // Keep the loading page intact if report generation throws.
+            const html = GNSSReport.render(task, data, unavailable);
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
+        }
+    } catch (e) {
+        if (!w.closed) {
+            w.document.open();
+            w.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Ошибка формирования отчёта</title><body><h1>Не удалось сформировать отчёт</h1><p id="report-error"></p></body></html>');
+            w.document.close();
+            const detail = e instanceof Error ? e.message : String(e);
+            w.document.getElementById('report-error').textContent = detail || 'Обновите страницу профиля и повторите попытку.';
+        }
+        console.error('Report generation failed', e);
     }
-
-    let arrow = '';
-    if (pts.length >= 2) {
-        const a = pts[pts.length - 2], b = pts[pts.length - 1];
-        const ax = px(a), ay = py(a), bx = px(b), by = py(b);
-        const ang = Math.atan2(by - ay, bx - ax);
-        const len = 12;
-        const x1 = bx - len * Math.cos(ang - 0.4);
-        const y1 = by - len * Math.sin(ang - 0.4);
-        const x2 = bx - len * Math.cos(ang + 0.4);
-        const y2 = by - len * Math.sin(ang + 0.4);
-        arrow = `<polyline points="${x1.toFixed(1)},${y1.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}"
-            fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-    }
-
-    const mLat = (dLat * 111320).toFixed(0);
-    const mLon = (dLon * 111320 * Math.cos(((td.minLat+td.maxLat)/2) * Math.PI/180)).toFixed(0);
-    const scaleBar = `<text x="${PAD}" y="${H - 8}" font-size="10" fill="#999" font-family="monospace">
-        ΔB=${mLat} м  ΔL=${mLon} м  n=${pts.length} эп.</text>`;
-
-    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="${W}" height="${H}" fill="#fafafa"/>
-        <path d="${path}" fill="none" stroke="#e0e0e0" stroke-width="1"/>
-        ${circles}
-        ${arrow}
-        ${scaleBar}
-    </svg>`;
-}
-
-// ── Временна́я шкала качества (Q-timeline) ─────────────────────────────────
-function buildQTimelineSvg(pts) {
-    if (!pts || pts.length === 0) return '';
-    const W = 520, H = 32, PAD = 0;
-    const step = Math.max(1, Math.floor(pts.length / W));
-    const bars = [];
-    for (let i = 0; i < pts.length; i += step) {
-        const x = Math.round((i / pts.length) * W);
-        const w = Math.max(1, Math.round((step / pts.length) * W));
-        const col = pts[i].q === 1 ? '#22c55e' : '#f59e0b';
-        bars.push(`<rect x="${x}" y="0" width="${w}" height="${H}" fill="${col}"/>`);
-    }
-    const nFix = pts.filter(p => p.q === 1).length;
-    const pFix = ((nFix / pts.length) * 100).toFixed(1);
-    return `<svg width="${W}" height="${H + 22}" viewBox="0 0 ${W} ${H + 22}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="${W}" height="${H}" fill="#f3f4f6" rx="3"/>
-        ${bars.join('')}
-        <rect width="${W}" height="${H}" fill="none" stroke="#ddd" stroke-width="0.5" rx="3"/>
-        <text x="6"   y="${H + 16}" font-size="11" fill="#22c55e" font-family="monospace" font-weight="bold">FIX ${pFix}%</text>
-        <text x="110" y="${H + 16}" font-size="11" fill="#f59e0b" font-family="monospace" font-weight="bold">FLOAT ${(100 - parseFloat(pFix)).toFixed(1)}%</text>
-        <text x="${W - 6}" y="${H + 16}" font-size="11" fill="#999" font-family="monospace" text-anchor="end">${pts.length} эпох</text>
-    </svg>`;
-}
-
-// ── Профиль высоты по эпохам ────────────────────────────────────────────────
-function buildHeightProfileSvg(pts) {
-    if (!pts || pts.length === 0) return '';
-    const W = 700, H = 160, PAD_L = 68, PAD_B = 28, PAD_T = 12;
-    const innerW = W - PAD_L - 12, innerH = H - PAD_B - PAD_T;
-
-    const heights = pts.map(p => p.h);
-    const hMin = Math.min(...heights), hMax = Math.max(...heights);
-    const hRange = hMax - hMin || 0.001;
-
-    const step = Math.max(1, Math.floor(pts.length / 600));
-    const px = i => PAD_L + (i / (pts.length - 1)) * innerW;
-    const py = h => PAD_T + innerH - ((h - hMin) / hRange) * innerH;
-
-    // Линия высоты с цветом по Q
-    let pathSegs = '';
-    for (let i = 0; i < pts.length - 1; i += step) {
-        const p1 = pts[i], p2 = pts[Math.min(i + step, pts.length - 1)];
-        const col = p1.q === 1 ? '#22c55e' : '#f59e0b';
-        pathSegs += `<line x1="${px(i).toFixed(1)}" y1="${py(p1.h).toFixed(1)}" x2="${px(i+step).toFixed(1)}" y2="${py(p2.h).toFixed(1)}" stroke="${col}" stroke-width="1.5"/>`;
-    }
-
-    // Ось Y — засечки
-    const nTicks = 5;
-    let yAxis = '';
-    for (let t = 0; t <= nTicks; t++) {
-        const hVal = hMin + (t / nTicks) * hRange;
-        const yPos = py(hVal);
-        yAxis += `<line x1="${PAD_L}" y1="${yPos.toFixed(1)}" x2="${W - 12}" y2="${yPos.toFixed(1)}" stroke="#e5e7eb" stroke-width="0.8"/>`;
-        yAxis += `<text x="${PAD_L - 6}" y="${(yPos + 4).toFixed(1)}" font-size="10" fill="#888" font-family="monospace" text-anchor="end">${hVal.toFixed(3)}</text>`;
-    }
-
-    // Ось X — засечки по эпохам
-    let xAxis = '';
-    for (let t = 0; t <= 4; t++) {
-        const idx = Math.round((t / 4) * (pts.length - 1));
-        const xPos = px(idx);
-        xAxis += `<line x1="${xPos.toFixed(1)}" y1="${PAD_T + innerH}" x2="${xPos.toFixed(1)}" y2="${PAD_T + innerH + 4}" stroke="#ccc" stroke-width="0.8"/>`;
-        xAxis += `<text x="${xPos.toFixed(1)}" y="${H - 6}" font-size="10" fill="#aaa" font-family="monospace" text-anchor="middle">${idx}</text>`;
-    }
-
-    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="${W}" height="${H}" fill="#fafafa"/>
-        ${yAxis}
-        <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + innerH}" stroke="#ccc" stroke-width="1"/>
-        <line x1="${PAD_L}" y1="${PAD_T + innerH}" x2="${W - 12}" y2="${PAD_T + innerH}" stroke="#ccc" stroke-width="1"/>
-        ${pathSegs}
-        ${xAxis}
-        <text x="${PAD_L / 2 - 4}" y="${PAD_T + innerH / 2}" font-size="10" fill="#aaa" font-family="monospace"
-              text-anchor="middle" transform="rotate(-90 ${PAD_L / 2 - 4} ${PAD_T + innerH / 2})">Высота, м</text>
-        <text x="${PAD_L + innerW / 2}" y="${H}" font-size="10" fill="#aaa" font-family="monospace" text-anchor="middle">Эпоха</text>
-    </svg>`;
-}
-
-// ── Столбчатая диаграмма по сессиям ────────────────────────────────────────
-function buildQBarSvg(pts) {
-    if (!pts || pts.length === 0) return '';
-    const nFix   = pts.filter(p => p.q === 1).length;
-    const nFloat = pts.length - nFix;
-    const total  = pts.length;
-    const W = 260, H = 160, BAR_W = 72, GAP = 32, PAD_L = 52, PAD_B = 32, PAD_T = 12;
-    const innerH = H - PAD_B - PAD_T;
-
-    const maxVal = Math.max(nFix, nFloat, 1);
-    const hFix   = (nFix   / maxVal) * innerH;
-    const hFloat = (nFloat / maxVal) * innerH;
-
-    const x1 = PAD_L, x2 = PAD_L + BAR_W + GAP;
-    const yFix   = PAD_T + innerH - hFix;
-    const yFloat = PAD_T + innerH - hFloat;
-
-    const pFix   = ((nFix   / total) * 100).toFixed(1);
-    const pFloat = ((nFloat / total) * 100).toFixed(1);
-
-    // Засечки оси Y
-    let yAxis = '';
-    for (let t = 0; t <= 4; t++) {
-        const y = PAD_T + innerH - (t / 4) * innerH;
-        yAxis += `<line x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${W - 8}" y2="${y.toFixed(1)}" stroke="#e5e7eb" stroke-width="0.8"/>`;
-        const val = Math.round((t / 4) * maxVal);
-        yAxis += `<text x="${PAD_L - 6}" y="${(y + 4).toFixed(1)}" font-size="10" fill="#999" font-family="monospace" text-anchor="end">${val}</text>`;
-    }
-
-    // Подписи над столбцами
-    const labelFix   = `<text x="${(x1 + BAR_W/2).toFixed(1)}" y="${(yFix - 5).toFixed(1)}"   font-size="11" fill="#22c55e" font-family="monospace" font-weight="bold" text-anchor="middle">${nFix}</text>`;
-    const labelFloat = `<text x="${(x2 + BAR_W/2).toFixed(1)}" y="${(yFloat - 5).toFixed(1)}" font-size="11" fill="#f59e0b" font-family="monospace" font-weight="bold" text-anchor="middle">${nFloat}</text>`;
-
-    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="${W}" height="${H}" fill="#fafafa"/>
-        ${yAxis}
-        <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${PAD_T + innerH}" stroke="#ccc" stroke-width="1"/>
-        <line x1="${PAD_L}" y1="${PAD_T + innerH}" x2="${W - 8}" y2="${PAD_T + innerH}" stroke="#ccc" stroke-width="1"/>
-        <rect x="${x1}" y="${yFix.toFixed(1)}"   width="${BAR_W}" height="${Math.max(hFix,1).toFixed(1)}"   fill="#22c55e" rx="3"/>
-        <rect x="${x2}" y="${yFloat.toFixed(1)}" width="${BAR_W}" height="${Math.max(hFloat,1).toFixed(1)}" fill="#f59e0b" rx="3"/>
-        ${labelFix}${labelFloat}
-        <text x="${(x1 + BAR_W/2).toFixed(1)}" y="${H - 8}" font-size="11" fill="#22c55e" font-family="monospace" text-anchor="middle" font-weight="bold">FIX</text>
-        <text x="${(x2 + BAR_W/2).toFixed(1)}" y="${H - 8}" font-size="11" fill="#f59e0b" font-family="monospace" text-anchor="middle" font-weight="bold">FLOAT</text>
-        <text x="${(x1 + BAR_W/2).toFixed(1)}" y="${H - 18}" font-size="9.5" fill="#555" font-family="monospace" text-anchor="middle">${pFix}%</text>
-        <text x="${(x2 + BAR_W/2).toFixed(1)}" y="${H - 18}" font-size="9.5" fill="#555" font-family="monospace" text-anchor="middle">${pFloat}%</text>
-    </svg>`;
 }
 
 /* ════════════════════════════════════════════

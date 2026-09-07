@@ -403,7 +403,9 @@ async function inspectFile(file) {
            <div>Длительность<br><strong>${duration !== null && duration >= 0 ? (duration/60).toFixed(1) + ' мин' : 'Уточнится при обработке'}</strong></div>
            <div>Антенна<br><strong>${Workflow.escape(info.antenna || 'Не указана')}</strong></div>
           </div>
-          <p>Диапазоны наблюдений: ${Workflow.escape(info.bands.join(', ') || 'не определены')}. Шкала времени: ${Workflow.escape(info.first?.system || 'не указана')}.</p>
+          <p>Сигналы, указанные в заголовке:</p>
+          ${Workflow.signalSummary(info).map(item => `<div><strong>${Workflow.escape(item.system)}:</strong> ${Workflow.escape(item.signals)}</div>`).join('') || '<div>Не определены</div>'}
+          <p>Шкала времени: ${Workflow.escape(info.first?.system || 'не указана')}.</p>
           <p class="workflow-note">Это проверка заголовка, а не качества всех наблюдений. ${info.complete ? '' : 'Заголовок больше лимита предпросмотра; проверка частичная.'}</p>`;
     } catch {
         if (selectedFile !== file) return;

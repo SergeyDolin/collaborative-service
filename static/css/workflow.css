@@ -7,7 +7,17 @@
 .workflow-note { font-size:.78rem; color:var(--ink-3,#666); line-height:1.6; margin-top:8px; }
 .workflow-warning { border-left:3px solid var(--warn,#b17a15); padding-left:10px; }
 .workflow-error { color:var(--err,#b33131); }
-.workflow-actions { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+/* Match the existing result buttons: «Пересчёт», «Отчёт», «Скачать .pos». */
+.workflow-actions button,.workflow-button {
+    display:inline-flex; align-items:center; justify-content:center; gap:4px;
+    padding:6px 12px;
+    font-family:var(--font-sans); font-size:0.74rem; font-weight:500;
+    line-height:normal; letter-spacing:normal;
+    background:var(--paper); color:var(--ink);
+    border:1px solid var(--paper-edge); border-radius:var(--r-sm);
+    cursor:pointer; transition:all var(--t);
+}
+.workflow-actions button:hover,.workflow-button:hover { border-color:var(--graphite); background:var(--paper-2); }
 .workflow-actions button,.workflow-button { padding:8px 12px; background:var(--paper,#fff); color:var(--ink,#222); border:1px solid var(--rule,var(--paper-edge,#ccc)); border-radius:4px; cursor:pointer; font:inherit; }
 .workflow-actions button:disabled { opacity:.5; cursor:default; }
 .workflow-panel [hidden], [hidden].workflow-panel { display:none !important; }
