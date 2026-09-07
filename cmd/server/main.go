@@ -5,6 +5,7 @@ import (
 	"collaborative/internal/config"
 	"collaborative/internal/handlers"
 	"collaborative/internal/middlewares"
+	"collaborative/internal/services"
 	"collaborative/internal/storage"
 	"collaborative/internal/workers"
 	"context"
@@ -28,12 +29,16 @@ const (
 	IdleTimeout         = 60 * time.Second
 	CleanupInterval     = 1 * time.Hour
 	ResultExpirationTTL = 24 * time.Hour
-	DefaultWorkDir      = "./tmp"
-	ConfigDir           = "./cmd/solver/app"
-	MaxUploadSize       = 1 << 30
-	RTKConfTemplate     = "./cmd/solver/configs/single-rtk.conf"
-	ATXFile             = "./cmd/solver/src/igs20.atx"
-	RTKRCVBinary        = "./cmd/solver/app/rtkrcv"
+	// Суточные продукты IGS (SP3/CLK/ERP/DCB/BIA/BRDC) кэшируются в
+	// ./tmp/_cache/YYYYMMDD и переиспользуются всеми задачами за этот день.
+	CacheGCInterval = 6 * time.Hour
+	CacheMaxAge     = 7 * 24 * time.Hour
+	DefaultWorkDir  = "./tmp"
+	ConfigDir       = "./cmd/solver/app"
+	MaxUploadSize   = 1 << 30
+	RTKConfTemplate = "./cmd/solver/configs/single-rtk.conf"
+	ATXFile         = "./cmd/solver/src/igs20.atx"
+	RTKRCVBinary    = "./cmd/solver/app/rtkrcv"
 )
 
 // Application представляет приложение с управлением жизненным циклом
@@ -278,6 +283,11 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 func (app *Application) Run() error {
 	app.workerMgr.Start(app.ctx)
 	app.logger.Info("Background workers started")
+
+	// Очистка однодневного кэша продуктов IGS
+	services.NewFileDownloader(DefaultWorkDir, app.logger).
+		StartCacheGC(app.ctx, CacheGCInterval, CacheMaxAge)
+	app.logger.Info("Product cache GC started")
 
 	// if app.posWorker != nil {
 	// 	app.posWorker.Start(app.ctx)

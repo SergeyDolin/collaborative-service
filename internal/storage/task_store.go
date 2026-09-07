@@ -173,6 +173,14 @@ func (s *TaskStorage) InitTaskSchema() error {
 		fmt.Printf("Warning: Failed to add stat_output column: %v\n", err)
 	}
 
+	_, err = s.pool.Exec(context.Background(), `
+		ALTER TABLE processing_tasks
+		ADD COLUMN IF NOT EXISTS retry_count INT NOT NULL DEFAULT 0;
+	`)
+	if err != nil {
+		fmt.Printf("Warning: Failed to add retry_count column: %v\n", err)
+	}
+
 	return nil
 }
 
@@ -483,14 +491,14 @@ func (s *TaskStorage) GetUserTasksWithResults(userLogin string, limit, offset in
 		}
 
 		task := map[string]interface{}{
-			"id":            id,
-			"userLogin":     userLogin,
-			"config":        config,
-			"filename":      filename,
-			"status":        status,
-			"createdAt":     createdAt,
-			"fileType":      fileType,
-			"hasResultFile": hasResultFile,
+			"id":              id,
+			"userLogin":       userLogin,
+			"config":          config,
+			"filename":        filename,
+			"status":          status,
+			"createdAt":       createdAt,
+			"fileType":        fileType,
+			"hasResultFile":   hasResultFile,
 			"resultExpiresAt": resultExpiresAt,
 		}
 
@@ -572,6 +580,89 @@ func (s *TaskStorage) ClearResultFile(taskID string) error {
 		taskID,
 	)
 	return err
+}
+
+// GetRecoverableTasks возвращает задачи, которые стоит автоматически перезапустить:
+//   - "processing" дольше orphanTimeout — собственный дедлайн задачи
+//     (taskProcessingTimeout в measurement_service.go) должен был её уже завершить,
+//     так что если она всё ещё "processing" так долго, горутина погибла вместе
+//     с процессом (например, рестарт сервера), и это безопасно перезапустить;
+//   - "failed" с признаками временной сетевой ошибки и retryCount < maxRetries.
+func (s *TaskStorage) GetRecoverableTasks(maxRetries int, orphanTimeout time.Duration) ([]model.ProcessingTask, error) {
+	cutoff := time.Now().UTC().Add(-orphanTimeout)
+	query := `
+		SELECT id, user_login, config, filename, retry_count
+		FROM processing_tasks
+		WHERE (status = 'processing' AND started_at < $1 AND retry_count < $2)
+		   OR (status = 'failed' AND retry_count < $2 AND (
+		         error_message ILIKE '%download%' OR
+		         error_message ILIKE '%timed out%' OR
+		         error_message ILIKE '%timeout%' OR
+		         error_message ILIKE '%curl%' OR
+		         error_message ILIKE '%http %' OR
+		         error_message ILIKE '%empty response%' OR
+		         error_message ILIKE '%empty file%' OR
+		         error_message ILIKE '%connection%'
+		   ))
+	`
+
+	rows, err := s.pool.Query(context.Background(), query, cutoff, maxRetries)
+	if err != nil {
+		return nil, fmt.Errorf("query recoverable tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []model.ProcessingTask
+	for rows.Next() {
+		var task model.ProcessingTask
+		var configJSON []byte
+
+		if err := rows.Scan(&task.ID, &task.UserLogin, &configJSON, &task.Filename, &task.RetryCount); err != nil {
+			return nil, fmt.Errorf("scan recoverable task: %w", err)
+		}
+		if err := json.Unmarshal(configJSON, &task.Config); err != nil {
+			continue
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
+
+// RequeueTaskForRetry сбрасывает задачу обратно в processing перед повторной попыткой.
+func (s *TaskStorage) RequeueTaskForRetry(taskID string) error {
+	_, err := s.pool.Exec(context.Background(), `
+		UPDATE processing_tasks
+		SET status = 'processing', started_at = NOW(), error_message = '', retry_count = retry_count + 1
+		WHERE id = $1
+	`, taskID)
+	if err != nil {
+		return fmt.Errorf("requeue task for retry: %w", err)
+	}
+	return nil
+}
+
+// GetExhaustedTaskIDs возвращает ID задач, исчерпавших лимит попыток —
+// для них можно удалить сохранённую копию исходного файла.
+func (s *TaskStorage) GetExhaustedTaskIDs(maxRetries int) ([]string, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		SELECT id FROM processing_tasks WHERE status = 'failed' AND retry_count >= $1
+	`, maxRetries)
+	if err != nil {
+		return nil, fmt.Errorf("query exhausted tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan exhausted task id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 // FailStalledTasks marks tasks stuck in "processing" for longer than timeout as failed.

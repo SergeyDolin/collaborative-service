@@ -179,7 +179,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		outputPath, procErr = s.rtk.ProcessPPP(
 			rinexPath, files.NavigationFile,
 			files.EphemerisFile, files.ClockFile,
-			configPath, taskID)
+			configPath, taskID, config.DeviceType)
 
 	case model.MethodRelative:
 		s.logger.Infof("Using Relative method for task: %s", taskID)
@@ -192,7 +192,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		}
 
 		outputPath, procErr = s.rtk.ProcessRelative(
-			rinexPath, "", files.NavigationFile, configPath, taskID,
+			rinexPath, "", files.NavigationFile, configPath, taskID, config.DeviceType,
 		)
 
 	default: // MethodSingle
@@ -206,7 +206,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		}
 
 		outputPath, procErr = s.rtk.ProcessAbsolute(
-			rinexPath, files.NavigationFile, configPath, taskID,
+			rinexPath, files.NavigationFile, configPath, taskID, config.DeviceType,
 		)
 	}
 

@@ -2,6 +2,7 @@ package services
 
 import (
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -25,6 +27,15 @@ type FileDownloader struct {
 	client  *http.Client
 	logger  *zap.SugaredLogger
 }
+
+// Локи скачивания — на уровне пакета, а не экземпляра: FileDownloader
+// создаётся в нескольких местах (container, measurement_handler), но кэш на
+// диске у них общий, поэтому и дедупликация параллельных загрузок должна быть
+// общей.
+var (
+	downloadLocksMu sync.Mutex
+	downloadLocks   = make(map[string]*sync.Mutex)
+)
 
 func (d *FileDownloader) downloadFTP(remotePath, destPath string) error {
 	url := fmt.Sprintf("ftp://%s:21%s", cddisHost, remotePath)
@@ -69,6 +80,91 @@ func NewFileDownloader(workDir string, logger *zap.SugaredLogger) *FileDownloade
 		},
 		logger: logger,
 	}
+}
+
+// lockFor возвращает мьютекс, закреплённый за ключом (например "sp3_20260714").
+// Используется, чтобы несколько задач за один день не скачивали один и тот
+// же суточный продукт параллельно — вторая задача дождётся первой и
+// получит уже закэшированный файл.
+func (d *FileDownloader) lockFor(key string) *sync.Mutex {
+	downloadLocksMu.Lock()
+	defer downloadLocksMu.Unlock()
+	l, ok := downloadLocks[key]
+	if !ok {
+		l = &sync.Mutex{}
+		downloadLocks[key] = l
+	}
+	return l
+}
+
+// cacheDateDir возвращает (и создаёт) директорию однодневного кэша для
+// продуктов, не зависящих от станции (BRDC/SP3/CLK/ERP/DCB/BIA): все задачи
+// за один день переиспользуют одни и те же файлы вместо повторного скачивания.
+func (d *FileDownloader) cacheDateDir(date time.Time) (string, error) {
+	dir := filepath.Join(d.workDir, "_cache", date.Format("20060102"))
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
+// StartCacheGC периодически удаляет директории однодневного кэша, к которым
+// давно не обращались (maxAge). Продукты IGS за прошедшие дни неизменны, но
+// хранить их вечно не нужно — диск не резиновый.
+func (d *FileDownloader) StartCacheGC(ctx context.Context, every, maxAge time.Duration) {
+	go func() {
+		ticker := time.NewTicker(every)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				d.gcCache(maxAge)
+			}
+		}
+	}()
+}
+
+func (d *FileDownloader) gcCache(maxAge time.Duration) {
+	root := filepath.Join(d.workDir, "_cache")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-maxAge)
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		// mtime каталога обновляется при каждой записи файла в него, поэтому
+		// каталог старше maxAge гарантированно не участвует в активной загрузке.
+		info, err := e.Info()
+		if err != nil || !info.ModTime().Before(cutoff) {
+			continue
+		}
+		path := filepath.Join(root, e.Name())
+		if err := os.RemoveAll(path); err != nil {
+			d.logger.Warnf("cache GC: не удалось удалить %s: %v", path, err)
+		} else {
+			d.logger.Infof("cache GC: удалён устаревший кэш %s", path)
+		}
+	}
+}
+
+// withCache проверяет, есть ли уже непустой файл finalPath; если да —
+// возвращает его сразу. Иначе выполняет produce() под блокировкой cacheKey.
+func (d *FileDownloader) withCache(cacheKey, finalPath string, produce func() (string, error)) (string, error) {
+	lock := d.lockFor(cacheKey)
+	lock.Lock()
+	defer lock.Unlock()
+
+	if info, err := os.Stat(finalPath); err == nil && info.Size() > 0 {
+		d.logger.Infof("[cache hit] %s: %s", cacheKey, finalPath)
+		return finalPath, nil
+	}
+
+	return produce()
 }
 
 // getYearDay возвращает год и день года (DOY)
@@ -140,27 +236,35 @@ func getWeekSunday(date time.Time) (year int, doy int) {
 func (d *FileDownloader) DownloadBroadcastEphemeris(date time.Time, taskID string) (string, error) {
 	year, doy := getYearDay(date)
 
-	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_brdc.rnx.gz", taskID))
-	url := fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/BRDC/%d/%03d/BRDC00WRD_R_%d%03d0000_01D_MN.rnx.gz",
-		year, doy, year, doy)
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", fmt.Errorf("cache dir: %w", err)
+	}
+	unpacked := filepath.Join(cacheDir, "brdc.rnx")
+	cacheKey := "brdc_" + date.Format("20060102")
 
-	if err := d.downloadFile(url, localFile); err != nil {
-		d.logger.Warnf("Failed to download BRDC from BKG: %v, trying CDDIS...", err)
-		url = fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/brdc/brdc%03d0.%02dn.gz",
-			year, doy, year%100)
+	return d.withCache(cacheKey, unpacked, func() (string, error) {
+		localFile := unpacked + ".gz"
+		url := fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/BRDC/%d/%03d/BRDC00WRD_R_%d%03d0000_01D_MN.rnx.gz",
+			year, doy, year, doy)
+
 		if err := d.downloadFile(url, localFile); err != nil {
-			return "", fmt.Errorf("failed to download broadcast ephemeris: %w", err)
+			d.logger.Warnf("[%s] Failed to download BRDC from BKG: %v, trying CDDIS...", taskID, err)
+			url = fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/brdc/brdc%03d0.%02dn.gz",
+				year, doy, year%100)
+			if err := d.downloadFile(url, localFile); err != nil {
+				return "", fmt.Errorf("failed to download broadcast ephemeris: %w", err)
+			}
 		}
-	}
 
-	unpacked := localFile[:len(localFile)-3]
-	if err := d.gunzipFile(localFile, unpacked); err != nil {
-		return "", fmt.Errorf("failed to unpack broadcast ephemeris: %w", err)
-	}
+		if err := d.gunzipFile(localFile, unpacked); err != nil {
+			return "", fmt.Errorf("failed to unpack broadcast ephemeris: %w", err)
+		}
 
-	d.logger.Infof("Downloaded broadcast ephemeris: %s", unpacked)
-	os.Remove(localFile)
-	return unpacked, nil
+		d.logger.Infof("[%s] Downloaded broadcast ephemeris: %s", taskID, unpacked)
+		os.Remove(localFile)
+		return unpacked, nil
+	})
 }
 
 // DownloadPreciseEphemeris скачивает точные эфемериды SP3 для PPP.
@@ -171,7 +275,13 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
-	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_sp3.sp3.gz", taskID))
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", fmt.Errorf("cache dir: %w", err)
+	}
+	unpacked := filepath.Join(cacheDir, "sp3.sp3")
+	cacheKey := "sp3_" + date.Format("20060102")
+	localFile := filepath.Join(cacheDir, "sp3.download")
 
 	type candidate struct {
 		label  string
@@ -241,36 +351,37 @@ func (d *FileDownloader) DownloadPreciseEphemeris(date time.Time, taskID string)
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.sp3.gz", week, week, dow)},
 	}...)
 
-	var lastErr error
-	for _, c := range candidates {
-		var err error
-		if c.ftpDir != "" {
-			err = d.downloadFTP(c.ftpDir+"/"+c.url, localFile)
-		} else {
-			err = d.downloadFile(c.url, localFile)
+	return d.withCache(cacheKey, unpacked, func() (string, error) {
+		var lastErr error
+		for _, c := range candidates {
+			var err error
+			if c.ftpDir != "" {
+				err = d.downloadFTP(c.ftpDir+"/"+c.url, localFile)
+			} else {
+				err = d.downloadFile(c.url, localFile)
+			}
+			if err != nil {
+				d.logger.Warnf("[%s] Failed to download %s SP3: %v", taskID, c.label, err)
+				lastErr = err
+				continue
+			}
+			lastErr = nil
+			break
 		}
-		if err != nil {
-			d.logger.Warnf("Failed to download %s SP3: %v", c.label, err)
-			lastErr = err
-			continue
+		if lastErr != nil {
+			return "", fmt.Errorf("failed to download precise ephemeris: %w", lastErr)
 		}
-		lastErr = nil
-		break
-	}
-	if lastErr != nil {
-		return "", fmt.Errorf("failed to download precise ephemeris: %w", lastErr)
-	}
 
-	// Убираем суффикс сжатия (.gz или .Z) — имя файла всегда .sp3.gz,
-	// но скачанный контент может быть как gzip так и Unix compress (.Z).
-	unpacked := strings.TrimSuffix(strings.TrimSuffix(localFile, ".gz"), ".Z")
-	if err := d.decompressFile(localFile, unpacked); err != nil {
-		return "", fmt.Errorf("failed to unpack SP3: %w", err)
-	}
+		// decompressFile определяет формат сжатия (gzip либо Unix compress) по
+		// магическим байтам, а не по расширению файла.
+		if err := d.decompressFile(localFile, unpacked); err != nil {
+			return "", fmt.Errorf("failed to unpack SP3: %w", err)
+		}
 
-	d.logger.Infof("Downloaded precise ephemeris: %s", unpacked)
-	os.Remove(localFile)
-	return unpacked, nil
+		d.logger.Infof("[%s] Downloaded precise ephemeris: %s", taskID, unpacked)
+		os.Remove(localFile)
+		return unpacked, nil
+	})
 }
 
 // DownloadPreciseClock скачивает точные часы CLK для PPP.
@@ -281,7 +392,13 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 	week, dow := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
-	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_clk.clk.gz", taskID))
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", fmt.Errorf("cache dir: %w", err)
+	}
+	unpacked := filepath.Join(cacheDir, "clk.clk")
+	cacheKey := "clk_" + date.Format("20060102")
+	localFile := filepath.Join(cacheDir, "clk.download")
 
 	type candidate struct {
 		label  string
@@ -345,34 +462,35 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 			fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.clk.gz", week, week, dow)},
 	}...)
 
-	var lastErr error
-	for _, c := range candidates {
-		var err error
-		if c.ftpDir != "" {
-			err = d.downloadFTP(c.ftpDir+"/"+c.url, localFile)
-		} else {
-			err = d.downloadFile(c.url, localFile)
+	return d.withCache(cacheKey, unpacked, func() (string, error) {
+		var lastErr error
+		for _, c := range candidates {
+			var err error
+			if c.ftpDir != "" {
+				err = d.downloadFTP(c.ftpDir+"/"+c.url, localFile)
+			} else {
+				err = d.downloadFile(c.url, localFile)
+			}
+			if err != nil {
+				d.logger.Warnf("[%s] Failed to download %s CLK: %v", taskID, c.label, err)
+				lastErr = err
+				continue
+			}
+			lastErr = nil
+			break
 		}
-		if err != nil {
-			d.logger.Warnf("Failed to download %s CLK: %v", c.label, err)
-			lastErr = err
-			continue
+		if lastErr != nil {
+			return "", fmt.Errorf("failed to download precise clock: %w", lastErr)
 		}
-		lastErr = nil
-		break
-	}
-	if lastErr != nil {
-		return "", fmt.Errorf("failed to download precise clock: %w", lastErr)
-	}
 
-	unpacked := strings.TrimSuffix(strings.TrimSuffix(localFile, ".gz"), ".Z")
-	if err := d.decompressFile(localFile, unpacked); err != nil {
-		return "", fmt.Errorf("failed to unpack CLK: %w", err)
-	}
+		if err := d.decompressFile(localFile, unpacked); err != nil {
+			return "", fmt.Errorf("failed to unpack CLK: %w", err)
+		}
 
-	d.logger.Infof("Downloaded precise clock: %s", unpacked)
-	os.Remove(localFile)
-	return unpacked, nil
+		d.logger.Infof("[%s] Downloaded precise clock: %s", taskID, unpacked)
+		os.Remove(localFile)
+		return unpacked, nil
+	})
 }
 
 // DownloadERP скачивает параметры вращения Земли (ERP).
@@ -383,7 +501,13 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 	week, dow := getGPSWeekAndDOW(date)
 	sunYear, sunDOY := getWeekSunday(date)
 
-	localFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_erp.erp.gz", taskID))
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", fmt.Errorf("cache dir: %w", err)
+	}
+	unpacked := filepath.Join(cacheDir, "erp.erp")
+	cacheKey := "erp_" + date.Format("20060102")
+	localFile := filepath.Join(cacheDir, "erp.download")
 
 	ftpWeekDir := fmt.Sprintf("/gnss/products/%d", week)
 
@@ -418,34 +542,35 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 				date.Year(), week, dow)},
 	}
 
-	var lastErr error
-	for _, c := range candidates {
-		var err error
-		if c.ftpDir != "" {
-			err = d.downloadFTP(c.ftpDir+"/"+c.url, localFile)
-		} else {
-			err = d.downloadFile(c.url, localFile)
+	return d.withCache(cacheKey, unpacked, func() (string, error) {
+		var lastErr error
+		for _, c := range candidates {
+			var err error
+			if c.ftpDir != "" {
+				err = d.downloadFTP(c.ftpDir+"/"+c.url, localFile)
+			} else {
+				err = d.downloadFile(c.url, localFile)
+			}
+			if err != nil {
+				d.logger.Warnf("[%s] Failed to download %s ERP: %v", taskID, c.label, err)
+				lastErr = err
+				continue
+			}
+			lastErr = nil
+			break
 		}
-		if err != nil {
-			d.logger.Warnf("Failed to download %s ERP: %v", c.label, err)
-			lastErr = err
-			continue
+		if lastErr != nil {
+			return "", fmt.Errorf("failed to download ERP: %w", lastErr)
 		}
-		lastErr = nil
-		break
-	}
-	if lastErr != nil {
-		return "", fmt.Errorf("failed to download ERP: %w", lastErr)
-	}
 
-	unpacked := strings.TrimSuffix(strings.TrimSuffix(localFile, ".gz"), ".Z")
-	if err := d.decompressFile(localFile, unpacked); err != nil {
-		return "", fmt.Errorf("failed to unpack ERP: %w", err)
-	}
+		if err := d.decompressFile(localFile, unpacked); err != nil {
+			return "", fmt.Errorf("failed to unpack ERP: %w", err)
+		}
 
-	d.logger.Infof("Downloaded ERP: %s", unpacked)
-	os.Remove(localFile)
-	return unpacked, nil
+		d.logger.Infof("[%s] Downloaded ERP: %s", taskID, unpacked)
+		os.Remove(localFile)
+		return unpacked, nil
+	})
 }
 
 // DownloadDCB скачивает Differential Code Bias.
@@ -455,8 +580,13 @@ func (d *FileDownloader) DownloadERP(date time.Time, taskID string) (string, err
 func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, error) {
 	year, doy := getYearDay(date)
 
-	gzFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx.gz", taskID))
-	outFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_dcb.bsx", taskID))
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", fmt.Errorf("cache dir: %w", err)
+	}
+	outFile := filepath.Join(cacheDir, "dcb.bsx")
+	cacheKey := "dcb_" + date.Format("20060102")
+	gzFile := filepath.Join(cacheDir, "dcb.bsx.gz")
 
 	ftpDir := fmt.Sprintf("/gnss/products/bias/%d", year)
 
@@ -479,33 +609,35 @@ func (d *FileDownloader) DownloadDCB(date time.Time, taskID string) (string, err
 				year, year, doy)},
 	}
 
-	var lastErr error
-	for _, c := range candidates {
-		var err error
-		if c.ftpPath != "" {
-			err = d.downloadFTP(c.ftpPath, gzFile)
-		} else {
-			err = d.downloadFile(c.httpURL, gzFile)
+	return d.withCache(cacheKey, outFile, func() (string, error) {
+		var lastErr error
+		for _, c := range candidates {
+			var err error
+			if c.ftpPath != "" {
+				err = d.downloadFTP(c.ftpPath, gzFile)
+			} else {
+				err = d.downloadFile(c.httpURL, gzFile)
+			}
+			if err != nil {
+				d.logger.Warnf("[%s] Failed to download %s DCB: %v", taskID, c.label, err)
+				lastErr = err
+				continue
+			}
+			lastErr = nil
+			break
 		}
-		if err != nil {
-			d.logger.Warnf("Failed to download %s DCB: %v", c.label, err)
-			lastErr = err
-			continue
+		if lastErr != nil {
+			return "", fmt.Errorf("failed to download DCB: %w", lastErr)
 		}
-		lastErr = nil
-		break
-	}
-	if lastErr != nil {
-		return "", fmt.Errorf("failed to download DCB: %w", lastErr)
-	}
 
-	if err := d.gunzipFile(gzFile, outFile); err != nil {
-		return "", fmt.Errorf("failed to unpack DCB: %w", err)
-	}
+		if err := d.gunzipFile(gzFile, outFile); err != nil {
+			return "", fmt.Errorf("failed to unpack DCB: %w", err)
+		}
 
-	os.Remove(gzFile)
-	d.logger.Infof("Downloaded DCB: %s", outFile)
-	return outFile, nil
+		os.Remove(gzFile)
+		d.logger.Infof("[%s] Downloaded DCB: %s", taskID, outFile)
+		return outFile, nil
+	})
 }
 
 // DownloadBIA скачивает файл фазовых смещений (BIA/OSB) для PPP-AR.
@@ -514,8 +646,13 @@ func (d *FileDownloader) DownloadBIA(date time.Time, taskID string) (string, err
 	week, _ := getGPSWeekAndDOW(date)
 	year, doy := getYearDay(date)
 
-	gzFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_bia.bia.gz", taskID))
-	outFile := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_bia.bia", taskID))
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", fmt.Errorf("cache dir: %w", err)
+	}
+	outFile := filepath.Join(cacheDir, "bia.bia")
+	cacheKey := "bia_" + date.Format("20060102")
+	gzFile := filepath.Join(cacheDir, "bia.bia.gz")
 
 	// MGEX-продукты (COD0MGX*, GRG0MGX*, WUM0MGX*) на CDDIS лежат в
 	// /gnss/products/mgex/{week}/; стандартные IGS-продукты (COD0OPS*)
@@ -558,33 +695,35 @@ func (d *FileDownloader) DownloadBIA(date time.Time, taskID string) (string, err
 		})
 	}
 
-	var lastErr error
-	for _, c := range candidates {
-		var err error
-		if c.ftpPath != "" {
-			err = d.downloadFTP(c.ftpPath, gzFile)
-		} else {
-			err = d.downloadFile(c.httpURL, gzFile)
+	return d.withCache(cacheKey, outFile, func() (string, error) {
+		var lastErr error
+		for _, c := range candidates {
+			var err error
+			if c.ftpPath != "" {
+				err = d.downloadFTP(c.ftpPath, gzFile)
+			} else {
+				err = d.downloadFile(c.httpURL, gzFile)
+			}
+			if err != nil {
+				d.logger.Warnf("[%s] Failed to download %s BIA: %v", taskID, c.label, err)
+				lastErr = err
+				continue
+			}
+			lastErr = nil
+			break
 		}
-		if err != nil {
-			d.logger.Warnf("Failed to download %s BIA: %v", c.label, err)
-			lastErr = err
-			continue
+		if lastErr != nil {
+			return "", fmt.Errorf("failed to download BIA: %w", lastErr)
 		}
-		lastErr = nil
-		break
-	}
-	if lastErr != nil {
-		return "", fmt.Errorf("failed to download BIA: %w", lastErr)
-	}
 
-	if err := d.gunzipFile(gzFile, outFile); err != nil {
-		return "", fmt.Errorf("failed to unpack BIA: %w", err)
-	}
+		if err := d.gunzipFile(gzFile, outFile); err != nil {
+			return "", fmt.Errorf("failed to unpack BIA: %w", err)
+		}
 
-	os.Remove(gzFile)
-	d.logger.Infof("Downloaded BIA: %s", outFile)
-	return outFile, nil
+		os.Remove(gzFile)
+		d.logger.Infof("[%s] Downloaded BIA: %s", taskID, outFile)
+		return outFile, nil
+	})
 }
 
 // downloadFile скачивает файл по URL.
@@ -722,38 +861,44 @@ func (d *FileDownloader) DownloadBaseStation(stationID string, date time.Time, t
 	urlCrx := fmt.Sprintf("https://cddis.nasa.gov/archive/gnss/data/daily/%d/%03d/%s%03d0.%02dcrx.gz",
 		year, doy, strings.ToLower(stationID), doy, year%100)
 
-	filename := filepath.Join(d.workDir, taskID, fmt.Sprintf("%s_base", taskID))
-	gzFile := filename + ".gz"
-
-	// Сначала пробуем скачать .crx.gz
-	err := d.downloadFile(urlCrx, gzFile)
-	if err == nil {
-		d.logger.Infof("Downloaded CRX file: %s", gzFile)
-
-		// Распаковываем gz
-		crxFile := filename + ".crx"
-		if err := d.gunzipFile(gzFile, crxFile); err != nil {
-			return "", err
-		}
-		os.Remove(gzFile)
-
-		// Конвертируем CRX в RNX
-		rnxFile := filename + ".obs"
-		if converter != nil {
-			if err := converter.ConvertCRX2RNX(crxFile, rnxFile); err != nil {
-				d.logger.Warnf("CRX conversion failed: %v, trying RINEX2 fallback", err)
-				os.Remove(crxFile)
-				// Пробуем RINEX2 формат
-				return d.downloadBaseStationRinex2(urlRinex2, filename, taskID)
-			}
-		}
-		os.Remove(crxFile)
-		d.logger.Infof("Converted to RINEX: %s", rnxFile)
-		return rnxFile, nil
+	// Суточный файл базовой станции одинаков для всех задач за этот день —
+	// кэшируем по паре (станция, дата).
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", fmt.Errorf("cache dir: %w", err)
 	}
+	filename := filepath.Join(cacheDir, "base_"+strings.ToLower(stationID))
+	cacheKey := fmt.Sprintf("base_%s_%s", strings.ToLower(stationID), date.Format("20060102"))
+	rnxFile := filename + ".obs"
 
-	// Fallback на RINEX 2.x
-	return d.downloadBaseStationRinex2(urlRinex2, filename, taskID)
+	return d.withCache(cacheKey, rnxFile, func() (string, error) {
+		gzFile := filename + ".gz"
+
+		// Сначала пробуем скачать .crx.gz
+		if err := d.downloadFile(urlCrx, gzFile); err == nil {
+			d.logger.Infof("[%s] Downloaded CRX file: %s", taskID, gzFile)
+
+			crxFile := filename + ".crx"
+			if err := d.gunzipFile(gzFile, crxFile); err != nil {
+				return "", err
+			}
+			os.Remove(gzFile)
+
+			if converter != nil {
+				if err := converter.ConvertCRX2RNX(crxFile, rnxFile); err != nil {
+					d.logger.Warnf("[%s] CRX conversion failed: %v, trying RINEX2 fallback", taskID, err)
+					os.Remove(crxFile)
+					return d.downloadBaseStationRinex2(urlRinex2, filename, taskID)
+				}
+			}
+			os.Remove(crxFile)
+			d.logger.Infof("[%s] Converted to RINEX: %s", taskID, rnxFile)
+			return rnxFile, nil
+		}
+
+		// Fallback на RINEX 2.x
+		return d.downloadBaseStationRinex2(urlRinex2, filename, taskID)
+	})
 }
 
 func (d *FileDownloader) downloadBaseStationRinex2(url, filename, taskID string) (string, error) {
@@ -769,6 +914,6 @@ func (d *FileDownloader) downloadBaseStationRinex2(url, filename, taskID string)
 	}
 	os.Remove(gzFile)
 
-	d.logger.Infof("Downloaded base station RINEX: %s", unpacked)
+	d.logger.Infof("[%s] Downloaded base station RINEX: %s", taskID, unpacked)
 	return unpacked, nil
 }

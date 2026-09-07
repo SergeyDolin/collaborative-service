@@ -30,6 +30,7 @@ type ProcessingTask struct {
 	CompletedAt     *time.Time           `json:"completedAt,omitempty" db:"completed_at"`
 	ProcessingSec   float64              `json:"processingSec,omitempty" db:"processing_sec"`
 	ObservationDate *time.Time           `json:"observationDate,omitempty" db:"observation_date"`
+	RetryCount      int                  `json:"retryCount,omitempty" db:"retry_count"`
 }
 
 // ProcessingResult результат обработки
