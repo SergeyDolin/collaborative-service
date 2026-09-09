@@ -2,6 +2,8 @@ package workers
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 
 	"collaborative/internal/storage"
@@ -42,6 +44,7 @@ func (m *Manager) Start(ctx context.Context) {
 func (m *Manager) runCleanup(ctx context.Context) {
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
+	m.cleanExpiredResults()
 
 	for {
 		select {
@@ -77,6 +80,10 @@ func (m *Manager) cleanExpiredResults() {
 	if m.taskStorage == nil {
 		return
 	}
+	if err := m.taskStorage.CleanExpiredCalibrations(); err != nil {
+		m.logger.Warnf("Calibration cleanup failed: %v", err)
+	}
+	m.cleanCalibrationFiles()
 	if err := m.taskStorage.CleanExpiredResults(); err != nil {
 		m.logger.Warnf("Failed to clean expired results: %v", err)
 	} else {
@@ -86,6 +93,28 @@ func (m *Manager) cleanExpiredResults() {
 		m.logger.Warnf("Failed to clean expired tasks: %v", err)
 	} else {
 		m.logger.Debug("Expired tasks cleaned")
+	}
+}
+
+// A crash can bypass the per-session defer. Only marked calibration directories
+// are eligible; neither solver assets nor other processing files are touched.
+func (m *Manager) cleanCalibrationFiles() {
+	entries, err := os.ReadDir(m.workDir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dir := filepath.Join(m.workDir, entry.Name())
+		marker, err := os.Lstat(filepath.Join(dir, ".calibration"))
+		if err != nil || !marker.Mode().IsRegular() || time.Since(marker.ModTime()) < 24*time.Hour {
+			continue
+		}
+		if err = os.RemoveAll(dir); err != nil {
+			m.logger.Warn("Calibration temporary file cleanup failed")
+		}
 	}
 }
 

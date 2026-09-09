@@ -1,15 +1,19 @@
 package handlers
 
 import (
-	"encoding/json"
-	"io"
-	"net/http"
-	"time"
-
 	"collaborative/internal/middlewares"
 	"collaborative/internal/model"
 	"collaborative/internal/services"
 	"collaborative/internal/storage"
+	"context"
+	"encoding/json"
+	"io"
+	"math"
+	"net/http"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/google/uuid"
@@ -19,304 +23,202 @@ import (
 type CalibrationHandler struct {
 	taskStorage *storage.TaskStorage
 	calibSvc    *services.CalibrationService
-	measSvc     *services.MeasurementService
 	logger      *zap.SugaredLogger
 }
 
-func NewCalibrationHandler(
-	taskStorage *storage.TaskStorage,
-	logger *zap.SugaredLogger,
-	measHandler *MeasurementHandler,
-) *CalibrationHandler {
-	measSvc := measHandler.NewMeasurementService()
-	calibSvc := services.NewCalibrationService(taskStorage, measSvc, logger)
-	return &CalibrationHandler{
-		taskStorage: taskStorage,
-		calibSvc:    calibSvc,
-		measSvc:     measSvc,
-		logger:      logger,
-	}
+func NewCalibrationHandler(st *storage.TaskStorage, l *zap.SugaredLogger, m *MeasurementHandler) *CalibrationHandler {
+	return &CalibrationHandler{st, services.NewCalibrationService(st, m.NewMeasurementService(), l), l}
 }
-
-// POST /api/calibration/start
-//
-// Body JSON:
-//
-//	{
-//	  "deviceId": 42,
-//	  "deviceModel": "iPhone 15 Pro",
-//	  "mode": "full|horizontal_only|quick",
-//	  "refType": "geodetic|receiver|none",
-//	  "refLat": 55.1234, "refLon": 37.5678, "refH": 123.45,   // если geodetic
-//	  "reduceH": 0.12, "reduceE": 0.0, "reduceN": 0.0
-//	}
-//
-// Ответ: {"taskId": "..."}
+func (h *CalibrationHandler) owned(w http.ResponseWriter, r *http.Request) (*model.CalibrationTask, string) {
+	login, ok := middlewares.GetUserFromContext(r.Context())
+	if !ok {
+		SendJSONError(w, "Unauthorized", 401, h.logger)
+		return nil, ""
+	}
+	t, e := h.taskStorage.GetCalibrationTask(chi.URLParam(r, "taskId"))
+	if e != nil || t.UserLogin != login {
+		SendJSONError(w, "Задача недоступна или срок хранения истёк", 404, h.logger)
+		return nil, ""
+	}
+	return t, login
+}
 func (h *CalibrationHandler) StartCalibration(w http.ResponseWriter, r *http.Request) {
 	login, ok := middlewares.GetUserFromContext(r.Context())
 	if !ok {
-		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+		SendJSONError(w, "Unauthorized", 401, h.logger)
 		return
 	}
-
-	var req struct {
-		DeviceID    int     `json:"deviceId"`
-		DeviceModel string  `json:"deviceModel"`
-		Mode        string  `json:"mode"`
-		RefType     string  `json:"refType"`
-		RefLat      float64 `json:"refLat"`
-		RefLon      float64 `json:"refLon"`
-		RefH        float64 `json:"refH"`
-		ReduceH     float64 `json:"reduceH"`
-		ReduceE     float64 `json:"reduceE"`
-		ReduceN     float64 `json:"reduceN"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		SendJSONError(w, "Неверный формат запроса", http.StatusBadRequest, h.logger)
+	r.Body = http.MaxBytesReader(w, r.Body, 16384)
+	var t model.CalibrationTask
+	var raw json.RawMessage
+	if e := json.NewDecoder(r.Body).Decode(&raw); e != nil || json.Unmarshal(raw, &t) != nil {
+		SendJSONError(w, "Неверный JSON", 400, h.logger)
 		return
 	}
-
-	validModes := map[string]bool{
-		model.CalibModeFullCalib:      true,
-		model.CalibModeHorizontalOnly: true,
-		model.CalibModeQuick:          true,
+	var fields map[string]json.RawMessage
+	_ = json.Unmarshal(raw, &fields)
+	var options map[string]json.RawMessage
+	_ = json.Unmarshal(fields["options"], &options)
+	present := func(m map[string]json.RawMessage, keys ...string) bool {
+		for _, key := range keys {
+			if len(m[key]) == 0 || string(m[key]) == "null" {
+				return false
+			}
+		}
+		return true
 	}
-	if !validModes[req.Mode] {
-		SendJSONError(w, "Неверный режим калибровки", http.StatusBadRequest, h.logger)
+	if !present(options, "baseLat", "baseLon", "baseH") || t.RefType == "geodetic" && !present(fields, "refLat", "refLon", "refH") {
+		SendJSONError(w, "Введите все координаты B, L, H явно, включая нулевые значения", 400, h.logger)
 		return
 	}
-	if req.RefType == "" {
-		req.RefType = model.CalibRefNone
-	}
-
-	task := &model.CalibrationTask{
-		ID:          uuid.NewString(),
-		UserLogin:   login,
-		DeviceID:    req.DeviceID,
-		DeviceModel: req.DeviceModel,
-		Mode:        req.Mode,
-		Status:      "pending",
-		RefType:     req.RefType,
-		RefLat:      req.RefLat,
-		RefLon:      req.RefLon,
-		RefH:        req.RefH,
-		ReduceH:     req.ReduceH,
-		ReduceE:     req.ReduceE,
-		ReduceN:     req.ReduceN,
-		CreatedAt:   time.Now(),
-	}
-
-	if err := h.taskStorage.CreateCalibrationTask(task); err != nil {
-		h.logger.Errorf("create calibration task: %v", err)
-		SendJSONError(w, "Ошибка создания задачи", http.StatusInternalServerError, h.logger)
+	if t.Mode != "full" && t.Mode != "horizontal_only" && t.Mode != "quick" {
+		SendJSONError(w, "Неверный режим", 400, h.logger)
 		return
 	}
-
-	SendJSONResponse(w, http.StatusCreated, map[string]string{"taskId": task.ID}, h.logger)
+	if t.RefType != "geodetic" && t.RefType != "none" || t.RefType == "none" && t.Mode != "horizontal_only" {
+		SendJSONError(w, "Для этого режима нужны координаты марки", 400, h.logger)
+		return
+	}
+	valid := func(lat, lon, h float64) bool {
+		return !math.IsNaN(lat) && !math.IsNaN(lon) && !math.IsNaN(h) && math.Abs(lat) <= 90 && math.Abs(lon) <= 180 && math.Abs(h) < 100000
+	}
+	if !valid(t.Options.BaseLat, t.Options.BaseLon, t.Options.BaseH) || t.RefType == "geodetic" && !valid(t.RefLat, t.RefLon, t.RefH) {
+		SendJSONError(w, "Неверные координаты", 400, h.logger)
+		return
+	}
+	if strings.TrimSpace(t.Options.ReferenceFrame) == "" {
+		SendJSONError(w, "Укажите систему отсчёта и эпоху координат", 400, h.logger)
+		return
+	}
+	if t.Options.Frequency != "l1" {
+		SendJSONError(w, "Эта версия поддерживает GPS L1 / Galileo E1", 400, h.logger)
+		return
+	}
+	t.ID = uuid.NewString()
+	t.UserLogin = login
+	t.Status = "pending"
+	t.CreatedAt = time.Now()
+	t.CompletedAt = nil
+	t.Result = nil
+	t.Sessions = nil
+	t.ReceiverTaskID = ""
+	// Selection of a profile is optional; no write to device profiles is performed.
+	t.DeviceID = 0
+	if e := h.taskStorage.CreateCalibrationTask(&t); e != nil {
+		SendJSONError(w, "Не удалось создать задачу", 500, h.logger)
+		return
+	}
+	SendJSONResponse(w, 201, map[string]string{"taskId": t.ID}, h.logger)
 }
-
-// POST /api/calibration/{taskId}/receiver
-//
-// Загружает RINEX-файл опорного приёмника. Запускает PPP асинхронно.
-// Ответ: {"sessionPppTaskId": "..."}
 func (h *CalibrationHandler) UploadReceiverFile(w http.ResponseWriter, r *http.Request) {
-	login, ok := middlewares.GetUserFromContext(r.Context())
-	if !ok {
-		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
-		return
-	}
-	taskID := chi.URLParam(r, "taskId")
-
-	task, err := h.taskStorage.GetCalibrationTask(taskID)
-	if err != nil || task.UserLogin != login {
-		SendJSONError(w, "Задача не найдена", http.StatusNotFound, h.logger)
-		return
-	}
-	if task.RefType != model.CalibRefReceiver {
-		SendJSONError(w, "Задача не требует файла приёмника", http.StatusBadRequest, h.logger)
-		return
-	}
-
-	fileData, filename, err := readMultipartFile(r, "file")
-	if err != nil {
-		SendJSONError(w, "Ошибка загрузки файла: "+err.Error(), http.StatusBadRequest, h.logger)
-		return
-	}
-
-	pppTaskID, err := h.measSvc.SubmitForPPP(r.Context(), login, fileData, filename)
-	if err != nil {
-		h.logger.Errorf("[calib:%s] receiver PPP submit: %v", taskID, err)
-		SendJSONError(w, "Ошибка запуска PPP для приёмника", http.StatusInternalServerError, h.logger)
-		return
-	}
-
-	// Сохранить ppp_task_id приёмника в задаче
-	if err := h.taskStorage.SetCalibrationReceiverTask(taskID, pppTaskID); err != nil {
-		h.logger.Errorf("[calib:%s] set receiver task: %v", taskID, err)
-	}
-
-	SendJSONResponse(w, http.StatusAccepted, map[string]string{"receiverPppTaskId": pppTaskID}, h.logger)
+	h.upload(w, r, true)
 }
-
-// POST /api/calibration/{taskId}/session
-//
-// Загружает один RINEX-файл сеанса смартфона.
-// Form fields: file (binary), position (vertical|horizontal), orientation (north|south|east|west).
-// Запускает PPP асинхронно.
-// Ответ: {"sessionId": "...", "pppTaskId": "..."}
 func (h *CalibrationHandler) UploadSession(w http.ResponseWriter, r *http.Request) {
-	login, ok := middlewares.GetUserFromContext(r.Context())
-	if !ok {
-		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
-		return
-	}
-	taskID := chi.URLParam(r, "taskId")
-
-	task, err := h.taskStorage.GetCalibrationTask(taskID)
-	if err != nil || task.UserLogin != login {
-		SendJSONError(w, "Задача не найдена", http.StatusNotFound, h.logger)
-		return
-	}
-	if task.Status != "pending" {
-		SendJSONError(w, "Задача уже запущена или завершена", http.StatusConflict, h.logger)
-		return
-	}
-
-	if err := r.ParseMultipartForm(1 << 30); err != nil {
-		SendJSONError(w, "Ошибка разбора формы", http.StatusBadRequest, h.logger)
-		return
-	}
-	position := r.FormValue("position")
-	orientation := r.FormValue("orientation")
-
-	if position != model.CalibPosVertical && position != model.CalibPosHorizontal {
-		SendJSONError(w, "Неверное положение: vertical или horizontal", http.StatusBadRequest, h.logger)
-		return
-	}
-	validOrient := map[string]bool{
-		model.CalibOrientNorth: true,
-		model.CalibOrientSouth: true,
-		model.CalibOrientEast:  true,
-		model.CalibOrientWest:  true,
-	}
-	if !validOrient[orientation] {
-		SendJSONError(w, "Неверная ориентация: north|south|east|west", http.StatusBadRequest, h.logger)
-		return
-	}
-
-	fileData, filename, err := readMultipartFile(r, "file")
-	if err != nil {
-		SendJSONError(w, "Ошибка загрузки файла: "+err.Error(), http.StatusBadRequest, h.logger)
-		return
-	}
-
-	pppTaskID, err := h.measSvc.SubmitForPPP(r.Context(), login, fileData, filename)
-	if err != nil {
-		h.logger.Errorf("[calib:%s] session PPP submit: %v", taskID, err)
-		SendJSONError(w, "Ошибка запуска PPP для сеанса", http.StatusInternalServerError, h.logger)
-		return
-	}
-
-	sess := &model.CalibrationSession{
-		ID:          uuid.NewString(),
-		TaskID:      taskID,
-		Filename:    filename,
-		Position:    position,
-		Orientation: orientation,
-		PPPTaskID:   pppTaskID,
-		Status:      "pending",
-	}
-	if err := h.taskStorage.AddCalibrationSession(sess); err != nil {
-		h.logger.Errorf("[calib:%s] add session: %v", taskID, err)
-		SendJSONError(w, "Ошибка сохранения сеанса", http.StatusInternalServerError, h.logger)
-		return
-	}
-
-	SendJSONResponse(w, http.StatusAccepted, map[string]string{
-		"sessionId": sess.ID,
-		"pppTaskId": pppTaskID,
-	}, h.logger)
+	h.upload(w, r, false)
 }
-
-// POST /api/calibration/{taskId}/submit
-//
-// Запускает вычисление фазового центра по уже загруженным сеансам.
+func (h *CalibrationHandler) upload(w http.ResponseWriter, r *http.Request, base bool) {
+	task, login := h.owned(w, r)
+	if task == nil {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 128<<20)
+	if e := r.ParseMultipartForm(8 << 20); e != nil {
+		SendJSONError(w, "Не удалось прочитать файл; лимит 128 МБ", 400, h.logger)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	file, info, e := r.FormFile("file")
+	if e != nil {
+		SendJSONError(w, "Выберите файл", 400, h.logger)
+		return
+	}
+	defer file.Close()
+	data, e := io.ReadAll(file)
+	if e != nil || len(data) == 0 {
+		SendJSONError(w, "Не удалось прочитать файл", 400, h.logger)
+		return
+	}
+	filename := filepath.Base(info.Filename)
+	// Calibration accepts plain RINEX 3 only. This avoids changing the reference
+	// antenna header and makes observation epochs and signals auditable.
+	first := strings.SplitN(string(data[:min(len(data), 200)]), "\n", 2)[0]
+	version := 0.0
+	if len(first) >= 9 {
+		version, _ = strconv.ParseFloat(strings.TrimSpace(first[:9]), 64)
+	}
+	if len(first) < 61 || !strings.Contains(first, "RINEX VERSION / TYPE") || !(version >= 3 && version < 4) || first[20] != 'O' {
+		SendJSONError(w, "Загрузите несжатый файл наблюдений RINEX 3 (.obs или .rnx)", 400, h.logger)
+		return
+	}
+	filename = strings.TrimSuffix(filename, filepath.Ext(filename)) + ".rnx"
+	id := "base"
+	var sess *model.CalibrationSession
+	if !base {
+		id = uuid.NewString()
+		sess = &model.CalibrationSession{ID: id, TaskID: task.ID, Filename: filename, Position: r.FormValue("position"), Orientation: r.FormValue("orientation"), Status: "pending"}
+		if e = json.Unmarshal([]byte(r.FormValue("geometry")), &sess.Geometry); e != nil {
+			SendJSONError(w, "Укажите геометрию установки", 400, h.logger)
+			return
+		}
+		var fields map[string]json.RawMessage
+		_ = json.Unmarshal([]byte(r.FormValue("geometry")), &fields)
+		for _, key := range []string{"reduceE", "reduceN", "reduceH"} {
+			var value *float64
+			if json.Unmarshal(fields[key], &value) != nil || value == nil {
+				SendJSONError(w, "Введите все три компоненты редуцирования, включая нулевые", 400, h.logger)
+				return
+			}
+		}
+		if e = services.ValidateCalibrationSession(task, *sess); e != nil {
+			SendJSONError(w, e.Error(), 400, h.logger)
+			return
+		}
+	}
+	if e = h.taskStorage.SaveCalibrationUpload(task.ID, login, id, filename, data, sess); e != nil {
+		SendJSONError(w, e.Error(), 409, h.logger)
+		return
+	}
+	SendJSONResponse(w, 201, map[string]string{"sessionId": id}, h.logger)
+}
 func (h *CalibrationHandler) Submit(w http.ResponseWriter, r *http.Request) {
-	login, ok := middlewares.GetUserFromContext(r.Context())
-	if !ok {
-		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+	task, login := h.owned(w, r)
+	if task == nil {
 		return
 	}
-	taskID := chi.URLParam(r, "taskId")
-
-	task, err := h.taskStorage.GetCalibrationTask(taskID)
-	if err != nil || task.UserLogin != login {
-		SendJSONError(w, "Задача не найдена", http.StatusNotFound, h.logger)
+	if e := services.ValidateCalibration(task); e != nil {
+		SendJSONError(w, e.Error(), 400, h.logger)
 		return
 	}
-	if task.Status != "pending" {
-		SendJSONError(w, "Задача уже запущена или завершена", http.StatusConflict, h.logger)
+	claimed, e := h.taskStorage.ClaimCalibration(task.ID, login)
+	if e != nil || !claimed {
+		SendJSONError(w, "Задача уже запущена либо недоступна", 409, h.logger)
 		return
 	}
-	if len(task.Sessions) == 0 {
-		SendJSONError(w, "Нет загруженных сеансов", http.StatusBadRequest, h.logger)
-		return
-	}
-
-	go h.calibSvc.RunCalibration(r.Context(), taskID)
-
-	SendJSONResponse(w, http.StatusAccepted, map[string]string{"status": "processing"}, h.logger)
+	go h.calibSvc.RunCalibration(context.Background(), task.ID)
+	SendJSONResponse(w, 202, map[string]string{"status": "processing"}, h.logger)
 }
-
-// GET /api/calibration/{taskId}/status
 func (h *CalibrationHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
-	login, ok := middlewares.GetUserFromContext(r.Context())
-	if !ok {
-		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+	task, _ := h.owned(w, r)
+	if task == nil {
 		return
 	}
-	taskID := chi.URLParam(r, "taskId")
-
-	task, err := h.taskStorage.GetCalibrationTask(taskID)
-	if err != nil || task.UserLogin != login {
-		SendJSONError(w, "Задача не найдена", http.StatusNotFound, h.logger)
-		return
-	}
-
-	SendJSONResponse(w, http.StatusOK, task, h.logger)
+	w.Header().Set("Cache-Control", "no-store")
+	SendJSONResponse(w, 200, task, h.logger)
 }
-
-// GET /api/calibration/list
 func (h *CalibrationHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	login, ok := middlewares.GetUserFromContext(r.Context())
 	if !ok {
-		SendJSONError(w, "Unauthorized", http.StatusUnauthorized, h.logger)
+		SendJSONError(w, "Unauthorized", 401, h.logger)
 		return
 	}
-
-	tasks, err := h.taskStorage.ListCalibrationTasks(login)
-	if err != nil {
-		SendJSONError(w, "Ошибка получения задач", http.StatusInternalServerError, h.logger)
+	ts, e := h.taskStorage.ListCalibrationTasks(login)
+	if e != nil {
+		SendJSONError(w, "Не удалось получить задачи", 500, h.logger)
 		return
 	}
-	if tasks == nil {
-		tasks = []*model.CalibrationTask{}
+	if ts == nil {
+		ts = []*model.CalibrationTask{}
 	}
-	SendJSONResponse(w, http.StatusOK, tasks, h.logger)
-}
-
-// readMultipartFile читает файл из multipart-запроса.
-func readMultipartFile(r *http.Request, field string) ([]byte, string, error) {
-	if r.MultipartForm == nil {
-		if err := r.ParseMultipartForm(1 << 30); err != nil {
-			return nil, "", err
-		}
-	}
-	f, fh, err := r.FormFile(field)
-	if err != nil {
-		return nil, "", err
-	}
-	defer f.Close()
-	data, err := io.ReadAll(f)
-	return data, fh.Filename, err
+	w.Header().Set("Cache-Control", "no-store")
+	SendJSONResponse(w, 200, ts, h.logger)
 }

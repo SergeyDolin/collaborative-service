@@ -362,6 +362,8 @@ func (g *ConfigGenerator) replaceParameters(
 
 	replacements := map[string]string{
 		"{{POS_MODE}}":         g.getPosMode(config),
+		"{{SOL_TYPE}}":         g.getSolType(config),
+		"{{DYNAMICS}}":         g.getDynamics(config),
 		"{{FREQUENCY}}":        string(config.Frequency),
 		"{{ELEVATION_MASK}}":   strconv.FormatFloat(config.ElevationMask, 'f', 1, 64),
 		"{{IONO_MODEL}}":       string(config.IonoModel),
@@ -454,6 +456,20 @@ func (g *ConfigGenerator) getPosMode(config model.UserProcessingConfig) string {
 	default:
 		return "single"
 	}
+}
+
+func (g *ConfigGenerator) getSolType(config model.UserProcessingConfig) string {
+	if config.Method == model.MethodPPP && config.Mode == model.ModeKinematic {
+		return "forward"
+	}
+	return "combined"
+}
+
+func (g *ConfigGenerator) getDynamics(config model.UserProcessingConfig) string {
+	if config.Method == model.MethodPPP && config.Mode == model.ModeKinematic {
+		return "on"
+	}
+	return "off"
 }
 
 func (g *ConfigGenerator) boolToStr(b bool) string {

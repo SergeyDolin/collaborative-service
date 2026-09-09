@@ -6,7 +6,7 @@ import "time"
 const (
 	CalibModeFullCalib      = "full"            // 4 вертик. + 4 гориз. + опора
 	CalibModeHorizontalOnly = "horizontal_only" // 4 вертик., без опоры
-	CalibModeQuick          = "quick"           // 1 вертик. + опора, валидность 12 ч
+	CalibModeQuick          = "quick"           // поправка для одной установки + контроль
 )
 
 // Тип опорной точки
@@ -32,21 +32,24 @@ const (
 
 // CalibrationTask — задача определения фазового центра смартфона.
 type CalibrationTask struct {
-	ID          string     `json:"id"`
-	UserLogin   string     `json:"userLogin"`
-	DeviceID    int        `json:"deviceId"`
-	DeviceModel string     `json:"deviceModel"`
-	Mode        string     `json:"mode"`
-	Status      string     `json:"status"` // pending | processing | completed | failed
-	ErrorMsg    string     `json:"errorMessage,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	CompletedAt *time.Time `json:"completedAt,omitempty"`
+	ID          string             `json:"id"`
+	UserLogin   string             `json:"userLogin"`
+	DeviceID    int                `json:"deviceId"`
+	DeviceModel string             `json:"deviceModel"`
+	Mode        string             `json:"mode"`
+	Status      string             `json:"status"` // pending | processing | completed | failed
+	ErrorMsg    string             `json:"errorMessage,omitempty"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	CompletedAt *time.Time         `json:"completedAt,omitempty"`
+	ExpiresAt   time.Time          `json:"expiresAt"`
+	Options     CalibrationOptions `json:"options"`
+	HasReceiver bool               `json:"hasReceiver"`
 
 	// Опорная точка
 	RefType string  `json:"refType"`
-	RefLat  float64 `json:"refLat,omitempty"`
-	RefLon  float64 `json:"refLon,omitempty"`
-	RefH    float64 `json:"refH,omitempty"`
+	RefLat  float64 `json:"refLat"`
+	RefLon  float64 `json:"refLon"`
+	RefH    float64 `json:"refH"`
 	// Если refType=receiver — task_id PPP-обработки файла приёмника
 	ReceiverTaskID string `json:"receiverTaskId,omitempty"`
 
@@ -68,23 +71,49 @@ type CalibrationSession struct {
 	Orientation string `json:"orientation"` // north | south | east | west
 	PPPTaskID   string `json:"pppTaskId,omitempty"`
 	Status      string `json:"status"` // pending | processing | completed | failed
-	// Результаты PPP этого сеанса (после редуцирования)
-	DeltaE  float64 `json:"deltaE,omitempty"`
-	DeltaN  float64 `json:"deltaN,omitempty"`
-	DeltaU  float64 `json:"deltaU,omitempty"`
-	FixRate float64 `json:"fixRate,omitempty"`
+	// Средние относительного решения после редуцирования, ENU.
+	DeltaE   float64             `json:"deltaE,omitempty"`
+	DeltaN   float64             `json:"deltaN,omitempty"`
+	DeltaU   float64             `json:"deltaU,omitempty"`
+	FixRate  float64             `json:"fixRate,omitempty"`
+	Geometry CalibrationGeometry `json:"geometry"`
+}
+
+// All coordinates refer to the same reference frame and epoch. Base coordinates
+// refer to its RINEX marker; DELTA H/E/N and ANTEX correct the reference antenna.
+type CalibrationOptions struct {
+	BaseLat        float64 `json:"baseLat"`
+	BaseLon        float64 `json:"baseLon"`
+	BaseH          float64 `json:"baseH"`
+	ReferenceFrame string  `json:"referenceFrame"`
+	Frequency      string  `json:"frequency"`
+}
+type CalibrationGeometry struct {
+	ReduceE     float64 `json:"reduceE"`
+	ReduceN     float64 `json:"reduceN"`
+	ReduceH     float64 `json:"reduceH"`
+	Control     bool    `json:"control"`
+	Epochs      int     `json:"epochs"`
+	FixedEpochs int     `json:"fixedEpochs"`
+	First       string  `json:"first,omitempty"`
+	Last        string  `json:"last,omitempty"`
 }
 
 // CalibrationResult — итоговые смещения фазового центра в осях тела смартфона.
 type CalibrationResult struct {
 	// Оси тела (все в метрах, знак: + = влево, + = в тело (от экрана), + = вниз от верхней грани)
-	OffsetLeft  float64 `json:"offsetLeft"`  // влево от центра экрана
-	OffsetDepth float64 `json:"offsetDepth"` // вглубь корпуса (от экрана к задней крышке)
-	OffsetDown  float64 `json:"offsetDown"`  // вниз от верхней грани (ARP)
+	OffsetLeft  float64  `json:"offsetLeft"`  // влево от центра экрана
+	OffsetDepth float64  `json:"offsetDepth"` // вглубь корпуса (от экрана к задней крышке)
+	OffsetDown  *float64 `json:"offsetDown"`  // nil: не определяется
 
-	SigmaLeft  float64 `json:"sigmaLeft"`
-	SigmaDepth float64 `json:"sigmaDepth"`
-	SigmaDown  float64 `json:"sigmaDown"`
+	SigmaLeft        *float64               `json:"sigmaLeft"`
+	SigmaDepth       *float64               `json:"sigmaDepth"`
+	SigmaDown        *float64               `json:"sigmaDown"`
+	Method           string                 `json:"method"`
+	Scope            string                 `json:"scope"`
+	Validation       *CalibrationValidation `json:"validation"`
+	TrainingSessions int                    `json:"trainingSessions"`
+	UncertaintyKind  string                 `json:"uncertaintyKind"`
 
 	// Только для быстрой калибровки
 	ValidUntil *time.Time `json:"validUntil,omitempty"`
@@ -101,4 +130,12 @@ type SessionDetail struct {
 	DeltaN      float64 `json:"deltaN"`
 	DeltaU      float64 `json:"deltaU"`
 	FixRate     float64 `json:"fixRate"`
+	Control     bool    `json:"control"`
+	FixedEpochs int     `json:"fixedEpochs"`
+}
+
+type CalibrationValidation struct {
+	Sessions int         `json:"sessions"`
+	Before   [3]*float64 `json:"before"`
+	After    [3]*float64 `json:"after"`
 }

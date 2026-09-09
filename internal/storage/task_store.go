@@ -388,7 +388,7 @@ func (s *TaskStorage) GetRawOutput(taskID, userLogin string) (raw string, found 
 		SELECT COALESCE(r.raw_output, '')
 		FROM processing_results r
 		JOIN processing_tasks t ON t.id = r.task_id
-		WHERE r.task_id = $1 AND t.user_login = $2
+		WHERE r.task_id = $1 AND t.user_login = $2 AND r.expires_at > NOW()
 	`, taskID, userLogin).Scan(&raw)
 	if queryErr != nil {
 		if queryErr == pgx.ErrNoRows {

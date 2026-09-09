@@ -113,6 +113,9 @@ func (stor *DBStorage) UpdateUserPassword(login, newPassword string) error {
 func (stor *DBStorage) DeleteUser(login string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	if _, err := stor.pool.Exec(ctx, `DELETE FROM calibration_tasks WHERE user_login=$1`, login); err != nil {
+		return fmt.Errorf("delete calibrations: %w", err)
+	}
 
 	if _, err := stor.pool.Exec(ctx,
 		`DELETE FROM processing_results WHERE user_login = $1`, login); err != nil {

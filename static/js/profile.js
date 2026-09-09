@@ -715,7 +715,7 @@ async function loadHistory() {
                 resultHtml = `<div class="result-block">
                     <div class="stats-info">${getSolutionStatus(r.q)}${fixRate?` <span>(${fixRate}%)</span>`:''} ${r.nSat?`<span><span data-icon="satellite" data-icon-size="12"></span> ${r.nSat}</span>`:''}</div>
                     ${coordsHtml}
-                    <p class="workflow-note">B, L — градусы; H — высота над эллипсоидом. Реализация системы координат и эпоха требуют проверки по исходным продуктам перед пересчётом.</p>
+                    <p class="workflow-note">B, L — градусы; H — высота над эллипсоидом.</p>
                     <div class="action-buttons">${dlBtn}${trBtn}${repBtn}</div>
                     <div class="action-buttons">
                      ${hasCoords ? `<button class="btn-report" onclick="copyResultCoords('${task.id}')">Скопировать B, L, H</button><button class="btn-report" onclick="compareResult('${task.id}')">Сравнить</button>` : ''}

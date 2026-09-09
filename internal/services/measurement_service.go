@@ -235,6 +235,7 @@ func (s *MeasurementService) ProcessMeasurement(
 	}
 
 	result := s.parseResult(outputData, taskID, login, config)
+	result.RawOutput += satelliteReport(rinexPath, files.EphemerisFile, files.NavigationFile, outputData, config.Mode == model.ModeStatic)
 	// Статика хранится дольше (результат фиксированной точки, не траектория).
 	// Кинематика — траектория движения, минимальный TTL.
 	switch config.Mode {
