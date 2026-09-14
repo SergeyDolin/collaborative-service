@@ -90,8 +90,8 @@ func (h *CalibrationHandler) StartCalibration(w http.ResponseWriter, r *http.Req
 		SendJSONError(w, "Укажите систему отсчёта и эпоху координат", 400, h.logger)
 		return
 	}
-	if t.Options.Frequency != "l1" {
-		SendJSONError(w, "Эта версия поддерживает GPS L1 / Galileo E1", 400, h.logger)
+	if t.Options.Frequency != "l1" && t.Options.Frequency != "l1+l5" {
+		SendJSONError(w, "Эта версия поддерживает GPS L1 / Galileo E1 и L1+L5", 400, h.logger)
 		return
 	}
 	t.ID = uuid.NewString()

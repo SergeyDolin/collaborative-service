@@ -40,6 +40,9 @@ func computeCalibration(t *model.CalibrationTask) (*model.CalibrationResult, err
 		if s.Status != "completed" {
 			return nil, fmt.Errorf("не все сеансы успешно обработаны")
 		}
+		if s.Geometry.Warning != "" && !calibrationWarningExists(result.Warnings, s.Geometry.Warning) {
+			result.Warnings = append(result.Warnings, s.Geometry.Warning)
+		}
 		result.Sessions = append(result.Sessions, model.SessionDetail{Position: s.Position, Orientation: s.Orientation, DeltaE: s.DeltaE, DeltaN: s.DeltaN, DeltaU: s.DeltaU, FixRate: s.FixRate, Control: s.Geometry.Control, FixedEpochs: s.Geometry.FixedEpochs})
 		if s.Geometry.Control {
 			continue
@@ -109,6 +112,16 @@ func computeCalibration(t *model.CalibrationTask) (*model.CalibrationResult, err
 	result.Validation = check
 	return result, nil
 }
+
+func calibrationWarningExists(warnings []string, warning string) bool {
+	for _, existing := range warnings {
+		if existing == warning {
+			return true
+		}
+	}
+	return false
+}
+
 func calLeastSquares(a [][]float64, y []float64, n int) ([]float64, [][]float64, error) {
 	if len(a) != len(y) || len(a) < n {
 		return nil, nil, fmt.Errorf("недостаточно независимых наблюдений")

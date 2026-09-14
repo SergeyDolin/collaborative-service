@@ -97,6 +97,7 @@ type CalibrationGeometry struct {
 	FixedEpochs int     `json:"fixedEpochs"`
 	First       string  `json:"first,omitempty"`
 	Last        string  `json:"last,omitempty"`
+	Warning     string  `json:"warning,omitempty"`
 }
 
 // CalibrationResult — итоговые смещения фазового центра в осях тела смартфона.
@@ -114,6 +115,7 @@ type CalibrationResult struct {
 	Validation       *CalibrationValidation `json:"validation"`
 	TrainingSessions int                    `json:"trainingSessions"`
 	UncertaintyKind  string                 `json:"uncertaintyKind"`
+	Warnings         []string               `json:"warnings,omitempty"`
 
 	// Только для быстрой калибровки
 	ValidUntil *time.Time `json:"validUntil,omitempty"`

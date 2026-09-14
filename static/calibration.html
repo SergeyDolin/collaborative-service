@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Калибровка антенны смартфона — CPS</title><link rel="stylesheet" href="/css/theme.css">
+<title>Калибровка антенны смартфона — CPS</title><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"><link rel="stylesheet" href="/css/theme.css">
 <style>
-body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{max-width:960px;margin:32px auto;padding:0 20px}h1{font-size:1.8rem}h2{font-size:1.2rem}section{padding:24px;margin:20px 0;border:1px solid var(--paper-edge);border-radius:10px;background:var(--paper-2)}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}label{display:flex;flex-direction:column;gap:6px}input,select,button{font:inherit;padding:9px;border:1px solid var(--paper-edge);border-radius:6px;background:var(--paper);color:var(--ink)}button{cursor:pointer;margin-top:14px}button:disabled{opacity:.5;cursor:default}fieldset{border:0;padding:0;margin:0}p{line-height:1.5}.status{padding:14px;background:var(--paper-2)}.error{color:var(--err)}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid var(--paper-edge)}.scroll{overflow:auto}[hidden]{display:none!important}.checks label{display:block}.axis{font-size:1.3rem}a{color:inherit}@media(max-width:640px){.grid{grid-template-columns:1fr}section{padding:16px}} 
+body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{max-width:960px;margin:32px auto;padding:0 20px}h1{font-size:1.8rem}h2{font-size:1.2rem}section{padding:24px;margin:20px 0;border:1px solid var(--paper-edge);border-radius:10px;background:var(--paper-2)}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}label{display:flex;flex-direction:column;gap:6px}input,select,button{font:inherit;padding:9px;border:1px solid var(--paper-edge);border-radius:6px;background:var(--paper);color:var(--ink)}button{cursor:pointer;margin-top:14px}button:disabled{opacity:.5;cursor:default}fieldset{border:0;padding:0;margin:0}p{line-height:1.5}.status{padding:14px;background:var(--paper-2)}.error{color:var(--err)}.warning{padding:12px 14px;border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid var(--paper-edge)}.scroll{overflow:auto}.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.actions button{margin-top:14px}[hidden]{display:none!important}.checks label{display:block}.axis{font-size:1.3rem}a{color:inherit}@media(max-width:640px){.grid{grid-template-columns:1fr}section{padding:16px}.actions{display:grid}} 
 </style></head><body><main>
 <a href="/profile">← Профиль</a> · <a href="/calibration">Новая калибровка</a>
 <h1>Калибровка антенны смартфона</h1>
@@ -12,12 +12,12 @@ body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{
 <div class="grid">
 <label>Смартфон<input id="device-model" required maxlength="120" placeholder="Модель и экземпляр"></label>
 <label>Режим<select id="mode"><option value="full">Пространственная: 8 ориентаций</option><option value="horizontal_only">Развороты: 4 ориентации</option><option value="quick">Поправка одной установки</option></select></label>
-<label>Наблюдения<select id="frequency"><option value="l1">GPS L1 / Galileo E1</option></select></label>
+<label>Наблюдения<select id="frequency"><option value="l1+l5">L1+L5</option><option value="l1">GPS L1 / Galileo E1</option></select></label>
 </div>
 <p id="protocol"></p>
 <label>Система отсчёта и эпоха координат<input id="reference-frame" required placeholder="Например: ITRF2020, эпоха наблюдений 2025.5"></label>
 <h3>Марка опорного приёмника</h3>
-<p>Координаты марки базы. Высота антенны H/E/N и тип антенны берутся из RINEX; калибровка антенны должна присутствовать в ANTEX сервера.</p>
+<p>Координаты марки базы. Высота антенны H/E/N берётся из RINEX базы; обработка выполняется без обязательной PCV-калибровки из ANTEX.</p>
 <div class="grid">
 <label>B, °<input id="base-lat" type="number" min="-90" max="90" step="any" required></label>
 <label>L, °<input id="base-lon" type="number" min="-180" max="180" step="any" required></label>
@@ -33,7 +33,7 @@ body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{
 </div>
 <p>ARP — середина верхней грани на стороне экрана. Положительные смещения: влево при взгляде на экран, вглубь к задней крышке, вниз от верхней грани. Север — истинный. При поворотах фиксируйте одну ось и измеряйте перемещение ARP.</p>
 <p>Опора, марка и наблюдения должны быть согласованы по системе отсчёта и эпохе. Результат относится к выбранным сигналам и установке; экспериментальная проверка по статье ещё не выполнена.</p>
-<button type="submit" id="create">Создать задачу и загрузить базу</button>
+	<div class="actions"><button type="submit" id="create">Создать задачу и загрузить базу</button><button type="button" id="reuse-setup" hidden>Назад к координатам</button></div>
 </fieldset></form>
 <p>Файлы удаляются после расчёта; задача и результат доступны 24 часа от создания. Истёкшие данные удаляются при ближайшей ежечасной очистке. Это срок хранения, не срок действия поправки.</p>
 </section>
@@ -55,9 +55,9 @@ body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{
 <label>Файл сеанса (до 128 МБ)<input id="session-file" type="file" accept=".obs,.rnx" required></label>
 <button type="submit" id="upload">Добавить сеанс</button>
 </fieldset></form>
-<button id="submit" disabled>Рассчитать</button>
+	<div class="actions"><button type="button" id="back-to-setup">Назад к координатам</button><button id="submit" disabled>Рассчитать</button></div>
 </section>
-<section id="result-section" hidden><h2>3. Результат</h2><p id="result-kind"></p><div class="grid" id="offsets"></div>
+<section id="result-section" hidden><h2>3. Результат</h2><p id="result-kind"></p><div id="warnings"></div><div class="grid" id="offsets"></div>
 <p>Стандартные ошибки ниже характеризуют внутреннюю согласованность модели. Ошибки опоры, ориентации, установки и временная корреляция полностью не учтены.</p>
 <div id="validation"></div><button id="download">Скачать результат JSON</button>
 </section>

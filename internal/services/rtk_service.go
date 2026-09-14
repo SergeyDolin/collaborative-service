@@ -41,6 +41,7 @@ func absPath(p string) string {
 const (
 	binRnx2rtkp     = "rnx2rtkp"
 	binRnx2rtkPhone = "rnx2rtkpPhone"
+	binSppostls     = "sppostls"
 )
 
 // solverBinary выбирает бинарь обработки по типу устройства:
@@ -57,6 +58,17 @@ func (r *RTKService) solverBinary(deviceType string) string {
 		r.logger.Warnf("%s не найден в %s — используем %s", binRnx2rtkPhone, r.rtklibPath, binRnx2rtkp)
 	}
 	return absPath(filepath.Join(r.rtklibPath, name))
+}
+
+// calibrationSolverBinary selects the smartphone static batch-LS handler when
+// it is present in the configured RTKLIB directory on the server.
+func (r *RTKService) calibrationSolverBinary() string {
+	sppostls := absPath(filepath.Join(r.rtklibPath, binSppostls))
+	if _, err := os.Stat(sppostls); err == nil {
+		return sppostls
+	}
+	r.logger.Warnf("%s не найден в %s — используем мобильный RTKLIB fallback", binSppostls, r.rtklibPath)
+	return r.solverBinary("mobile")
 }
 
 // ProcessPPP запускает PPP обработку с использованием точных файлов.

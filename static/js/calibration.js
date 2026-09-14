@@ -1,6 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const names={vertical:'Вертикально',horizontal:'Горизонтально',north:'С',east:'В',south:'Ю',west:'З'};
+const draftKey='calibration:draft:v1';
 const state={task:null,busy:false,polling:false};
 const protocols={
  full:'8 калибровочных сеансов: вертикально и горизонтально, С/В/Ю/З; плюс отдельный контрольный сеанс.',
@@ -22,6 +23,36 @@ async function api(path,options={}){
  }finally{clearTimeout(timeout);}
 }
 function geometry(){return {reduceE:number('reduce-e'),reduceN:number('reduce-n'),reduceH:number('reduce-h'),control:$('purpose').value==='control'};}
+function setupPayload(){return {deviceModel:$('device-model').value,mode:$('mode').value,refType:$('reference').value,refLat:number('mark-lat'),refLon:number('mark-lon'),refH:number('mark-h'),options:{baseLat:number('base-lat'),baseLon:number('base-lon'),baseH:number('base-h'),referenceFrame:$('reference-frame').value,frequency:$('frequency').value}};}
+function saveDraft(){
+ try{localStorage.setItem(draftKey,JSON.stringify(setupPayload()));}catch(_){}
+}
+function fillSetup(t){
+ const values={'device-model':t.deviceModel,mode:t.mode,reference:t.refType,'mark-lat':t.refLat??0,'mark-lon':t.refLon??0,'mark-h':t.refH??0,'base-lat':t.options?.baseLat,'base-lon':t.options?.baseLon,'base-h':t.options?.baseH,'reference-frame':t.options?.referenceFrame,frequency:t.options?.frequency};
+ for(const [id,value] of Object.entries(values))if(value!==undefined&&value!==null)$(id).value=value;
+ modeChanged();
+}
+function loadDraft(){
+ try{
+  const t=JSON.parse(localStorage.getItem(draftKey)||'null');
+  if(t?.options)fillSetup(t);
+ }catch(_){}
+}
+function unlockSetup(){
+ for(const el of $('setup-fields').querySelectorAll('input,select,button'))el.disabled=false;
+ $('base-file').value='';
+ $('create').textContent='Создать задачу и загрузить базу';
+ $('reuse-setup').hidden=true;
+ modeChanged();
+}
+function backToSetup(){
+ if(state.task?.options){fillSetup(state.task);saveDraft();}
+ state.task=null;state.polling=false;
+ history.replaceState(null,'','/calibration');
+ $('sessions-section').hidden=true;$('result-section').hidden=true;$('sessions').innerHTML='';
+ unlockSetup();
+ message('Координаты сохранены. Выберите файл базы и запустите новую задачу.');
+}
 function modeChanged(){
  $('protocol').textContent=protocols[$('mode').value];
  const none=$('reference').querySelector('option[value="none"]');none.disabled=$('mode').value!=='horizontal_only';
@@ -36,7 +67,9 @@ function complete(t){
  return positions.every(p=>orientations.every(o=>seen.has(p+'/'+o)))&&t.sessions.some(s=>s.geometry.control);
 }
 function showTask(t){
- state.task=t;restoreSetup(t);$('sessions-section').hidden=!t.hasReceiver && t.status==='pending';
+    state.task=t;restoreSetup(t);$('sessions-section').hidden=!t.hasReceiver && t.status==='pending';
+    $('reuse-setup').hidden=t.status==='pending'&&!t.hasReceiver;
+    $('reuse-setup').disabled=$('reuse-setup').hidden;
  $('required').textContent=protocols[t.mode];
  $('expiry').textContent='Доступно до '+new Date(t.expiresAt).toLocaleString('ru-RU');
  $('sessions').innerHTML=(t.sessions||[]).map(s=>'<tr><td>'+esc(s.filename)+'</td><td>'+names[s.position]+' / '+names[s.orientation]+'</td><td>'+(s.geometry?.control?'Контроль':'Калибровка')+'</td><td>'+esc({pending:'Ожидает',processing:'Обработка',completed:'Готово',failed:'Ошибка'}[s.status]||s.status)+'</td></tr>').join('');
@@ -49,16 +82,15 @@ function showTask(t){
  else if(t.status==='completed'&&t.result){message('Расчёт завершён');showResult(t);}
 }
 function restoreSetup(t){
- const values={'device-model':t.deviceModel,mode:t.mode,reference:t.refType,'mark-lat':t.refLat??0,'mark-lon':t.refLon??0,'mark-h':t.refH??0,'base-lat':t.options.baseLat,'base-lon':t.options.baseLon,'base-h':t.options.baseH,'reference-frame':t.options.referenceFrame,frequency:t.options.frequency};
- for(const [id,value] of Object.entries(values))$(id).value=value;
- modeChanged();
- $('setup-fields').disabled=false;
- for(const el of $('setup-fields').querySelectorAll('input,select,button'))el.disabled=true;
+    fillSetup(t);saveDraft();
+    $('setup-fields').disabled=false;
+    for(const el of $('setup-fields').querySelectorAll('input,select,button'))el.disabled=true;
  if(t.status==='pending'&&!t.hasReceiver){$('base-file').disabled=false;$('create').disabled=false;$('create').textContent='Загрузить базу';}
 }
 function showResult(t){
  const r=t.result;$('result-section').hidden=false;
  $('result-kind').textContent=r.scope==='single-setup-offset'?'Поправка одной установки':'Среднее смещение в осях корпуса';
+ $('warnings').innerHTML=(r.warnings||[]).map(w=>'<p class="warning">'+esc(w)+'</p>').join('');
  $('offsets').innerHTML=[['Влево',r.offsetLeft,r.sigmaLeft],['Вглубь',r.offsetDepth,r.sigmaDepth],['Вниз от ARP',r.offsetDown,r.sigmaDown]].map(([name,value,sigma])=>'<div><p>'+name+'</p><p class="axis">'+mm(value)+(value===null?'':' мм')+'</p><p>Стандартная ошибка: '+mm(sigma)+(sigma===null?'':' мм')+'</p></div>').join('');
  const v=r.validation;
  $('validation').innerHTML=v?'<h3>Контроль: '+v.sessions+' сеанс(а)</h3><p>'+(t.refType==='none'?'Отклонения от оценённого положения оси установки':'Отклонения от известных координат марки')+'</p><table><thead><tr><th>Ось</th><th>RMS до, мм</th><th>RMS после, мм</th></tr></thead><tbody>'+['E','N','U'].map((axis,i)=>'<tr><td>'+axis+'</td><td>'+mm(v.before[i])+'</td><td>'+mm(v.after[i])+'</td></tr>').join('')+'</tbody></table>':'';
@@ -67,16 +99,18 @@ $('mode').onchange=modeChanged;$('reference').onchange=modeChanged;modeChanged()
 $('setup-form').onsubmit=async event=>{
  event.preventDefault();if(state.busy)return;state.busy=true;$('create').disabled=true;
  try{
-  if(!state.task){
-   const payload={deviceModel:$('device-model').value,mode:$('mode').value,refType:$('reference').value,refLat:number('mark-lat'),refLon:number('mark-lon'),refH:number('mark-h'),options:{baseLat:number('base-lat'),baseLon:number('base-lon'),baseH:number('base-h'),referenceFrame:$('reference-frame').value,frequency:$('frequency').value}};
-   const created=await api('/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+	  if(!state.task){
+	   const payload=setupPayload();saveDraft();
+	   const created=await api('/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
    state.task={...payload,id:created.taskId,status:'pending',hasReceiver:false};restoreSetup(state.task);history.replaceState(null,'','/calibration?task='+encodeURIComponent(created.taskId));
    state.task=await api('/'+created.taskId+'/status');restoreSetup(state.task);
   }
   const fd=new FormData();fd.append('file',$('base-file').files[0]);await api('/'+state.task.id+'/receiver',{method:'POST',body:fd});
   showTask(await api('/'+state.task.id+'/status'));message('База загружена. Добавьте сеансы смартфона.');
- }catch(e){message(e.message,true);}finally{state.busy=false;if(state.task?.options)restoreSetup(state.task);else $('create').disabled=false;}
-};
+	 }catch(e){message(e.message,true);}finally{state.busy=false;if(state.task?.options)restoreSetup(state.task);else $('create').disabled=false;}
+	};
+$('back-to-setup').onclick=backToSetup;$('reuse-setup').onclick=backToSetup;
+$('setup-fields').addEventListener('input',saveDraft);$('setup-fields').addEventListener('change',saveDraft);loadDraft();
 $('session-form').onsubmit=async event=>{
  event.preventDefault();if(state.busy)return;state.busy=true;$('upload').disabled=true;
  try{
