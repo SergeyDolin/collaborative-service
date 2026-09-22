@@ -13,6 +13,52 @@ function stats(values) {
  const percentile = p => { const i=(n-1)*p, j=Math.floor(i); return a[j]+(a[Math.min(j+1,n-1)]-a[j])*(i-j); };
  return {n,min:a[0],max:a[n-1],mean,median:percentile(.5),p95:percentile(.95),sd:n>1?Math.sqrt(a.reduce((s,v)=>s+(v-mean)**2,0)/(n-1)):null};
 }
+function residualStats(values) {
+ const s=stats(values), abs=values.filter(finite).map(Math.abs);
+ return {...s,rms:abs.length?Math.sqrt(values.reduce((sum,v)=>sum+v*v,0)/values.length):null,abs95:stats(abs).p95};
+}
+const satSystems={G:'GPS',R:'ГЛОНАСС',E:'Galileo',C:'BeiDou',J:'QZSS',I:'NavIC',S:'SBAS'};
+const satSystem=sat=>satSystems[String(sat||'')[0]]||'Другая';
+function parseStatOutput(text) {
+ const bySat={}, bySystem={}, byPass={}, code=[], phase=[], snr=[], el=[], epochs=new Set();
+ let pass='all';
+ for (const line of String(text || '').split(/\r?\n/)) {
+  const hdr=line.match(/^%\s*residual stat file:\s*(.+)$/i);
+  if (hdr) {
+   pass=/backward/i.test(hdr[1])?'backward':(/forward/i.test(hdr[1])?'forward':hdr[1]);
+   continue;
+  }
+  if (!line.startsWith('$SAT,')) continue;
+  const f=line.split(',').map(v=>v.trim());
+  if (f.length < 15 || !/^[A-Z]?\d{2,3}$/.test(f[3] || '')) continue;
+  const sat=f[3], sys=satSystem(sat), resp=Number(f[6]), resc=Number(f[7]), used=Number(f[8])>0;
+  const row={pass,sat,sys,az:Number(f[4]),el:Number(f[5]),resp,resc,used,snr:Number(f[9]),fix:Number(f[10]),slip:Number(f[11]),lock:Number(f[12]),outc:Number(f[13]),slipc:Number(f[14]),rejc:Number(f[15])};
+  const rec=bySat[sat] ||= {sat,sys,code:[],phase:[],snr:[],el:[],seen:0,used:0,slips:0,rejections:0};
+  const sysRec=bySystem[sys] ||= {name:sys,seen:0,used:0,slips:0,rejections:0,code:[],phase:[],snr:[],el:[]};
+  const passRec=byPass[pass] ||= {name:pass,seen:0,used:0,code:[],phase:[]};
+  rec.seen++; sysRec.seen++; passRec.seen++;
+  if (used) { rec.used++; sysRec.used++; passRec.used++; }
+  if (finite(row.slip)&&row.slip>0) { rec.slips++; sysRec.slips++; }
+  if (finite(row.rejc)&&row.rejc>0) { rec.rejections++; sysRec.rejections++; }
+  for (const target of [rec,sysRec]) {
+   if (finite(row.snr)&&row.snr>0) target.snr.push(row.snr);
+   if (finite(row.el)) target.el.push(row.el);
+  }
+  if (finite(row.snr)&&row.snr>0) snr.push(row.snr);
+  if (finite(row.el)) el.push(row.el);
+  if (finite(resp)) { code.push(resp); rec.code.push(resp); }
+  if (finite(resc)) { phase.push(resc); rec.phase.push(resc); }
+  if (finite(resp)) { sysRec.code.push(resp); passRec.code.push(resp); }
+  if (finite(resc)) { sysRec.phase.push(resc); passRec.phase.push(resc); }
+  if (f[1] && f[2]) epochs.add(f[1]+':'+f[2]);
+ }
+ const enrich=s=>({...s,codeStats:residualStats(s.code),phaseStats:residualStats(s.phase),snrStats:stats(s.snr||[]),elStats:stats(s.el||[]),usedRate:s.seen?s.used/s.seen*100:null});
+ const sats=Object.values(bySat).map(enrich)
+  .sort((a,b)=>Math.max(b.codeStats.rms||0,b.phaseStats.rms||0)-Math.max(a.codeStats.rms||0,a.phaseStats.rms||0));
+ const systems=Object.values(bySystem).map(enrich).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+ const passes=Object.values(byPass).map(p=>({...p,codeStats:residualStats(p.code),phaseStats:residualStats(p.phase),usedRate:p.seen?p.used/p.seen*100:null})).sort((a,b)=>a.name.localeCompare(b.name));
+ return {rows:code.length+phase.length,epochs:epochs.size,sats,systems,passes,code:residualStats(code),phase:residualStats(phase),snr:stats(snr),el:stats(el)};
+}
 function epoch(time) {
  if (!/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(time || '')) return null;
  const t = Date.parse(time.replaceAll('/','-').replace(' ','T')+'Z');
@@ -82,6 +128,35 @@ function plan(points) {
  const pts=sample(points), path=pts.map(p=>`${x(p).toFixed(2)},${y(p).toFixed(2)}`).join(' ');
  return `<section><h2>Плановая траектория / разброс координат</h2><p class="legend">Север ↑ · Восток → · E, N от первой эпохи, м</p><svg role="img" aria-label="Плановая траектория" viewBox="0 0 760 395">${grid}<polyline points="${path}" fill="none" stroke="#cbd5e1"/>${pts.map(p=>`<circle cx="${x(p)}" cy="${y(p)}" r="2" fill="${quality(p.q)[1]}"/>`).join('')}<text x="${left}" y="380">Шаг сетки: ${label(step)} м · Размах E: ${fmt(es.max-es.min)} м · N: ${fmt(ns.max-ns.min)} м</text><text x="${x(points[0])+5}" y="${y(points[0])-7}">Начало</text><text x="${x(points.at(-1))+5}" y="${y(points.at(-1))+15}">Конец</text></svg></section>`;
 }
+function residualChart(sats) {
+ const rows=sats.filter(s=>s.codeStats.n||s.phaseStats.n).slice(0,14); if(!rows.length)return '';
+ const max=Math.max(...rows.flatMap(s=>[s.codeStats.rms||0,s.phaseStats.rms||0]),.001), W=760,H=70+rows.length*28,L=86,R=36;
+ const x=v=>L+v/max*(W-L-R), y=i=>52+i*28;
+ let svg='<path d="M'+L+' 28V'+(H-28)+'H'+(W-R)+'" stroke="#cbd5e1" fill="none"/>';
+ rows.forEach((s,i)=>{
+  const yy=y(i), c=s.codeStats.rms||0, p=s.phaseStats.rms||0;
+  svg+=`<text x="${L-10}" y="${yy+5}" text-anchor="end">${esc(s.sat)}</text><rect x="${L}" y="${yy-9}" width="${Math.max(1,x(c)-L)}" height="8" fill="#2563eb"/><rect x="${L}" y="${yy+2}" width="${Math.max(1,x(p)-L)}" height="8" fill="#d97706"/><text x="${x(Math.max(c,p))+6}" y="${yy+6}">${fmt(c,3)} / ${fmt(p,4)}</text>`;
+ });
+ for(let i=0;i<=4;i++){const v=max*i/4;svg+=`<path d="M${x(v)} 28V${H-28}" stroke="#e2e8f0"/><text x="${x(v)}" y="20" text-anchor="middle">${fmt(v,3)}</text>`;}
+ return `<svg role="img" aria-label="RMS невязок по спутникам" viewBox="0 0 ${W} ${H}">${svg}<text x="${L}" y="${H-8}">RMS, м: кодовые / фазовые</text></svg>`;
+}
+function residualSummaryList(r) {
+ const totalSeen=r.sats.reduce((s,v)=>s+v.seen,0), totalUsed=r.sats.reduce((s,v)=>s+v.used,0);
+ const slips=r.sats.reduce((s,v)=>s+v.slips,0), rejects=r.sats.reduce((s,v)=>s+v.rejections,0);
+ const usedRate=totalSeen?totalUsed/totalSeen*100:null;
+ return `<div class="cards"><div class="card"><span>Кодовые невязки</span><strong>${fmt(r.code.rms,3)} м</strong><span>RMS · 95% ${fmt(r.code.abs95,3)} м · n=${esc(r.code.n)}</span></div><div class="card"><span>Фазовые невязки</span><strong>${fmt(r.phase.rms,4)} м</strong><span>RMS · 95% ${fmt(r.phase.abs95,4)} м · n=${esc(r.phase.n)}</span></div><div class="card"><span>Использование</span><strong>${fmt(usedRate,1)}%</strong><span>${esc(r.sats.length)} спутн. · ${esc(r.epochs || '—')} эпох · slip ${esc(slips)} · reject ${esc(rejects)}</span></div></div>`;
+}
+function residualSection(statOutput) {
+ const r=parseStatOutput(statOutput);
+ if(!r.rows)return `<section><h2>Диагностика измерений</h2><p>Данные невязок отсутствуют для этой обработки. Они появятся после нового расчёта решателем с параметром <code>-stat residuals.stat</code>; в combined-режиме также читаются <code>residuals_forward.stat</code> и <code>residuals_backward.stat</code>.</p></section>`;
+ const row=(s)=>`<tr><td>${esc(s.sat)}</td><td>${esc(s.sys)}</td><td>${fmt(s.usedRate,1)}%</td><td>${fmt(s.elStats.mean,1)}</td><td>${fmt(s.snrStats.mean,1)}</td><td>${esc(s.slips)}</td><td>${esc(s.rejections)}</td><td>${fmt(s.codeStats.rms,3)}</td><td>${fmt(s.codeStats.abs95,3)}</td><td>${fmt(s.phaseStats.rms,4)}</td><td>${fmt(s.phaseStats.abs95,4)}</td></tr>`;
+ const sysRow=(s)=>`<tr><td>${esc(s.name)}</td><td>${esc(s.seen)}</td><td>${fmt(s.usedRate,1)}%</td><td>${fmt(s.elStats.mean,1)}</td><td>${fmt(s.snrStats.mean,1)}</td><td>${esc(s.slips)}</td><td>${esc(s.rejections)}</td><td>${fmt(s.codeStats.rms,3)}</td><td>${fmt(s.phaseStats.rms,4)}</td></tr>`;
+ const passRow=(p)=>`<tr><td>${esc(p.name)}</td><td>${esc(p.seen)}</td><td>${fmt(p.usedRate,1)}%</td><td>${fmt(p.codeStats.rms,3)}</td><td>${fmt(p.codeStats.abs95,3)}</td><td>${fmt(p.phaseStats.rms,4)}</td><td>${fmt(p.phaseStats.abs95,4)}</td></tr>`;
+ const byCode=r.sats.slice().sort((a,b)=>(b.codeStats.rms||0)-(a.codeStats.rms||0)).slice(0,10);
+ const byPhase=r.sats.slice().sort((a,b)=>(b.phaseStats.rms||0)-(a.phaseStats.rms||0)).slice(0,10);
+ const events=r.sats.slice().sort((a,b)=>(b.slips+b.rejections)-(a.slips+a.rejections)).slice(0,10);
+ return `<section><h2>Диагностика измерений</h2>${residualSummaryList(r)}<p class="legend">Невязки рассчитаны решателем по строкам <code>$SAT</code>: <code>resp</code> — кодовая невязка, <code>resc</code> — фазовая невязка в метрах. Значения агрегированы по сохранённым файлам <code>residuals*.stat</code>; для combined-решения отдельно учитываются forward/backward проходы.</p>${residualChart(r.sats)}<h3>Проходы решения</h3><div class="scroll"><table><thead><tr><th>Проход</th><th>Записей</th><th>Used</th><th>Код RMS, м</th><th>Код 95%, м</th><th>Фаза RMS, м</th><th>Фаза 95%, м</th></tr></thead><tbody>${r.passes.map(passRow).join('')}</tbody></table></div><h3>По системам</h3><div class="scroll"><table><thead><tr><th>Система</th><th>Записей</th><th>Used</th><th>El ср., °</th><th>C/N₀ ср.</th><th>Slip</th><th>Reject</th><th>Код RMS, м</th><th>Фаза RMS, м</th></tr></thead><tbody>${r.systems.map(sysRow).join('')}</tbody></table></div><h3>Худшие по кодовым невязкам</h3><div class="scroll"><table><thead><tr><th>Спутник</th><th>Система</th><th>Used</th><th>El ср., °</th><th>C/N₀ ср.</th><th>Slip</th><th>Reject</th><th>Код RMS, м</th><th>Код 95%, м</th><th>Фаза RMS, м</th><th>Фаза 95%, м</th></tr></thead><tbody>${byCode.map(row).join('')}</tbody></table></div><h3>Худшие по фазовым невязкам</h3><div class="scroll"><table><thead><tr><th>Спутник</th><th>Система</th><th>Used</th><th>El ср., °</th><th>C/N₀ ср.</th><th>Slip</th><th>Reject</th><th>Код RMS, м</th><th>Код 95%, м</th><th>Фаза RMS, м</th><th>Фаза 95%, м</th></tr></thead><tbody>${byPhase.map(row).join('')}</tbody></table></div><h3>События slip / reject</h3><div class="scroll"><table><thead><tr><th>Спутник</th><th>Система</th><th>Used</th><th>El ср., °</th><th>C/N₀ ср.</th><th>Slip</th><th>Reject</th><th>Код RMS, м</th><th>Код 95%, м</th><th>Фаза RMS, м</th><th>Фаза 95%, м</th></tr></thead><tbody>${events.map(row).join('')}</tbody></table></div></section>`;
+}
 // Runs inside the isolated map frame, only after the user opens the map.
 async function mapRuntime(data) {
  const status = document.getElementById('status');
@@ -126,13 +201,14 @@ function mapDocument(points, result) {
 function render(task, td, unavailable='') {
  const a=analyze(td?.points), ps=a.points, r=task.result||{};
  const fields=(r.lastSolutionLine||'').trim().split(/\s+/);
- const coord=fields.length>=7?{lat:Number(fields[2]),lon:Number(fields[3]),h:Number(fields[4])}:{lat:r.latitude,lon:r.longitude,h:r.height};
+ const useLastLine=task.fileType!=='static'&&fields.length>=7;
+ const coord=useLastLine?{lat:Number(fields[2]),lon:Number(fields[3]),h:Number(fields[4])}:{lat:r.latitude,lon:r.longitude,h:r.height};
  const valid=finite(coord.lat)&&Math.abs(coord.lat)<=90&&finite(coord.lon)&&Math.abs(coord.lon)<=180&&finite(coord.h);
  const row=(label,value)=>`<tr><th>${esc(label)}</th><td>${esc(value)}</td></tr>`;
  const xyz=valid?ecef(coord):null;
  const mapPoints=ps.filter(p=>Math.abs(p.lat)<85.05112878);
  const mapResult=valid&&Math.abs(coord.lat)<85.05112878?coord:null;
- const satelliteRenderer=typeof module!=='undefined'&&module.exports?require('./satellites.js'):root.GNSSSatellites;
+ const satelliteRenderer=typeof module!=='undefined'&&module.exports?require('./satellite.js'):root.GNSSSatellites;
  const satelliteHTML=satelliteRenderer?.documentHTML(td?.satelliteReport);
  const satelliteSection=satelliteHTML?`<section><h2>Небесная карта и сигналы спутников</h2><iframe title="Спутники" style="height:1600px" srcdoc="${esc(satelliteHTML)}"></iframe></section>`:`<section><h2>Спутники</h2><p>${esc(td?.satelliteReport?.note||'Данные спутников отсутствуют в этом результате. Они формируются из входных файлов при новой обработке.')}</p></section>`;
  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Отчёт ГНСС — ${esc(task.filename)}</title><style>
@@ -143,8 +219,9 @@ function render(task, td, unavailable='') {
 ${unavailable?`<p role="status">${esc(unavailable)}</p>`:''}
 ${ps.length?`<section><h2>Период наблюдений</h2><table>${row('Число эпох',ps.length)}${row('Длительность, с',fmt(a.duration,1))}${row('Первая эпоха',ps[0].time)}${row('Последняя эпоха',ps.at(-1).time)}${row('Шкала времени',td?.timeSystem||'не указана')}${row('Медианный интервал, с',fmt(a.cadence.median))}</table></section>`:''}
 ${plan(ps)}${chart(ps,[['h','Высота','#2563eb']],'Высота по эпохам','м')}${chart(ps,[['ns','Спутники','#15803d']],'Число спутников в решении','шт.',true)}${chart(ps,[['sdn','Север (σN)','#2563eb'],['sde','Восток (σE)','#15803d'],['sdu','Высота (σU)','#d97706']],'Стандартные отклонения координат σN, σE, σU','м')}${chart(ps,[['e','Восток','#2563eb'],['n','Север','#15803d'],['u','Вверх','#d97706']],'Изменение координат относительно первой эпохи','м')}
+${residualSection(td?.statOutput || r.statOutput)}
 ${satelliteSection}</main></body></html>`;
 }
-const api={stats,epoch,analyze,render,quality,chart,mapDocument,plan};
+const api={stats,epoch,analyze,render,quality,chart,mapDocument,plan,parseStatOutput,residualSection};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.GNSSReport=api;
 })(typeof window!=='undefined'?window:globalThis);

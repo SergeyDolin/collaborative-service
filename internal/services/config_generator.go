@@ -363,6 +363,7 @@ func (g *ConfigGenerator) replaceParameters(
 	replacements := map[string]string{
 		"{{POS_MODE}}":         g.getPosMode(config),
 		"{{SOL_TYPE}}":         g.getSolType(config),
+		"{{SOL_STATIC}}":       g.getSolStatic(config),
 		"{{DYNAMICS}}":         g.getDynamics(config),
 		"{{FREQUENCY}}":        string(config.Frequency),
 		"{{ELEVATION_MASK}}":   strconv.FormatFloat(config.ElevationMask, 'f', 1, 64),
@@ -463,6 +464,14 @@ func (g *ConfigGenerator) getSolType(config model.UserProcessingConfig) string {
 		return "forward"
 	}
 	return "combined"
+}
+
+func (g *ConfigGenerator) getSolStatic(config model.UserProcessingConfig) string {
+	// Keep epoch-wise output for static PPP. RTKLIB combined+solstatic=single can
+	// produce an empty solution file in this service setup; the service stores the
+	// selected static result separately, while the UI no longer displays the last
+	// epoch for static tasks.
+	return "all"
 }
 
 func (g *ConfigGenerator) getDynamics(config model.UserProcessingConfig) string {

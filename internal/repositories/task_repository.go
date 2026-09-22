@@ -274,8 +274,8 @@ func (r *TaskRepositoryImpl) SaveResult(result *model.ProcessingResult) error {
 		INSERT INTO processing_results (
 			task_id, user_login, x, y, z, latitude, longitude, height,
 			q, n_sat, sdx, sdy, sdz, last_solution_line, 
-			full_result_file, file_type, raw_output, created_at, expires_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			full_result_file, file_type, raw_output, stat_output, created_at, expires_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		ON CONFLICT (task_id) DO UPDATE SET
 			x = EXCLUDED.x, y = EXCLUDED.y, z = EXCLUDED.z,
 			latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude,
@@ -283,7 +283,8 @@ func (r *TaskRepositoryImpl) SaveResult(result *model.ProcessingResult) error {
 			sdx = EXCLUDED.sdx, sdy = EXCLUDED.sdy, sdz = EXCLUDED.sdz,
 			last_solution_line = EXCLUDED.last_solution_line,
 			full_result_file = EXCLUDED.full_result_file, file_type = EXCLUDED.file_type,
-			raw_output = EXCLUDED.raw_output, expires_at = EXCLUDED.expires_at
+			raw_output = EXCLUDED.raw_output, stat_output = EXCLUDED.stat_output,
+			expires_at = EXCLUDED.expires_at
 	`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -294,7 +295,7 @@ func (r *TaskRepositoryImpl) SaveResult(result *model.ProcessingResult) error {
 		result.Latitude, result.Longitude, result.Height, result.Q,
 		result.NSat, result.SDX, result.SDY, result.SDZ,
 		result.LastSolutionLine, result.FullResultFile, result.FileType,
-		result.RawOutput, result.CreatedAt, result.ExpiresAt,
+		result.RawOutput, result.StatOutput, result.CreatedAt, result.ExpiresAt,
 	)
 
 	if err != nil {
@@ -309,7 +310,7 @@ func (r *TaskRepositoryImpl) GetResultByTaskID(taskID string) (*model.Processing
 	query := `
 		SELECT id, task_id, user_login, x, y, z, latitude, longitude, height,
 		       q, n_sat, sdx, sdy, sdz, last_solution_line, 
-		       full_result_file, file_type, raw_output, created_at, expires_at
+		       full_result_file, file_type, raw_output, COALESCE(stat_output, ''), created_at, expires_at
 		FROM processing_results
 		WHERE task_id = $1
 	`
@@ -323,7 +324,7 @@ func (r *TaskRepositoryImpl) GetResultByTaskID(taskID string) (*model.Processing
 		&result.ID, &result.TaskID, &result.UserLogin, &result.X, &result.Y, &result.Z,
 		&result.Latitude, &result.Longitude, &result.Height, &result.Q, &result.NSat,
 		&result.SDX, &result.SDY, &result.SDZ, &result.LastSolutionLine,
-		&result.FullResultFile, &result.FileType, &result.RawOutput,
+		&result.FullResultFile, &result.FileType, &result.RawOutput, &result.StatOutput,
 		&result.CreatedAt, &result.ExpiresAt,
 	)
 

@@ -252,8 +252,8 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 		INSERT INTO processing_results (
 			task_id, user_login, x, y, z, latitude, longitude, height,
 			q, n_sat, sdx, sdy, sdz, fix_rate, last_solution_line,
-			full_result_file, file_type, raw_output, created_at, expires_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+			full_result_file, file_type, raw_output, stat_output, created_at, expires_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
 		ON CONFLICT (task_id) DO UPDATE SET
 			x = EXCLUDED.x, y = EXCLUDED.y, z = EXCLUDED.z,
 			latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude,
@@ -262,7 +262,8 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 			fix_rate = EXCLUDED.fix_rate,
 			last_solution_line = EXCLUDED.last_solution_line,
 			full_result_file = EXCLUDED.full_result_file, file_type = EXCLUDED.file_type,
-			raw_output = EXCLUDED.raw_output, expires_at = EXCLUDED.expires_at
+			raw_output = EXCLUDED.raw_output, stat_output = EXCLUDED.stat_output,
+			expires_at = EXCLUDED.expires_at
 	`
 
 	_, err := s.pool.Exec(context.Background(), query,
@@ -270,7 +271,7 @@ func (s *TaskStorage) SaveResult(result *model.ProcessingResult) error {
 		result.Latitude, result.Longitude, result.Height, result.Q,
 		result.NSat, result.SDX, result.SDY, result.SDZ, result.FixRate,
 		result.LastSolutionLine, result.FullResultFile, result.FileType,
-		result.RawOutput, result.CreatedAt, result.ExpiresAt,
+		result.RawOutput, result.StatOutput, result.CreatedAt, result.ExpiresAt,
 	)
 
 	if err != nil {
@@ -399,12 +400,29 @@ func (s *TaskStorage) GetRawOutput(taskID, userLogin string) (raw string, found 
 	return raw, true, nil
 }
 
+// GetReportOutputs возвращает .pos и solver .stat для отчёта без тяжёлого BYTEA.
+func (s *TaskStorage) GetReportOutputs(taskID, userLogin string) (raw, stat string, found bool, err error) {
+	queryErr := s.pool.QueryRow(context.Background(), `
+		SELECT COALESCE(r.raw_output, ''), COALESCE(r.stat_output, '')
+		FROM processing_results r
+		JOIN processing_tasks t ON t.id = r.task_id
+		WHERE r.task_id = $1 AND t.user_login = $2 AND r.expires_at > NOW()
+	`, taskID, userLogin).Scan(&raw, &stat)
+	if queryErr != nil {
+		if queryErr == pgx.ErrNoRows {
+			return "", "", false, nil
+		}
+		return "", "", false, fmt.Errorf("get report outputs: %w", queryErr)
+	}
+	return raw, stat, true, nil
+}
+
 // GetResultByTaskID возвращает результат по ID задачи
 func (s *TaskStorage) GetResultByTaskID(taskID string) (*model.ProcessingResult, error) {
 	query := `
 		SELECT id, task_id, user_login, x, y, z, latitude, longitude, height,
 		       q, n_sat, sdx, sdy, sdz, last_solution_line, 
-		       full_result_file, file_type, raw_output, created_at, expires_at
+		       full_result_file, file_type, raw_output, COALESCE(stat_output, ''), created_at, expires_at
 		FROM processing_results
 		WHERE task_id = $1
 	`
@@ -415,7 +433,8 @@ func (s *TaskStorage) GetResultByTaskID(taskID string) (*model.ProcessingResult,
 		&result.ID, &result.TaskID, &result.UserLogin, &result.X, &result.Y, &result.Z,
 		&result.Latitude, &result.Longitude, &result.Height, &result.Q, &result.NSat,
 		&result.SDX, &result.SDY, &result.SDZ, &result.LastSolutionLine,
-		&result.FullResultFile, &result.FileType, &result.RawOutput, &result.CreatedAt, &result.ExpiresAt,
+		&result.FullResultFile, &result.FileType, &result.RawOutput, &result.StatOutput,
+		&result.CreatedAt, &result.ExpiresAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {

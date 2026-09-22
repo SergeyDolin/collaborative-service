@@ -139,18 +139,18 @@ func (h *CalibrationHandler) upload(w http.ResponseWriter, r *http.Request, base
 		return
 	}
 	filename := filepath.Base(info.Filename)
-	// Calibration accepts plain RINEX 3 only. This avoids changing the reference
-	// antenna header and makes observation epochs and signals auditable.
+	// Calibration accepts plain observation RINEX 2/3/4. Keep the original
+	// extension: year-coded RINEX 2 names such as .25o are meaningful to users
+	// and to some RTKLIB builds.
 	first := strings.SplitN(string(data[:min(len(data), 200)]), "\n", 2)[0]
 	version := 0.0
 	if len(first) >= 9 {
 		version, _ = strconv.ParseFloat(strings.TrimSpace(first[:9]), 64)
 	}
-	if len(first) < 61 || !strings.Contains(first, "RINEX VERSION / TYPE") || !(version >= 3 && version < 4) || first[20] != 'O' {
-		SendJSONError(w, "Загрузите несжатый файл наблюдений RINEX 3 (.obs или .rnx)", 400, h.logger)
+	if len(first) < 61 || !strings.Contains(first, "RINEX VERSION / TYPE") || !(version >= 2 && version < 5) || first[20] != 'O' {
+		SendJSONError(w, "Загрузите несжатый файл наблюдений RINEX 2/3/4 (.obs, .rnx или .YYo, например .25o)", 400, h.logger)
 		return
 	}
-	filename = strings.TrimSuffix(filename, filepath.Ext(filename)) + ".rnx"
 	id := "base"
 	var sess *model.CalibrationSession
 	if !base {

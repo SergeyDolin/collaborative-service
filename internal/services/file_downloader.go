@@ -493,6 +493,412 @@ func (d *FileDownloader) DownloadPreciseClock(date time.Time, taskID string) (st
 	})
 }
 
+type precisePairCandidate struct {
+	label   string
+	sp3Dir  string
+	sp3Name string
+	clkDir  string
+	clkName string
+	sp3URL  string
+	clkURL  string
+}
+
+// DownloadPreciseOrbitClock downloads a matched SP3/CLK pair from the same
+// analysis center/product series. Mixing the first available orbit from one
+// center with the first available clock from another can leave a systematic PPP
+// coordinate bias while the FIX percentage barely changes.
+func (d *FileDownloader) DownloadPreciseOrbitClock(date time.Time, taskID string) (string, string, error) {
+	week, dow := getGPSWeekAndDOW(date)
+	year, doy := getYearDay(date)
+
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return "", "", fmt.Errorf("cache dir: %w", err)
+	}
+
+	sp3Out := filepath.Join(cacheDir, "paired.sp3")
+	clkOut := filepath.Join(cacheDir, "paired.clk")
+	cacheKey := "sp3clk_" + date.Format("20060102")
+	sp3Download := filepath.Join(cacheDir, "paired.sp3.download")
+	clkDownload := filepath.Join(cacheDir, "paired.clk.download")
+
+	ftpWeekDir := fmt.Sprintf("/gnss/products/%d", week)
+	candidates := []precisePairCandidate{
+		{
+			label:   "CDDIS_COD_FINAL",
+			sp3Dir:  ftpWeekDir,
+			sp3Name: fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy),
+			clkDir:  ftpWeekDir,
+			clkName: fmt.Sprintf("COD0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy),
+		},
+		{
+			label:   "CDDIS_COD_RAPID",
+			sp3Dir:  ftpWeekDir,
+			sp3Name: fmt.Sprintf("COD0OPSRAP_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy),
+			clkDir:  ftpWeekDir,
+			clkName: fmt.Sprintf("COD0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy),
+		},
+		{
+			label:   "CDDIS_IGS_FINAL",
+			sp3Dir:  ftpWeekDir,
+			sp3Name: fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy),
+			clkDir:  ftpWeekDir,
+			clkName: fmt.Sprintf("IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy),
+		},
+		{
+			label:   "CDDIS_IGS_RAPID",
+			sp3Dir:  ftpWeekDir,
+			sp3Name: fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", year, doy),
+			clkDir:  ftpWeekDir,
+			clkName: fmt.Sprintf("IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", year, doy),
+		},
+		{
+			label:  "BKG_IGS_FINAL",
+			sp3URL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy),
+			clkURL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSFIN_%d%03d0000_01D_30S_CLK.CLK.gz", week, year, doy),
+		},
+		{
+			label:  "BKG_IGS_RAPID",
+			sp3URL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_15M_ORB.SP3.gz", week, year, doy),
+			clkURL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSRAP_%d%03d0000_01D_05M_CLK.CLK.gz", week, year, doy),
+		},
+	}
+
+	for _, u := range ultraRapidIssues(date) {
+		uDate := time.Date(u.year, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, u.doy-1)
+		uWeek, _ := getGPSWeekAndDOW(uDate)
+		candidates = append(candidates,
+			precisePairCandidate{
+				label:   fmt.Sprintf("CDDIS_IGS_ULTRA_%02d", u.hour),
+				sp3Dir:  fmt.Sprintf("/gnss/products/%d", uWeek),
+				sp3Name: fmt.Sprintf("IGS0OPSULT_%d%03d%02d00_02D_15M_ORB.SP3.gz", u.year, u.doy, u.hour),
+				clkDir:  fmt.Sprintf("/gnss/products/%d", uWeek),
+				clkName: fmt.Sprintf("IGS0OPSULT_%d%03d%02d00_02D_15M_CLK.CLK.gz", u.year, u.doy, u.hour),
+			},
+			precisePairCandidate{
+				label:  fmt.Sprintf("BKG_IGS_ULTRA_%02d", u.hour),
+				sp3URL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSULT_%d%03d%02d00_02D_15M_ORB.SP3.gz", uWeek, u.year, u.doy, u.hour),
+				clkURL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/IGS0OPSULT_%d%03d%02d00_02D_15M_CLK.CLK.gz", uWeek, u.year, u.doy, u.hour),
+			},
+			precisePairCandidate{
+				label:   fmt.Sprintf("CDDIS_WUM_ULTRA_%02d", u.hour),
+				sp3Dir:  fmt.Sprintf("/gnss/products/mgex/%d", uWeek),
+				sp3Name: fmt.Sprintf("WUM0MGXULT_%d%03d%02d00_01D_05M_ORB.SP3.gz", u.year, u.doy, u.hour),
+				clkDir:  fmt.Sprintf("/gnss/products/mgex/%d", uWeek),
+				clkName: fmt.Sprintf("WUM0MGXULT_%d%03d%02d00_01D_05M_CLK.CLK.gz", u.year, u.doy, u.hour),
+			},
+			precisePairCandidate{
+				label:   fmt.Sprintf("CDDIS_GFZ_ULTRA_%02d", u.hour),
+				sp3Dir:  fmt.Sprintf("/gnss/products/%d", uWeek),
+				sp3Name: fmt.Sprintf("GFZ0OPSULT_%d%03d%02d00_02D_05M_ORB.SP3.gz", u.year, u.doy, u.hour),
+				clkDir:  fmt.Sprintf("/gnss/products/%d", uWeek),
+				clkName: fmt.Sprintf("GFZ0OPSULT_%d%03d%02d00_02D_05M_CLK.CLK.gz", u.year, u.doy, u.hour),
+			},
+		)
+	}
+
+	candidates = append(candidates, []precisePairCandidate{
+		{
+			label:  "AIUB_CODE_MGEX_FINAL",
+			sp3URL: fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_05M_ORB.SP3.gz", year, year, doy),
+			clkURL: fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXFIN_%d%03d0000_01D_30S_CLK.CLK.gz", year, year, doy),
+		},
+		{
+			label:  "AIUB_CODE_MGEX_RAPID",
+			sp3URL: fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXRAP_%d%03d0000_01D_05M_ORB.SP3.gz", year, year, doy),
+			clkURL: fmt.Sprintf("http://ftp.aiub.unibe.ch/CODE_MGEX/CODE/%d/COD0MGXRAP_%d%03d0000_01D_30S_CLK.CLK.gz", year, year, doy),
+		},
+		{
+			label:   "CDDIS_OLD_FINAL",
+			sp3Dir:  ftpWeekDir,
+			sp3Name: fmt.Sprintf("igs%d%d.sp3.Z", week, dow),
+			clkDir:  ftpWeekDir,
+			clkName: fmt.Sprintf("igs%d%d.clk_30s.Z", week, dow),
+		},
+		{
+			label:   "CDDIS_OLD_RAPID",
+			sp3Dir:  ftpWeekDir,
+			sp3Name: fmt.Sprintf("igr%d%d.sp3.Z", week, dow),
+			clkDir:  ftpWeekDir,
+			clkName: fmt.Sprintf("igr%d%d.clk.Z", week, dow),
+		},
+		{
+			label:  "BKG_OLD_FINAL",
+			sp3URL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.sp3.gz", week, week, dow),
+			clkURL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igs%d%d.clk.gz", week, week, dow),
+		},
+		{
+			label:  "BKG_OLD_RAPID",
+			sp3URL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.sp3.gz", week, week, dow),
+			clkURL: fmt.Sprintf("https://igs.bkg.bund.de/root_ftp/IGS/products/%d/igr%d%d.clk.gz", week, week, dow),
+		},
+	}...)
+
+	lock := d.lockFor(cacheKey)
+	lock.Lock()
+	defer lock.Unlock()
+
+	if sp3Info, sp3Err := os.Stat(sp3Out); sp3Err == nil && sp3Info.Size() > 0 {
+		if clkInfo, clkErr := os.Stat(clkOut); clkErr == nil && clkInfo.Size() > 0 {
+			d.logger.Infof("[cache hit] %s: %s + %s", cacheKey, sp3Out, clkOut)
+			return sp3Out, clkOut, nil
+		}
+	}
+
+	var lastErr error
+	for _, c := range candidates {
+		os.Remove(sp3Download)
+		os.Remove(clkDownload)
+		os.Remove(sp3Out)
+		os.Remove(clkOut)
+
+		if err := d.downloadPrecisePairFile(c.sp3Dir, c.sp3Name, c.sp3URL, sp3Download); err != nil {
+			d.logger.Warnf("[%s] Failed to download %s SP3 pair member: %v", taskID, c.label, err)
+			lastErr = err
+			continue
+		}
+		if err := d.downloadPrecisePairFile(c.clkDir, c.clkName, c.clkURL, clkDownload); err != nil {
+			d.logger.Warnf("[%s] Failed to download %s CLK pair member: %v", taskID, c.label, err)
+			lastErr = err
+			continue
+		}
+		if err := d.decompressFile(sp3Download, sp3Out); err != nil {
+			lastErr = fmt.Errorf("failed to unpack paired SP3: %w", err)
+			d.logger.Warnf("[%s] %s", taskID, lastErr)
+			continue
+		}
+		if err := d.decompressFile(clkDownload, clkOut); err != nil {
+			lastErr = fmt.Errorf("failed to unpack paired CLK: %w", err)
+			d.logger.Warnf("[%s] %s", taskID, lastErr)
+			continue
+		}
+
+		os.Remove(sp3Download)
+		os.Remove(clkDownload)
+		d.logger.Infof("[%s] Downloaded matched precise products %s: %s + %s", taskID, c.label, sp3Out, clkOut)
+		return sp3Out, clkOut, nil
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no precise product candidates")
+	}
+	return "", "", fmt.Errorf("failed to download matched precise orbit/clock pair: %w", lastErr)
+}
+
+func (d *FileDownloader) downloadPrecisePairFile(ftpDir, name, url, destPath string) error {
+	if ftpDir != "" {
+		return d.downloadFTP(ftpDir+"/"+name, destPath)
+	}
+	return d.downloadFile(url, destPath)
+}
+
+// PPPProductSet — согласованный набор точных продуктов одного центра анализа.
+// Для PPP-AR нельзя независимо выбирать SP3, CLK и BIA у разных центров:
+// часы и OSB/phase-bias должны соответствовать одной и той же системе отсчёта.
+type PPPProductSet struct {
+	Source        string
+	Series        string
+	EphemerisFile string
+	ClockFile     string
+	ERPFile       string
+	BIAFile       string
+}
+
+type wumProductCandidate struct {
+	label   string
+	dir     string
+	sp3Name string
+	clkName string
+	erpName string
+	biaName string
+}
+
+// DownloadWUMPPPProducts скачивает единый согласованный комплект WUM0MGXRAP
+// для PPP/PPP-AR: SP3 + CLK + BIA и, если доступен, ERP.
+//
+// ВАЖНО:
+//   - для PPP-AR используется только WUM0MGXRAP;
+//   - WUM0MGXFIN здесь намеренно не используется: RAP содержит all-frequency
+//     code/phase OSB, необходимые в том числе для GPS L1/L5;
+//   - все файлы берутся из одной серии и одного analysis center;
+//   - недостающие продукты не добираются у CODE/IGS/GFZ/CAS;
+//   - CDDIS хранит WUM/MGEX продукты в обычном каталоге GPS-недели
+//     /gnss/products/WWWW/;
+//   - отдельные имена wum_rap_* исключают использование старого FIN/смешанного
+//     кэша после изменения логики загрузки.
+func (d *FileDownloader) DownloadWUMPPPProducts(date time.Time, taskID string, requireBIA bool) (*PPPProductSet, error) {
+	week, _ := getGPSWeekAndDOW(date)
+	year, doy := getYearDay(date)
+
+	cacheDir, err := d.cacheDateDir(date)
+	if err != nil {
+		return nil, fmt.Errorf("cache dir: %w", err)
+	}
+
+	sp3Out := filepath.Join(cacheDir, "wum_rap_sp3.sp3")
+	clkOut := filepath.Join(cacheDir, "wum_rap_clk.clk")
+	erpOut := filepath.Join(cacheDir, "wum_rap_erp.erp")
+	biaOut := filepath.Join(cacheDir, "wum_rap_bia.bia")
+	cacheKey := "ppp_wum_rap_" + date.Format("20060102")
+
+	// CDDIS: обычный недельный каталог. Никакого /products/mgex/ здесь нет.
+	weekDir := fmt.Sprintf("/gnss/products/%d", week)
+	c := wumProductCandidate{
+		label:   "WUM0MGXRAP",
+		dir:     weekDir,
+		sp3Name: fmt.Sprintf("WUM0MGXRAP_%d%03d0000_01D_05M_ORB.SP3.gz", year, doy),
+		clkName: fmt.Sprintf("WUM0MGXRAP_%d%03d0000_01D_30S_CLK.CLK.gz", year, doy),
+		erpName: fmt.Sprintf("WUM0MGXRAP_%d%03d0000_01D_01D_ERP.ERP.gz", year, doy),
+		biaName: fmt.Sprintf("WUM0MGXRAP_%d%03d0000_01D_01D_OSB.BIA.gz", year, doy),
+	}
+
+	lock := d.lockFor(cacheKey)
+	lock.Lock()
+	defer lock.Unlock()
+
+	if nonEmptyFile(sp3Out) && nonEmptyFile(clkOut) && (!requireBIA || nonEmptyFile(biaOut)) {
+		d.logger.Infof("[cache hit] %s: WUM0MGXRAP SP3/CLK/BIA", cacheKey)
+		return &PPPProductSet{
+			Source:        "WUM",
+			Series:        "WUM0MGXRAP",
+			EphemerisFile: sp3Out,
+			ClockFile:     clkOut,
+			ERPFile:       existingFileOrEmpty(erpOut),
+			BIAFile:       existingFileOrEmpty(biaOut),
+		}, nil
+	}
+
+	sp3Download := filepath.Join(cacheDir, "wum_rap_sp3.download")
+	clkDownload := filepath.Join(cacheDir, "wum_rap_clk.download")
+	erpDownload := filepath.Join(cacheDir, "wum_rap_erp.download")
+	biaDownload := filepath.Join(cacheDir, "wum_rap_bia.download")
+
+	// Не оставляем частично скачанный комплект от предыдущей неудачной попытки.
+	for _, p := range []string{
+		sp3Download, clkDownload, erpDownload, biaDownload,
+		sp3Out, clkOut, erpOut, biaOut,
+	} {
+		_ = os.Remove(p)
+	}
+
+	if err := d.downloadWUMProductFile(c, c.sp3Name, sp3Download); err != nil {
+		return nil, d.cleanupWUMAttempt(
+			fmt.Errorf("%s SP3: %w", c.label, err),
+			sp3Download, clkDownload, erpDownload, biaDownload,
+			sp3Out, clkOut, erpOut, biaOut,
+		)
+	}
+
+	if err := d.downloadWUMProductFile(c, c.clkName, clkDownload); err != nil {
+		return nil, d.cleanupWUMAttempt(
+			fmt.Errorf("%s CLK: %w", c.label, err),
+			sp3Download, clkDownload, erpDownload, biaDownload,
+			sp3Out, clkOut, erpOut, biaOut,
+		)
+	}
+
+	biaAvailable := true
+	if err := d.downloadWUMProductFile(c, c.biaName, biaDownload); err != nil {
+		biaAvailable = false
+		if requireBIA {
+			return nil, d.cleanupWUMAttempt(
+				fmt.Errorf("%s BIA: %w", c.label, err),
+				sp3Download, clkDownload, erpDownload, biaDownload,
+				sp3Out, clkOut, erpOut, biaOut,
+			)
+		}
+		d.logger.Warnf("[%s] %s BIA unavailable; float PPP will continue without AR bias: %v", taskID, c.label, err)
+	}
+
+	if err := d.decompressFile(sp3Download, sp3Out); err != nil {
+		return nil, d.cleanupWUMAttempt(
+			fmt.Errorf("%s unpack SP3: %w", c.label, err),
+			sp3Download, clkDownload, erpDownload, biaDownload,
+			sp3Out, clkOut, erpOut, biaOut,
+		)
+	}
+	if err := d.decompressFile(clkDownload, clkOut); err != nil {
+		return nil, d.cleanupWUMAttempt(
+			fmt.Errorf("%s unpack CLK: %w", c.label, err),
+			sp3Download, clkDownload, erpDownload, biaDownload,
+			sp3Out, clkOut, erpOut, biaOut,
+		)
+	}
+
+	biaFile := ""
+	if biaAvailable {
+		if err := d.decompressFile(biaDownload, biaOut); err != nil {
+			if requireBIA {
+				return nil, d.cleanupWUMAttempt(
+					fmt.Errorf("%s unpack BIA: %w", c.label, err),
+					sp3Download, clkDownload, erpDownload, biaDownload,
+					sp3Out, clkOut, erpOut, biaOut,
+				)
+			}
+			d.logger.Warnf("[%s] %s BIA unpack failed; float PPP will continue: %v", taskID, c.label, err)
+			_ = os.Remove(biaOut)
+		} else {
+			biaFile = biaOut
+		}
+	}
+
+	// ERP необязателен для завершения загрузки. Если WUM ERP отсутствует,
+	// другой центр не подмешиваем.
+	erpFile := ""
+	if err := d.downloadWUMProductFile(c, c.erpName, erpDownload); err != nil {
+		d.logger.Warnf("[%s] %s ERP unavailable; continuing without ERP: %v", taskID, c.label, err)
+	} else if err := d.decompressFile(erpDownload, erpOut); err != nil {
+		d.logger.Warnf("[%s] %s ERP unpack failed; continuing without ERP: %v", taskID, c.label, err)
+		_ = os.Remove(erpOut)
+	} else {
+		erpFile = erpOut
+	}
+
+	for _, p := range []string{sp3Download, clkDownload, erpDownload, biaDownload} {
+		_ = os.Remove(p)
+	}
+
+	d.logger.Infof(
+		"[%s] Downloaded WUM0MGXRAP product set: SP3=%s CLK=%s ERP=%s BIA=%s",
+		taskID, sp3Out, clkOut, erpFile, biaFile,
+	)
+
+	return &PPPProductSet{
+		Source:        "WUM",
+		Series:        "WUM0MGXRAP",
+		EphemerisFile: sp3Out,
+		ClockFile:     clkOut,
+		ERPFile:       erpFile,
+		BIAFile:       biaFile,
+	}, nil
+}
+
+// downloadWUMProductFile скачивает продукт WUM из недельного каталога CDDIS.
+func (d *FileDownloader) downloadWUMProductFile(c wumProductCandidate, name, destPath string) error {
+	remotePath := strings.TrimRight(c.dir, "/") + "/" + name
+	return d.downloadFTP(remotePath, destPath)
+}
+
+// cleanupWUMAttempt удаляет частично сформированный комплект и возвращает ошибку.
+func (d *FileDownloader) cleanupWUMAttempt(err error, paths ...string) error {
+	for _, p := range paths {
+		_ = os.Remove(p)
+	}
+	return fmt.Errorf("failed to download a complete WUM0MGXRAP PPP product set: %w", err)
+}
+
+func nonEmptyFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir() && info.Size() > 0
+}
+
+func existingFileOrEmpty(path string) string {
+	if nonEmptyFile(path) {
+		return path
+	}
+	return ""
+}
+
 // DownloadERP скачивает параметры вращения Земли (ERP).
 // Новый формат (IGS3, после ~2022): файлы индексируются по DOY воскресенья
 // GPS-недели (не дня наблюдения!). Воскресенье может быть в другом году.
@@ -654,11 +1060,10 @@ func (d *FileDownloader) DownloadBIA(date time.Time, taskID string) (string, err
 	cacheKey := "bia_" + date.Format("20060102")
 	gzFile := filepath.Join(cacheDir, "bia.bia.gz")
 
-	// MGEX-продукты (COD0MGX*, GRG0MGX*, WUM0MGX*) на CDDIS лежат в
-	// /gnss/products/mgex/{week}/; стандартные IGS-продукты (COD0OPS*)
-	// — в /gnss/products/{week}/.
-	opsDir := fmt.Sprintf("/gnss/products/%d", week)
+	// Старый универсальный загрузчик BIA оставляем без изменений.
+	// Он больше не используется новой строгой WUM-загрузкой, но должен компилироваться.
 	mgexDir := fmt.Sprintf("/gnss/products/mgex/%d", week)
+	opsDir := fmt.Sprintf("/gnss/products/%d", week)
 
 	type biaCandidate struct {
 		label   string

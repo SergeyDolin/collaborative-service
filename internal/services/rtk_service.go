@@ -38,6 +38,16 @@ func absPath(p string) string {
 	return abs
 }
 
+func (r *RTKService) statPath(taskID string) string {
+	return absPath(filepath.Join(r.workDir, taskID, "residuals.stat"))
+}
+
+func (r *RTKService) warnMissingStat(statFile, solverName string) {
+	if _, err := os.Stat(statFile); err != nil {
+		r.logger.Warnf("%s completed but residual stat file was not created: %s (%v)", solverName, statFile, err)
+	}
+}
+
 const (
 	binRnx2rtkp     = "rnx2rtkp"
 	binRnx2rtkPhone = "rnx2rtkpPhone"
@@ -77,10 +87,14 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath,
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
 	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
+	statFile := r.statPath(taskID)
 
 	// Все пути — абсолютные, чтобы решатель работал из любой CWD
 	args := []string{
 		"-k", absPath(configPath),
+		"-c",
+		"-y", "2",
+		"-stat", statFile,
 		"-o", outputFile,
 		absPath(roverObs),
 	}
@@ -110,6 +124,7 @@ func (r *RTKService) ProcessPPP(roverObs, navFile, sp3File, clkFile, configPath,
 	}
 
 	r.logger.Infof("PPP completed in %.2f seconds, output: %s", duration, outputFile)
+	r.warnMissingStat(statFile, filepath.Base(binPath))
 	r.logger.Debugf("stdout: %s", stdout.String())
 
 	return outputFile, nil
@@ -121,9 +136,13 @@ func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, tas
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
 	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
+	statFile := r.statPath(taskID)
 
 	args := []string{
 		"-k", absPath(configPath),
+		"-c",
+		"-y", "2",
+		"-stat", statFile,
 		"-o", outputFile,
 		absPath(roverObs),
 	}
@@ -156,6 +175,7 @@ func (r *RTKService) ProcessRelative(roverObs, baseObs, navFile, configPath, tas
 	}
 
 	r.logger.Infof("Relative positioning completed in %.2f seconds, output: %s", duration, outputFile)
+	r.warnMissingStat(statFile, filepath.Base(binPath))
 
 	return outputFile, nil
 }
@@ -166,9 +186,13 @@ func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID, devi
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
 	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
+	statFile := r.statPath(taskID)
 
 	args := []string{
 		"-k", absPath(configPath),
+		"-c",
+		"-y", "2",
+		"-stat", statFile,
 		"-o", outputFile,
 		absPath(roverObs),
 	}
@@ -208,6 +232,7 @@ func (r *RTKService) ProcessAbsolute(roverObs, navFile, configPath, taskID, devi
 	}
 
 	r.logger.Infof("Absolute positioning completed in %.2f seconds, output: %s", duration, outputFile)
+	r.warnMissingStat(statFile, solverName)
 
 	return outputFile, nil
 }
@@ -217,9 +242,13 @@ func (r *RTKService) ProcessWithConfig(configPath, rinexPath, taskID string) (st
 	taskDir := filepath.Join(r.workDir, taskID)
 	os.MkdirAll(taskDir, 0755)
 	outputFile := absPath(filepath.Join(taskDir, "output.pos"))
+	statFile := r.statPath(taskID)
 
 	args := []string{
 		"-k", absPath(configPath),
+		"-c",
+		"-y", "2",
+		"-stat", statFile,
 		"-o", outputFile,
 		absPath(rinexPath),
 	}
@@ -249,6 +278,7 @@ func (r *RTKService) ProcessWithConfig(configPath, rinexPath, taskID string) (st
 			stdout.String(), stderr.String())
 		return "", nil
 	}
+	r.warnMissingStat(statFile, filepath.Base(binPath))
 
 	return outputFile, nil
 }

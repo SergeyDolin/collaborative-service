@@ -97,7 +97,7 @@ var reRinex2ObsExt = regexp.MustCompile(`\.\d{2}[oO]$`)
 
 // isValidExtension возвращает true если расширение файла допустимо.
 func isValidExtension(lower string) bool {
-	fixed := []string{".obs", ".rnx", ".crx", ".gz", ".o"}
+	fixed := []string{".obs", ".rnx", ".crx", ".gz", ".o", ".zip", ".tar", ".tar.gz", ".tgz"}
 	for _, ext := range fixed {
 		if strings.HasSuffix(lower, ext) {
 			return true
@@ -112,7 +112,7 @@ func (v *FileValidator) ValidateFilename(filename string) error {
 	}
 	if !isValidExtension(strings.ToLower(filename)) {
 		return fmt.Errorf(
-			"unsupported file format; supported: .obs, .rnx, .crx, .gz, .o, .YYo (RINEX 2, e.g. .26o), .YYd (Hatanaka, e.g. .24d)",
+			"unsupported file format; supported: .obs, .rnx, .crx, .gz, .o, .YYo (RINEX 2, e.g. .26o), .YYd (Hatanaka, e.g. .24d), archives .zip, .tar, .tar.gz, .tgz",
 		)
 	}
 	return nil

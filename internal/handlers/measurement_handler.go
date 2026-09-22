@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -31,18 +33,22 @@ type MeasurementHandler struct {
 	logger         *zap.SugaredLogger
 }
 
+var measurementProcessingSlots = make(chan struct{}, 1)
+
 // NewMeasurementHandler создает новый обработчик измерений
 func NewMeasurementHandler(
 	dbStorage *storage.DBStorage,
 	taskStorage *storage.TaskStorage,
 	logger *zap.SugaredLogger,
 ) *MeasurementHandler {
-	return &MeasurementHandler{
+	h := &MeasurementHandler{
 		dbStorage:    dbStorage,
 		taskStorage:  taskStorage,
 		historyCache: cache.NewHistoryCache(5*time.Minute, 100),
 		logger:       logger,
 	}
+	h.measurementSvc = h.NewMeasurementService()
+	return h
 }
 
 // ProcessMeasurementHandler обрабатывает загрузку и обработку измерений
@@ -63,6 +69,9 @@ func (h *MeasurementHandler) ProcessMeasurementHandler(w http.ResponseWriter, r 
 	if err := r.ParseMultipartForm(1 << 30); err != nil { // 1 GB
 		SendJSONError(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest, h.logger)
 		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
 	}
 
 	// Парсим конфигурацию
@@ -112,18 +121,27 @@ func (h *MeasurementHandler) ProcessMeasurementHandler(w http.ResponseWriter, r 
 		return
 	}
 
-	// Создаем задачу
-	taskID := uuid.New().String()
-	task := &model.ProcessingTask{
-		ID:        taskID,
-		UserLogin: login,
-		Config:    config,
-		Filename:  header.Filename,
-		Status:    model.StatusPending,
-		CreatedAt: time.Now(),
+	if services.IsMeasurementArchive(header.Filename) {
+		taskIDs, err := h.createArchiveMeasurementTasks(login, config, header.Filename, fileData)
+		if err != nil {
+			h.logger.Errorf("Failed to create archive tasks: %v", err)
+			SendJSONError(w, err.Error(), http.StatusBadRequest, h.logger)
+			return
+		}
+		h.historyCache.Invalidate(login)
+		h.logger.Infof("Archive tasks created: %d for user: %s", len(taskIDs), login)
+		SendJSONResponse(w, http.StatusAccepted, map[string]interface{}{
+			"taskId":   taskIDs[0],
+			"taskIds":  taskIDs,
+			"count":    len(taskIDs),
+			"message":  "Batch processing started",
+			"filename": header.Filename,
+		}, h.logger)
+		return
 	}
 
-	if err := h.taskStorage.CreateTask(task); err != nil {
+	taskID, err := h.createMeasurementTask(login, config, header.Filename, fileData)
+	if err != nil {
 		h.logger.Errorf("Failed to create task: %v", err)
 		SendJSONError(w, "Failed to create task", http.StatusInternalServerError, h.logger)
 		return
@@ -132,15 +150,80 @@ func (h *MeasurementHandler) ProcessMeasurementHandler(w http.ResponseWriter, r 
 	// Инвалидируем кэш
 	h.historyCache.Invalidate(login)
 
-	// Запускаем обработку асинхронно
-	go h.processTaskAsync(taskID, login, config, fileData, header.Filename)
-
 	h.logger.Infof("Task created: %s for user: %s", taskID, login)
 
 	SendJSONResponse(w, http.StatusAccepted, map[string]interface{}{
 		"taskId":  taskID,
 		"message": "Processing started",
 	}, h.logger)
+}
+
+func (h *MeasurementHandler) createMeasurementTask(login string, config model.UserProcessingConfig, filename string, fileData []byte) (string, error) {
+	taskID := uuid.New().String()
+	task := &model.ProcessingTask{
+		ID:        taskID,
+		UserLogin: login,
+		Config:    config,
+		Filename:  filepath.Base(filename),
+		Status:    model.StatusPending,
+		CreatedAt: time.Now(),
+	}
+
+	if err := h.taskStorage.CreateTask(task); err != nil {
+		return "", err
+	}
+
+	uploadPath, err := h.persistUpload(taskID, filename, fileData)
+	if err != nil {
+		h.logger.Errorf("Failed to persist upload for task %s: %v", taskID, err)
+		h.taskStorage.UpdateTask(&model.ProcessingTask{
+			ID:           taskID,
+			Status:       model.StatusFailed,
+			ErrorMessage: "Failed to persist uploaded file",
+		})
+		return "", err
+	}
+
+	// Запускаем обработку асинхронно
+	go h.processTaskAsync(taskID, login, config, uploadPath, filepath.Base(filename), int64(len(fileData)))
+	return taskID, nil
+}
+
+func (h *MeasurementHandler) createArchiveMeasurementTasks(login string, config model.UserProcessingConfig, filename string, archiveData []byte) ([]string, error) {
+	batchID := uuid.NewString()
+	batchDir := filepath.Join("./tmp", "archive_uploads", batchID)
+	defer os.RemoveAll(batchDir)
+
+	archivePath := filepath.Join(batchDir, filepath.Base(filename))
+	if err := os.MkdirAll(batchDir, 0755); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(archivePath, archiveData, 0600); err != nil {
+		return nil, err
+	}
+
+	extractDir := filepath.Join(batchDir, "extracted")
+	if err := services.ExtractMeasurementArchive(archivePath, filename, extractDir); err != nil {
+		return nil, err
+	}
+	obsPaths, err := services.FindObservationFiles(extractDir)
+	if err != nil {
+		return nil, err
+	}
+
+	taskIDs := make([]string, 0, len(obsPaths))
+	for _, obsPath := range obsPaths {
+		obsData, err := os.ReadFile(obsPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read archive entry %s: %w", filepath.Base(obsPath), err)
+		}
+		taskID, err := h.createMeasurementTask(login, config, filepath.Base(obsPath), obsData)
+		if err != nil {
+			return nil, err
+		}
+		taskIDs = append(taskIDs, taskID)
+	}
+	return taskIDs, nil
 }
 
 // GetHistoryHandler возвращает историю обработок с кэшированием
@@ -363,40 +446,30 @@ func (h *MeasurementHandler) GetSystemStatsHandler(w http.ResponseWriter, r *htt
 
 // processTaskAsync processes a task in the background using MeasurementService.
 // All heavy-lifting (file I/O, conversion, download, RTK) is delegated to the service.
-func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model.UserProcessingConfig, fileData []byte, filename string) {
+func (h *MeasurementHandler) processTaskAsync(taskID, login string, config model.UserProcessingConfig, uploadPath, filename string, size int64) {
 	h.logger.Infof("Starting async processing for task: %s (file: %s, size: %.2f MB)",
-		taskID, filename, float64(len(fileData))/(1024*1024))
+		taskID, filename, float64(size)/(1024*1024))
 
-	const (
-		defaultWorkDir   = "./tmp"
-		defaultConfigDir = "./cmd/solver/configs"
-		defaultSolverDir = "./cmd/solver/app"
-		defaultBLQScript = "./cmd/solver/src/generate_blq.py"
-		defaultBLQConfig = "./cmd/solver/src/fes_ocean_loading.yml"
-	)
+	measurementProcessingSlots <- struct{}{}
+	defer func() { <-measurementProcessingSlots }()
 
-	configGen := services.NewConfigGenerator(defaultConfigDir, defaultWorkDir, h.logger)
-	downloader := services.NewFileDownloader(defaultWorkDir, h.logger)
-	converter := services.NewConverterService(defaultSolverDir, h.logger)
-	rtk := services.NewRTKService(defaultSolverDir, defaultWorkDir, h.logger)
-	fileSvc := services.NewFileService(defaultWorkDir, h.logger)
-	blqSvc := services.NewBLQService(defaultBLQScript, defaultBLQConfig, defaultWorkDir, h.logger)
-
-	measurementSvc := services.NewMeasurementService(
-		h.taskStorage,
-		configGen,
-		downloader,
-		converter,
-		rtk,
-		fileSvc,
-		blqSvc,
-		defaultWorkDir,
-		h.logger,
-	)
+	fileData, err := os.ReadFile(uploadPath)
+	if err != nil {
+		h.logger.Errorf("Task %s failed to read persisted upload: %v", taskID, err)
+		h.taskStorage.UpdateTask(&model.ProcessingTask{
+			ID:           taskID,
+			Status:       model.StatusFailed,
+			ErrorMessage: "Failed to read uploaded file",
+		})
+		h.historyCache.Invalidate(login)
+		return
+	}
 
 	ctx := context.Background()
-	if err := measurementSvc.ProcessMeasurement(ctx, taskID, login, &config, fileData, filename); err != nil {
+	if err := h.measurementSvc.ProcessMeasurement(ctx, taskID, login, &config, fileData, filename); err != nil {
 		h.logger.Errorf("Task %s failed: %v", taskID, err)
+	} else {
+		h.cleanupPersistedUpload(taskID)
 	}
 
 	// Invalidate cache so next history request reflects updated status
@@ -423,4 +496,25 @@ func (h *MeasurementHandler) NewMeasurementService() *services.MeasurementServic
 		h.taskStorage, configGen, downloader, converter, rtk, fileSvc, blqSvc,
 		defaultWorkDir, h.logger,
 	)
+}
+
+// MeasurementService возвращает сервис обработки, используемый этим хэндлером.
+func (h *MeasurementHandler) MeasurementService() *services.MeasurementService {
+	return h.measurementSvc
+}
+
+func (h *MeasurementHandler) persistUpload(taskID, filename string, fileData []byte) (string, error) {
+	dir := filepath.Join("./tmp", "uploads", taskID)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	uploadPath := filepath.Join(dir, filepath.Base(filename))
+	return uploadPath, os.WriteFile(uploadPath, fileData, 0600)
+}
+
+func (h *MeasurementHandler) cleanupPersistedUpload(taskID string) {
+	dir := filepath.Join("./tmp", "uploads", taskID)
+	if err := os.RemoveAll(dir); err != nil {
+		h.logger.Warnf("Failed to clean upload dir for task %s: %v", taskID, err)
+	}
 }

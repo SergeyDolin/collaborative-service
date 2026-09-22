@@ -604,7 +604,10 @@ function getMethodName(m) {
 function getStatusText(s) {
     return { pending:'⏳ В очереди', processing:'🔄 Обработка…', completed:'✅ Завершено', failed:'❌ Ошибка' }[s] || s;
 }
-function getSolutionStatus(q) {
+function getSolutionStatus(q, isStatic=false, fixRate=null) {
+    if (isStatic && Number.isFinite(Number(fixRate))) {
+        return Number(fixRate) > 0.0 ? '<span class="fix-badge">FIX есть</span>' : '<span class="float-badge">FIX нет</span>';
+    }
     if (q===1) return '<span class="fix-badge">FIX</span>';
     if (q===6) return '<span class="float-badge">FLOAT</span>';
     if (q===0) return '<span style="color:var(--err)">NO SOLUTION</span>';
@@ -675,7 +678,8 @@ async function loadHistory() {
         el.innerHTML = tasks.map(task => {
             const date   = new Date(task.createdAt).toLocaleString('ru');
             const method = getMethodName(task.config?.method);
-            const mode   = (task.fileType==='static'||task.config?.mode==='static') ? 'Статика' : 'Кинематика';
+            const isStatic = task.fileType==='static'||task.config?.mode==='static';
+            const mode   = isStatic ? 'Статика' : 'Кинематика';
             const status = task.status || 'pending';
             let resultHtml = '';
             if (status==='completed' && task.result) {
@@ -688,7 +692,7 @@ async function loadHistory() {
                 let lat = r.latitude, lon = r.longitude, h = r.height || 0;
                 let sN = 0, sE = 0, sU = 0;
                 const isKinOrAbs = task.config?.mode === 'kinematic' || task.config?.method === 'single';
-                if (r.lastSolutionLine) {
+                if (isKinOrAbs && r.lastSolutionLine) {
                     const f = r.lastSolutionLine.trim().split(/\s+/);
                     if (f[2]) lat = parseFloat(f[2]);
                     if (f[3]) lon = parseFloat(f[3]);
@@ -712,8 +716,9 @@ async function loadHistory() {
                 const trBtn = hasCoords
                     ? `<button class="btn-transform" onclick="openTransform(${r.latitude},${r.longitude},${r.height||0},'${task.id}')"><span data-icon="refresh" data-icon-size="14"></span> Пересчёт</button>` : '';
                 const repBtn = `<button class="btn-report" onclick="generateReport('${task.id}', _histTasks['${task.id}'])"><span data-icon="file" data-icon-size="14"></span> Отчёт</button>`;
+                const fixRateHtml = fixRate ? ` <span>${fixRate}%</span>` : '';
                 resultHtml = `<div class="result-block">
-                    <div class="stats-info">${getSolutionStatus(r.q)}${fixRate?` <span>(${fixRate}%)</span>`:''} ${r.nSat?`<span><span data-icon="satellite" data-icon-size="12"></span> ${r.nSat}</span>`:''}</div>
+                    <div class="stats-info">${getSolutionStatus(r.q, isStatic, r.fixRate)}${fixRateHtml} ${r.nSat?`<span><span data-icon="satellite" data-icon-size="12"></span> ${r.nSat}</span>`:''}</div>
                     ${coordsHtml}
                     <p class="workflow-note">B, L — градусы; H — высота над эллипсоидом.</p>
                     <div class="action-buttons">${dlBtn}${trBtn}${repBtn}</div>

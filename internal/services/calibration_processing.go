@@ -102,8 +102,8 @@ func calibrationSolutionTime(a, b string) (time.Time, error) {
 		Add(time.Duration(sec)*time.Second + time.Duration(frac*1e9)*time.Nanosecond), nil
 }
 
-// Converted observation file must be RINEX 3. Epoch span comes from records,
-// never from APPROX POSITION or a guessed current date.
+// Observation files may be RINEX 2/3/4. Epoch span comes from records, never
+// from APPROX POSITION or a guessed current date.
 func calibrationSpan(path string) (time.Time, time.Time, error) {
 	f, e := os.Open(path)
 	if e != nil {
@@ -116,6 +116,7 @@ func calibrationSpan(path string) (time.Time, time.Time, error) {
 	header, phase := true, false
 	timeSystem := ""
 	system := byte(' ')
+	version := 0.0
 	for scan.Scan() {
 		line := scan.Text()
 		if header {
@@ -123,8 +124,19 @@ func calibrationSpan(path string) (time.Time, time.Time, error) {
 				continue
 			}
 			label := strings.TrimSpace(line[60:])
+			if label == "RINEX VERSION / TYPE" && len(line) >= 21 {
+				version, _ = strconv.ParseFloat(strings.TrimSpace(line[:9]), 64)
+			}
 			if label == "TIME OF FIRST OBS" {
-				timeSystem = strings.TrimSpace(line[48:51])
+				if len(line) >= 51 {
+					timeSystem = strings.TrimSpace(line[48:51])
+				}
+				if len(timeSystem) < 3 {
+					fields := strings.Fields(line[:60])
+					if len(fields) >= 7 {
+						timeSystem = fields[6]
+					}
+				}
 			}
 			if label == "SYS / # / OBS TYPES" {
 				if line[0] != ' ' {
@@ -138,35 +150,24 @@ func calibrationSpan(path string) (time.Time, time.Time, error) {
 					}
 				}
 			}
+			if label == "# / TYPES OF OBSERV" {
+				for _, code := range strings.Fields(line[:60]) {
+					if calibrationIsL1Phase(code) {
+						phase = true
+					}
+				}
+			}
 			if strings.Contains(line, "END OF HEADER") {
 				header = false
 			}
 			continue
 		}
-		if !strings.HasPrefix(line, ">") {
+		tm, ok, err := calibrationEpochTime(line, version)
+		if err != nil {
+			return first, last, err
+		}
+		if !ok {
 			continue
-		}
-		fields := strings.Fields(strings.TrimPrefix(line, ">"))
-		if len(fields) < 8 {
-			continue
-		}
-		if fields[6] != "0" && fields[6] != "1" {
-			continue
-		}
-		v := make([]float64, 6)
-		valid := true
-		for i := range v {
-			v[i], e = strconv.ParseFloat(fields[i], 64)
-			if e != nil || !finiteCal(v[i]) {
-				valid = false
-			}
-		}
-		if !valid {
-			return first, last, fmt.Errorf("неверная эпоха RINEX")
-		}
-		tm := time.Date(int(v[0]), time.Month(v[1]), int(v[2]), int(v[3]), int(v[4]), int(v[5]), int((v[5]-float64(int(v[5])))*1e9), time.UTC)
-		if tm.Year() != int(v[0]) || int(tm.Month()) != int(v[1]) || tm.Day() != int(v[2]) || tm.Hour() != int(v[3]) || tm.Minute() != int(v[4]) || v[5] < 0 || v[5] >= 60 {
-			return first, last, fmt.Errorf("неверная календарная дата RINEX")
 		}
 		if !last.IsZero() && !tm.After(last) {
 			return first, last, fmt.Errorf("эпохи RINEX должны возрастать")
@@ -179,16 +180,71 @@ func calibrationSpan(path string) (time.Time, time.Time, error) {
 	if e = scan.Err(); e != nil {
 		return first, last, e
 	}
-	if timeSystem != "GPS" {
+	if timeSystem != "" && timeSystem != "GPS" {
 		return first, last, fmt.Errorf("в TIME OF FIRST OBS должна быть явно указана шкала GPS")
 	}
 	if header || !phase || first.IsZero() || !last.After(first) {
-		return first, last, fmt.Errorf("нужен RINEX 3 с фазовыми наблюдениями L1/E1 и несколькими эпохами")
+		return first, last, fmt.Errorf("нужен RINEX наблюдений с фазовыми наблюдениями L1/E1 и несколькими эпохами")
 	}
 	if last.Sub(first) > 48*time.Hour {
 		return first, last, fmt.Errorf("сеанс длиннее 48 часов")
 	}
 	return first, last, nil
+}
+
+func calibrationEpochTime(line string, version float64) (time.Time, bool, error) {
+	if version >= 3 {
+		if !strings.HasPrefix(line, ">") {
+			return time.Time{}, false, nil
+		}
+		fields := strings.Fields(strings.TrimPrefix(line, ">"))
+		if len(fields) < 8 {
+			return time.Time{}, false, nil
+		}
+		if fields[6] != "0" && fields[6] != "1" {
+			return time.Time{}, false, nil
+		}
+		return calibrationCalendarTime(fields[:6])
+	}
+	fields := strings.Fields(line)
+	if len(fields) < 8 {
+		return time.Time{}, false, nil
+	}
+	flag := fields[6]
+	if flag != "0" && flag != "1" {
+		return time.Time{}, false, nil
+	}
+	yy, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil || !finiteCal(yy) || yy < 0 || yy >= 100 {
+		return time.Time{}, false, nil
+	}
+	year := int(yy)
+	if year >= 80 {
+		year += 1900
+	} else {
+		year += 2000
+	}
+	return calibrationCalendarTime(append([]string{strconv.Itoa(year)}, fields[1:6]...))
+}
+
+func calibrationCalendarTime(fields []string) (time.Time, bool, error) {
+	if len(fields) < 6 {
+		return time.Time{}, false, nil
+	}
+	v := make([]float64, 6)
+	for i := range v {
+		value, err := strconv.ParseFloat(fields[i], 64)
+		if err != nil || !finiteCal(value) {
+			return time.Time{}, false, fmt.Errorf("неверная эпоха RINEX")
+		}
+		v[i] = value
+	}
+	sec, frac := math.Modf(v[5])
+	tm := time.Date(int(v[0]), time.Month(v[1]), int(v[2]), int(v[3]), int(v[4]), int(sec), int(frac*1e9), time.UTC)
+	if tm.Year() != int(v[0]) || int(tm.Month()) != int(v[1]) || tm.Day() != int(v[2]) || tm.Hour() != int(v[3]) || tm.Minute() != int(v[4]) || v[5] < 0 || v[5] >= 60 {
+		return time.Time{}, false, fmt.Errorf("неверная календарная дата RINEX")
+	}
+	return tm, true, nil
 }
 
 func calibrationIsL1Phase(code string) bool {
@@ -251,16 +307,24 @@ func (s *MeasurementService) processCalibrationSession(ctx context.Context, t *m
 	}
 	ant, err := calibrationBaseAntenna(base)
 	if err != nil {
-		return empty, err
+		warning := "В RINEX базы не найдены ANT # / TYPE и/или ANTENNA: DELTA H/E/N; обработка выполнена без редуцирования фазового центра базы"
+		session.Geometry.Warning = calibrationAppendWarning(session.Geometry.Warning, warning)
+		s.logger.Warnw("base antenna header incomplete; continuing without base antenna offsets", "task", t.ID, "session", id, "error", err)
+		ant = AntennaInfo{}
 	}
 	atx := absFilePath(filepath.Join(s.configGen.templateDir, "..", "src", "igs20.atx"))
-	atxData, err := os.ReadFile(atx)
-	if err != nil {
-		s.logger.Warnw("ANTEX not available; continuing without antenna PCV", "path", atx, "error", err)
-		ant.Type = ""
-		atx = ""
-	} else if err := calibrationAntennaAvailable(atxData, ant.Type); err != nil {
-		s.logger.Warnw("base antenna calibration not found; continuing without antenna PCV", "antenna", ant.Type, "error", err)
+	if ant.Type != "" {
+		atxData, err := os.ReadFile(atx)
+		if err != nil {
+			s.logger.Warnw("ANTEX not available; continuing without antenna PCV", "path", atx, "error", err)
+			ant.Type = ""
+			atx = ""
+		} else if err := calibrationAntennaAvailable(atxData, ant.Type); err != nil {
+			s.logger.Warnw("base antenna calibration not found; continuing without antenna PCV", "antenna", ant.Type, "error", err)
+			ant.Type = ""
+			atx = ""
+		}
+	} else {
 		ant.Type = ""
 		atx = ""
 	}
@@ -319,10 +383,20 @@ func (s *MeasurementService) processCalibrationSession(ctx context.Context, t *m
 	distance := math.Sqrt(math.Pow(mean.Mean[0]-bxyz[0], 2) + math.Pow(mean.Mean[1]-bxyz[1], 2) + math.Pow(mean.Mean[2]-bxyz[2], 2))
 	if distance > 1000 {
 		warning := fmt.Sprintf("Длина базы %.1f км превышает 1 км; результат рассчитан, но точность может быть хуже короткобазового режима", distance/1000)
-		session.Geometry.Warning = warning
+		session.Geometry.Warning = calibrationAppendWarning(session.Geometry.Warning, warning)
 		s.logger.Warnw("calibration baseline exceeds short-baseline recommendation", "task", t.ID, "session", id, "baseline_km", distance/1000)
 	}
 	return mean, nil
+}
+
+func calibrationAppendWarning(existing, warning string) string {
+	if existing == "" {
+		return warning
+	}
+	if existing == warning || strings.Contains(existing, warning) {
+		return existing
+	}
+	return existing + "\n" + warning
 }
 
 func calibrationReadSolution(output, dir string) ([]byte, error) {

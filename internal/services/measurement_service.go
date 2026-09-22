@@ -1,12 +1,16 @@
 package services
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"collaborative/internal/model"
 	"collaborative/internal/parsers"
 	"collaborative/internal/storage"
 	"collaborative/internal/telemetry"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +33,8 @@ type MeasurementService struct {
 	workDir     string
 	logger      *zap.SugaredLogger
 }
+
+const maxArchiveExtractedBytes = 2 << 30 // 2 GB after decompression
 
 // NewMeasurementService создает новый сервис
 func NewMeasurementService(
@@ -88,7 +94,7 @@ func (s *MeasurementService) ProcessMeasurement(
 		return err
 	}
 
-	obsPath := filepath.Join(workDir, filename)
+	obsPath := filepath.Join(workDir, filepath.Base(filename))
 
 	f, err := os.Create(obsPath)
 	if err != nil {
@@ -109,6 +115,12 @@ func (s *MeasurementService) ProcessMeasurement(
 	}
 
 	s.logger.Infof("File saved: %s (size: %.2f MB)", obsPath, float64(len(fileData))/(1024*1024))
+
+	obsPath, err = s.prepareObservationInput(obsPath, filename, workDir)
+	if err != nil {
+		s.handleError(taskID, login, fmt.Sprintf("Archive preparation failed: %v", err))
+		return err
+	}
 
 	telemetry.Default.SetStage(taskID, "converting")
 	// Конвертируем если нужно
@@ -269,6 +281,198 @@ func (s *MeasurementService) ProcessMeasurement(
 
 	s.logger.Infof("Task completed: %s in %.2fs", taskID, task.ProcessingSec)
 	return nil
+}
+
+func (s *MeasurementService) prepareObservationInput(uploadPath, originalName, workDir string) (string, error) {
+	if !IsMeasurementArchive(originalName) {
+		return uploadPath, nil
+	}
+
+	extractDir := filepath.Join(workDir, "archive")
+	if err := ExtractMeasurementArchive(uploadPath, originalName, extractDir); err != nil {
+		return "", err
+	}
+
+	obsPaths, err := FindObservationFiles(extractDir)
+	if err != nil {
+		return "", err
+	}
+	obsPath := obsPaths[0]
+	s.logger.Infof("Archive %s unpacked, selected observation file: %s", originalName, obsPath)
+	return obsPath, nil
+}
+
+func IsMeasurementArchive(filename string) bool {
+	lower := strings.ToLower(filename)
+	return strings.HasSuffix(lower, ".zip") ||
+		strings.HasSuffix(lower, ".tar") ||
+		strings.HasSuffix(lower, ".tar.gz") ||
+		strings.HasSuffix(lower, ".tgz")
+}
+
+func ExtractMeasurementArchive(src, originalName, dst string) error {
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+
+	switch {
+	case strings.HasSuffix(strings.ToLower(originalName), ".zip"):
+		return extractZip(src, dst)
+	case strings.HasSuffix(strings.ToLower(originalName), ".tar"):
+		return extractTarFile(src, dst)
+	case strings.HasSuffix(strings.ToLower(originalName), ".tar.gz"), strings.HasSuffix(strings.ToLower(originalName), ".tgz"):
+		return extractTarGzip(src, dst)
+	default:
+		return fmt.Errorf("unsupported archive format: %s", originalName)
+	}
+}
+
+func extractZip(src, dst string) error {
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	remaining := int64(maxArchiveExtractedBytes)
+	for _, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		if int64(f.UncompressedSize64) > remaining {
+			return fmt.Errorf("archive is too large after unpacking")
+		}
+		in, err := f.Open()
+		if err != nil {
+			return err
+		}
+		err = writeArchiveFile(dst, f.Name, in, &remaining)
+		in.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func extractTarFile(src, dst string) error {
+	f, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return extractTar(f, dst)
+}
+
+func extractTarGzip(src, dst string) error {
+	f, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+	return extractTar(gz, dst)
+}
+
+func extractTar(src io.Reader, dst string) error {
+	tr := tar.NewReader(src)
+	remaining := int64(maxArchiveExtractedBytes)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		if err := writeArchiveFile(dst, header.Name, tr, &remaining); err != nil {
+			return err
+		}
+	}
+}
+
+func writeArchiveFile(root, name string, src io.Reader, remaining *int64) error {
+	clean := filepath.Clean(name)
+	if filepath.IsAbs(clean) || clean == "." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) || clean == ".." {
+		return fmt.Errorf("unsafe path in archive: %s", name)
+	}
+
+	target := filepath.Join(root, clean)
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return err
+	}
+	if targetAbs != rootAbs && !strings.HasPrefix(targetAbs, rootAbs+string(os.PathSeparator)) {
+		return fmt.Errorf("unsafe path in archive: %s", name)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	n, err := io.Copy(out, io.LimitReader(src, *remaining+1))
+	if err != nil {
+		return err
+	}
+	if n > *remaining {
+		return fmt.Errorf("archive is too large after unpacking")
+	}
+	*remaining -= n
+	return nil
+}
+
+func FindObservationFiles(root string) ([]string, error) {
+	var candidates []string
+	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if isObservationFilename(path) {
+			candidates = append(candidates, path)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("archive does not contain a supported observation file")
+	}
+	return candidates, nil
+}
+
+func isObservationFilename(filename string) bool {
+	lower := strings.ToLower(filename)
+	if strings.HasSuffix(lower, ".obs") ||
+		strings.HasSuffix(lower, ".rnx") ||
+		strings.HasSuffix(lower, ".crx") ||
+		strings.HasSuffix(lower, ".o") {
+		return true
+	}
+	if strings.HasSuffix(lower, ".gz") {
+		return isObservationFilename(strings.TrimSuffix(lower, ".gz"))
+	}
+	ext := filepath.Ext(lower)
+	return isHatanakaExt(ext) || isRinex2ObsExt(ext)
 }
 
 // generateBLQIfAvailable извлекает позицию из RINEX-заголовка и вызывает

@@ -6,7 +6,7 @@ body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{
 </style></head><body><main>
 <a href="/profile">← Профиль</a> · <a href="/calibration">Новая калибровка</a>
 <h1>Калибровка антенны смартфона</h1>
-<p>Среднее смещение относительно ARP. Относительная обработка GPS/Galileo с соседним опорным приёмником, база до 1 км. Наблюдения — несжатый RINEX 3, шкала GPS.</p>
+<p>Среднее смещение относительно ARP. Относительная обработка GPS/Galileo с опорным приёмником. Наблюдения — несжатый RINEX 2/3/4, шкала GPS.</p>
 <p id="message" class="status" role="status" hidden></p>
 <section id="setup"><h2>1. Методика и опорные координаты</h2><form id="setup-form"><fieldset id="setup-fields">
 <div class="grid">
@@ -23,7 +23,7 @@ body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{
 <label>L, °<input id="base-lon" type="number" min="-180" max="180" step="any" required></label>
 <label>H эллипсоидальная, м<input id="base-h" type="number" step="any" required></label>
 </div>
-<label>Файл базы, охватывающий все сеансы<input id="base-file" type="file" accept=".obs,.rnx" required></label>
+<label>Файл базы, охватывающий все сеансы<input id="base-file" type="file" accept=".obs,.rnx,.o,.20o,.21o,.22o,.23o,.24o,.25o,.26o,.27o,.28o,.29o,.20O,.21O,.22O,.23O,.24O,.25O,.26O,.27O,.28O,.29O" required></label>
 <h3>Марка установки смартфона</h3>
 <label>Опора<select id="reference"><option value="geodetic">Известные координаты марки</option><option value="none">Без известных координат марки</option></select></label>
 <div class="grid" id="mark-fields">
@@ -52,7 +52,7 @@ body{color:var(--ink);background:var(--paper);font-family:var(--font-sans)}main{
 <label>ΔN, м — север<input id="reduce-n" type="number" min="-100" max="100" step="any" required></label>
 <label>ΔH, м — вверх<input id="reduce-h" type="number" min="-100" max="100" step="any" required></label>
 </div>
-<label>Файл сеанса (до 128 МБ)<input id="session-file" type="file" accept=".obs,.rnx" required></label>
+<label>Файл сеанса (до 128 МБ)<input id="session-file" type="file" accept=".obs,.rnx,.o,.20o,.21o,.22o,.23o,.24o,.25o,.26o,.27o,.28o,.29o,.20O,.21O,.22O,.23O,.24O,.25O,.26O,.27O,.28O,.29O" required></label>
 <button type="submit" id="upload">Добавить сеанс</button>
 </fieldset></form>
 	<div class="actions"><button type="button" id="back-to-setup">Назад к координатам</button><button id="submit" disabled>Рассчитать</button></div>

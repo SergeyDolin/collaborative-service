@@ -238,6 +238,11 @@ function handleFile(file) {
     inspectFile(file);
 }
 
+function isArchiveFile(file) {
+    const name = file.name.toLowerCase();
+    return name.endsWith('.zip') || name.endsWith('.tar') || name.endsWith('.tar.gz') || name.endsWith('.tgz');
+}
+
 async function startProcessing() {
     if (!selectedMethod || !selectedFile || !selectedDeviceType || preflightBusy || preflightBlocked) return;
     if (selectedProfileDevice?.phaseCenterValidUntil && new Date(selectedProfileDevice.phaseCenterValidUntil) <= new Date()) {
@@ -301,8 +306,10 @@ async function startProcessing() {
                 setBtnText('✅ Отправлено');
                 statusDiv.className = 'status-message status-success';
                 statusDiv.style.display = 'block';
+                const batchCount = Number(data.count) || 1;
+                const startText = batchCount > 1 ? `✅ Запущена обработка файлов: ${batchCount}.` : '✅ Обработка запущена!';
                 statusDiv.innerHTML = `
-                    ✅ Обработка запущена!<br>
+                    ${startText}<br>
                     <a href="/profile#task-${encodeURIComponent(data.taskId)}">Открыть состояние обработки →</a><br>
                     Можно закрыть страницу — обработка продолжится на сервере.
                 `;
@@ -314,7 +321,7 @@ async function startProcessing() {
                 document.getElementById('savedDevice').value = '';
                 selectedMethod = null;
                 selectedDeviceType = null;
-                document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYo, .YYd), сжатые (.gz)';
+                document.getElementById('fileInfo').innerHTML = 'Поддерживаются форматы: RINEX (.obs, .rnx, .crx, .YYo, .YYd), сжатые (.gz), архивы (.zip, .tar, .tar.gz)';
                 document.getElementById('fileInfo').style.color = '#718096';
                 document.querySelectorAll('.method-option[data-method]').forEach(opt => opt.classList.remove('selected'));
                 document.querySelectorAll('.device-option').forEach(el => el.classList.remove('selected'));
@@ -378,6 +385,14 @@ async function readHeader(file) {
 async function inspectFile(file) {
     const panel = document.getElementById('filePreview');
     panel.hidden = false;
+    if (isArchiveFile(file)) {
+        inspectedHeader = null;
+        preflightBusy = false;
+        preflightBlocked = false;
+        panel.textContent = 'Архив будет распакован на сервере. Обработка начнётся для всех найденных файлов наблюдений RINEX внутри архива.';
+        updateButtonState();
+        return;
+    }
     panel.textContent = 'Проверяем заголовок файла в браузере…';
     preflightBusy = true; preflightBlocked = false; inspectedHeader = null;
     updateButtonState();

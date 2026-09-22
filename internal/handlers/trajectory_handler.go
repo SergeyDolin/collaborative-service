@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"math"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"collaborative/internal/middlewares"
+	"collaborative/internal/model"
 	"collaborative/internal/storage"
 
 	"go.uber.org/zap"
@@ -36,12 +38,14 @@ type TrajectoryPoint struct {
 }
 
 type TrajectoryResponse struct {
-	Points     []TrajectoryPoint `json:"points"`
-	MinLat     float64           `json:"minLat"`
-	MaxLat     float64           `json:"maxLat"`
-	MinLon     float64           `json:"minLon"`
-	MaxLon     float64           `json:"maxLon"`
-	TimeSystem string            `json:"timeSystem"`
+	Points     []TrajectoryPoint      `json:"points"`
+	MinLat     float64                `json:"minLat"`
+	MaxLat     float64                `json:"maxLat"`
+	MinLon     float64                `json:"minLon"`
+	MaxLon     float64                `json:"maxLon"`
+	TimeSystem string                 `json:"timeSystem"`
+	StatOutput string                 `json:"statOutput,omitempty"`
+	Satellite  *model.SatelliteReport `json:"satelliteReport,omitempty"`
 }
 
 // GetTrajectory парсит raw_output результата и возвращает массив точек траектории.
@@ -59,7 +63,7 @@ func (h *TrajectoryHandler) GetTrajectory(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	raw, found, err := h.taskStorage.GetRawOutput(taskID, login)
+	raw, stat, found, err := h.taskStorage.GetReportOutputs(taskID, login)
 	if err != nil {
 		SendJSONError(w, "Failed to load result", http.StatusInternalServerError, h.logger)
 		return
@@ -75,7 +79,7 @@ func (h *TrajectoryHandler) GetTrajectory(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	resp := TrajectoryResponse{Points: points, TimeSystem: "не указана"}
+	resp := TrajectoryResponse{Points: points, TimeSystem: "не указана", StatOutput: stat, Satellite: parseSatelliteReport(raw)}
 	for _, line := range strings.Split(raw, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "%") && strings.Contains(line, "latitude") {
 			for _, system := range []string{"GPST", "UTC", "JST"} {
@@ -105,6 +109,21 @@ func (h *TrajectoryHandler) GetTrajectory(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Cache-Control", "no-store")
 	SendJSONResponse(w, http.StatusOK, resp, h.logger)
+}
+
+func parseSatelliteReport(rawOutput string) *model.SatelliteReport {
+	for _, line := range strings.Split(rawOutput, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "% SATELLITE_REPORT ") {
+			continue
+		}
+		var report model.SatelliteReport
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "% SATELLITE_REPORT ")), &report); err != nil {
+			return nil
+		}
+		return &report
+	}
+	return nil
 }
 
 // parseTrajectoryPoints извлекает точки из вывода RTKLIB .pos

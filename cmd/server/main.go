@@ -48,6 +48,7 @@ type Application struct {
 	dbStorage    *storage.DBStorage
 	taskStorage  *storage.TaskStorage
 	workerMgr    *workers.Manager
+	retryWorker  *workers.TaskRetryWorker
 	posWorker    *workers.PositioningWorker
 	streamWorker *workers.StreamWorker
 	ctx          context.Context
@@ -223,6 +224,12 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 			app.taskStorage,
 			app.logger,
 		)
+		app.retryWorker = workers.NewTaskRetryWorker(
+			app.logger,
+			app.taskStorage,
+			measurementHandler.MeasurementService(),
+			DefaultWorkDir,
+		)
 		transformHandler := handlers.NewTransformHandler(app.logger)
 		observationHandler := handlers.NewObservationHandler(app.taskStorage, app.logger)
 		trajectoryHandler := handlers.NewTrajectoryHandler(app.taskStorage, app.logger)
@@ -289,6 +296,10 @@ func (app *Application) setupRoutes(cfg *config.Config) *chi.Mux {
 func (app *Application) Run() error {
 	app.workerMgr.Start(app.ctx)
 	app.logger.Info("Background workers started")
+	if app.retryWorker != nil {
+		app.retryWorker.Start(app.ctx)
+		app.logger.Info("Task retry worker started")
+	}
 
 	// Очистка однодневного кэша продуктов IGS
 	services.NewFileDownloader(DefaultWorkDir, app.logger).

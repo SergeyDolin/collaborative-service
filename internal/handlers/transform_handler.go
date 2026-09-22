@@ -226,14 +226,25 @@ func buildMetadata(crs, coordType, heightSurface, epoch string) map[string]inter
 	return map[string]interface{}{
 		"crs": map[string]interface{}{
 			"referenceFrameID":   getReferenceFrameID(crs),
-			"deformated":         false,
-			"representationType": coordType,
+			"deformed":           false,
+			"representationType": geocentricRepresentationType(coordType),
 			"heightReference": map[string]interface{}{
 				"surface": heightSurface,
 			},
 		},
 		"epoch":  map[string]interface{}{"date": epoch},
 		"format": "GEOJSON",
+	}
+}
+
+func geocentricRepresentationType(coordType string) string {
+	switch coordType {
+	case "BLH":
+		// geocentric.xyz now names geodetic coordinates by GeoJSON axis order:
+		// longitude, latitude, height. Keep the UI label B,L,H and translate here.
+		return "LBH"
+	default:
+		return coordType
 	}
 }
 

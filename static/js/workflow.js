@@ -81,7 +81,8 @@
     }
     function qualityText(q, fixRate) {
         const label = ({1:'FIX — фазовые неоднозначности разрешены',2:'FLOAT — неоднозначности не зафиксированы',4:'DGPS — дифференциальное решение',5:'SPP — абсолютное решение',6:'PPP'})[q] || 'Тип решения не определён';
-        return label
+        if (!Number.isFinite(fixRate)) return label;
+        return `${label} · ${fixRate > 0 ? 'FIX есть' : 'FIX нет'} (${fixRate.toFixed(1)}%)`;
     }
     const api = { stages, escape, parseRinexHeader, signalSummary, preflightAdvice, qualityText };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

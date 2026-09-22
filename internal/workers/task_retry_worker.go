@@ -58,6 +58,8 @@ func (w *TaskRetryWorker) run(ctx context.Context) {
 	ticker := time.NewTicker(retryWorkerInterval)
 	defer ticker.Stop()
 
+	w.tick()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,6 +111,8 @@ func (w *TaskRetryWorker) retryTask(task model.ProcessingTask) {
 			context.Background(), task.ID, task.UserLogin, &cfg, fileData, task.Filename,
 		); err != nil {
 			w.logger.Errorf("TaskRetryWorker: retry failed for task %s: %v", task.ID, err)
+		} else {
+			w.cleanupUploadDir(task.ID)
 		}
 	}()
 }
@@ -122,9 +126,13 @@ func (w *TaskRetryWorker) cleanupExhausted() {
 		return
 	}
 	for _, id := range ids {
-		dir := filepath.Join(w.workDir, "uploads", id)
-		if err := os.RemoveAll(dir); err != nil {
-			w.logger.Warnf("TaskRetryWorker: failed to clean upload dir for %s: %v", id, err)
-		}
+		w.cleanupUploadDir(id)
+	}
+}
+
+func (w *TaskRetryWorker) cleanupUploadDir(taskID string) {
+	dir := filepath.Join(w.workDir, "uploads", taskID)
+	if err := os.RemoveAll(dir); err != nil {
+		w.logger.Warnf("TaskRetryWorker: failed to clean upload dir for %s: %v", taskID, err)
 	}
 }
