@@ -365,6 +365,12 @@ func (g *ConfigGenerator) replaceParameters(
 		"{{SOL_TYPE}}":         g.getSolType(config),
 		"{{SOL_STATIC}}":       g.getSolStatic(config),
 		"{{DYNAMICS}}":         g.getDynamics(config),
+		"{{AR_THRES1}}":        g.getARThres1(config),
+		"{{AR_MINFIX}}":        g.getARMinFix(config),
+		"{{AR_MAXITER}}":       g.getARMaxIter(config),
+		"{{PRN_ACCEL_H}}":      g.getPrnAccelH(config),
+		"{{PRN_ACCEL_V}}":      g.getPrnAccelV(config),
+		"{{PRN_POS}}":          g.getPrnPos(config),
 		"{{FREQUENCY}}":        string(config.Frequency),
 		"{{ELEVATION_MASK}}":   strconv.FormatFloat(config.ElevationMask, 'f', 1, 64),
 		"{{IONO_MODEL}}":       string(config.IonoModel),
@@ -479,6 +485,45 @@ func (g *ConfigGenerator) getDynamics(config model.UserProcessingConfig) string 
 		return "on"
 	}
 	return "off"
+}
+
+func (g *ConfigGenerator) getARThres1(config model.UserProcessingConfig) string {
+	if config.Method == model.MethodPPP && config.Mode == model.ModeStatic {
+		return "0.95"
+	}
+	return "0.9999"
+}
+
+func (g *ConfigGenerator) getARMinFix(config model.UserProcessingConfig) string {
+	if config.Method == model.MethodPPP && config.Mode == model.ModeStatic {
+		return "100"
+	}
+	return "10"
+}
+
+func (g *ConfigGenerator) getARMaxIter(config model.UserProcessingConfig) string {
+	if config.Method == model.MethodPPP && config.Mode == model.ModeStatic {
+		return "5"
+	}
+	return "1"
+}
+
+func (g *ConfigGenerator) getPrnAccelH(config model.UserProcessingConfig) string {
+	if config.Method == model.MethodPPP && config.Mode == model.ModeStatic {
+		return "10"
+	}
+	return "1"
+}
+
+func (g *ConfigGenerator) getPrnAccelV(config model.UserProcessingConfig) string {
+	if config.Method == model.MethodPPP && config.Mode == model.ModeStatic {
+		return "10"
+	}
+	return "0.1"
+}
+
+func (g *ConfigGenerator) getPrnPos(config model.UserProcessingConfig) string {
+	return "0"
 }
 
 func (g *ConfigGenerator) boolToStr(b bool) string {
